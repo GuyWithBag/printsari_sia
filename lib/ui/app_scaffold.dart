@@ -11,7 +11,7 @@ class AppScaffold extends HookWidget {
     return Scaffold(
       body: Row(
         children: [
-          Expanded(child: Sidebar()),
+          SizedBox(width: 250, child: Sidebar()),
           Expanded(child: child),
         ],
       ),

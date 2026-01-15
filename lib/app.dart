@@ -13,7 +13,7 @@ class App extends StatelessWidget {
       theme: mainTheme,
       themeMode: ThemeMode.light,
       debugShowCheckedModeBanner: false,
-      home: AppScaffold(child: Container(color: Colors.amber)),
+      home: AppScaffold(child: Container(color: Colors.grey[200])),
     );
   }
 }
