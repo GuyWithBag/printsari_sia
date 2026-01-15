@@ -14,9 +14,6 @@ class App extends StatelessWidget {
       themeMode: ThemeMode.light,
       debugShowCheckedModeBanner: false,
       home: AppScaffold(child: Container(color: Colors.amber)),
-      // routeInformationParser: routes.routeInformationParser,
-      // routeInformationProvider: routes.routeInformationProvider,
-      // routerDelegate: routes.routerDelegate,
     );
   }
 }

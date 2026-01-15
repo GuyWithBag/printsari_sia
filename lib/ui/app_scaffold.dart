@@ -9,16 +9,11 @@ class AppScaffold extends HookWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Container(
-        height: double.infinity,
-        width: double.infinity,
-        color: Colors.amber,
-        child: Row(
-          children: [
-            Sidebar(),
-            Expanded(child: child),
-          ],
-        ),
+      body: Row(
+        children: [
+          Expanded(child: Sidebar()),
+          Expanded(child: child),
+        ],
       ),
     );
   }
