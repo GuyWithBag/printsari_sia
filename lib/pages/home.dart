@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:printsari_sia/widgets/app_page.dart';
+import 'package:printsari_sia/ui/app_page.dart';
 
 // '/'
 
