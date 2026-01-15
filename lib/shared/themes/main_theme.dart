@@ -13,12 +13,17 @@ ThemeData mainTheme = ThemeData(
     style: ElevatedButton.styleFrom(
       foregroundColor: Colors.black, // Button background
       backgroundColor: Colors.white, // Text and icon color
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(8),
+        side: BorderSide(color: Colors.grey.shade300),
+      ),
     ),
   ),
 
   textButtonTheme: TextButtonThemeData(
     style: TextButton.styleFrom(
       foregroundColor: Colors.black, // Text and icon color
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
     ),
   ),
   textTheme: TextTheme(),
