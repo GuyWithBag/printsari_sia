@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:printsari_sia/shared/data/sitemap_items.dart';
-import 'package:printsari_sia/shared/types/sitemap_item.dart';
 
 class Sidebar extends StatelessWidget {
   const Sidebar({super.key});
@@ -10,25 +9,76 @@ class Sidebar extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
-        SizedBox(
+        Container(
+          padding: EdgeInsets.all(16),
+          width: double.infinity,
+          decoration: BoxDecoration(
+            border: Border(
+              bottom: BorderSide(color: Colors.grey.shade400, width: 1),
+            ),
+          ),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.start,
             crossAxisAlignment: CrossAxisAlignment.start,
-            children: [Text("Sari-Sari & Printing"), Text("POS System")],
+            children: [
+              Text("Sari-Sari & Printing"),
+              Text("POS System", style: TextTheme.of(context).bodySmall),
+            ],
           ),
         ),
-        for (var i in siteMapItems)
-          TextButton.icon(
-            icon: Icon(Icons.label),
-            label: Text(i.title),
-            onPressed: () {},
+        Container(
+          padding: EdgeInsets.all(16),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              for (var i in siteMapItems)
+                TextButton.icon(
+                  icon: Icon(i.icon),
+                  label: Text(i.title),
+                  onPressed: () {},
+                ),
+            ],
           ),
+        ),
         Spacer(),
-        ElevatedButton.icon(
-          onPressed: () {},
-          label: Text("Logout"),
-          icon: Icon(Icons.logout),
+        Divider(),
+        Container(
+          padding: EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            spacing: 10,
+            children: [
+              Container(
+                padding: EdgeInsets.all(11),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(8),
+                  color: Colors.grey[100],
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text("John Doe"),
+                    Text("Owner", style: TextTheme.of(context).bodySmall),
+                  ],
+                ),
+              ),
+              ElevatedButton.icon(
+                onPressed: () {},
+                label: Text("Logout"),
+                icon: Icon(Icons.logout),
+              ),
+            ],
+          ),
         ),
+        // SizedBox(
+        //   width: double.infinity,
+        //   child: ElevatedButton.icon(
+        //     onPressed: () {},
+        //     label: Text("Logout"),
+        //     icon: Icon(Icons.logout),
+        //   ),
+        // ),
       ],
     );
   }
