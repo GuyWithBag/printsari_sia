@@ -6,80 +6,113 @@ class Sidebar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: <Widget>[
-        Container(
-          padding: EdgeInsets.all(16),
-          width: double.infinity,
-          decoration: BoxDecoration(
-            border: Border(
-              bottom: BorderSide(color: Colors.grey.shade400, width: 1),
+    return Container(
+      decoration: BoxDecoration(
+        border: Border(right: Divider.createBorderSide(context, width: 1)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Container(
+            padding: EdgeInsets.all(16),
+            width: double.infinity,
+            decoration: BoxDecoration(
+              border: Border(
+                bottom: Divider.createBorderSide(context, width: 1),
+              ),
             ),
-          ),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.start,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text("Sari-Sari & Printing"),
-              Text("POS System", style: TextTheme.of(context).bodySmall),
-            ],
-          ),
-        ),
-        Container(
-          padding: EdgeInsets.all(16),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.start,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              for (var i in siteMapItems)
-                TextButton.icon(
-                  icon: Icon(i.icon),
-                  label: Text(i.title),
-                  onPressed: () {},
-                ),
-            ],
-          ),
-        ),
-        Spacer(),
-        Divider(),
-        Container(
-          padding: EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            spacing: 10,
-            children: [
-              Container(
-                padding: EdgeInsets.all(11),
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(8),
-                  color: Colors.grey[100],
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.start,
+                  crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    Text("John Doe"),
-                    Text("Owner", style: TextTheme.of(context).bodySmall),
+                    Icon(Icons.house_outlined, size: 30, color: Colors.blue),
+                    Icon(Icons.print_outlined, size: 30, color: Colors.purple),
                   ],
                 ),
-              ),
-              ElevatedButton.icon(
-                onPressed: () {},
-                label: Text("Logout"),
-                icon: Icon(Icons.logout),
-              ),
-            ],
+                SizedBox(height: 10),
+                Text(
+                  "Sari-Sari & Printing",
+                  style: TextTheme.of(context).bodyLarge,
+                ),
+                Text("POS System", style: TextTheme.of(context).bodySmall),
+              ],
+            ),
           ),
-        ),
-        // SizedBox(
-        //   width: double.infinity,
-        //   child: ElevatedButton.icon(
-        //     onPressed: () {},
-        //     label: Text("Logout"),
-        //     icon: Icon(Icons.logout),
-        //   ),
-        // ),
-      ],
+          Container(
+            padding: EdgeInsets.all(16),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              spacing: 10,
+              children: [
+                for (var i in siteMapItems)
+                  TextButton(
+                    onPressed: () {},
+                    style: TextButtonTheme.of(context).style!.copyWith(
+                      textStyle: WidgetStatePropertyAll(
+                        TextTheme.of(
+                          context,
+                        ).bodyMedium!.copyWith(fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(i.icon),
+                        SizedBox(
+                          width: 17,
+                        ), // Adjust this value to control spacing
+                        Text(i.title),
+                      ],
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          Spacer(),
+          Divider(),
+          Container(
+            padding: EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              spacing: 10,
+              children: [
+                Container(
+                  padding: EdgeInsets.all(11),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(8),
+                    color: Colors.grey[100],
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text("John Doe"),
+                      Text("Owner", style: TextTheme.of(context).bodySmall),
+                    ],
+                  ),
+                ),
+                ElevatedButton.icon(
+                  onPressed: () {},
+                  label: Text("Logout"),
+                  icon: Icon(Icons.logout),
+                ),
+              ],
+            ),
+          ),
+          // SizedBox(
+          //   width: double.infinity,
+          //   child: ElevatedButton.icon(
+          //     onPressed: () {},
+          //     label: Text("Logout"),
+          //     icon: Icon(Icons.logout),
+          //   ),
+          // ),
+        ],
+      ),
     );
   }
 }
