@@ -5,10 +5,10 @@ const textColor = Colors.black;
 ThemeData mainTheme = ThemeData(
   // Define the primary swatch
   colorScheme: ColorScheme.fromSwatch(
-    backgroundColor: Colors.grey[300],
+    backgroundColor: Colors.grey[200],
     cardColor: Colors.white,
   ), // Use the MaterialColor,
-  dividerTheme: DividerThemeData(color: Colors.grey[400], thickness: 1),
+  dividerTheme: DividerThemeData(color: Colors.grey[300], thickness: 1),
   elevatedButtonTheme: ElevatedButtonThemeData(
     style: ElevatedButton.styleFrom(
       foregroundColor: Colors.black, // Button background
@@ -26,5 +26,5 @@ ThemeData mainTheme = ThemeData(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
     ),
   ),
-  textTheme: TextTheme(),
+  textTheme: TextTheme(bodySmall: TextStyle(color: Colors.grey[600])),
 );
