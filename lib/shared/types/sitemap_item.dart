@@ -1,8 +1,11 @@
-import 'package:flutter/material.dart';
-
 class SiteMapItem {
   final String title;
-  final IconData icon;
+  final String iconPath;
+  final String path;
 
-  const SiteMapItem({required this.title, required this.icon});
+  const SiteMapItem({
+    required this.title,
+    required this.iconPath,
+    required this.path,
+  });
 }

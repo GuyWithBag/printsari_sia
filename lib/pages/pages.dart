@@ -1,1 +1,8 @@
-export 'home.dart';
+export 'dashboard_page.dart';
+export 'inventory_page.dart';
+export 'products_and_services_page.dart';
+export 'pos_terminal_page.dart';
+export 'user_management_page.dart';
+export 'financial_reports_page.dart';
+export 'business_expenses_page.dart';
+export 'activity_log_page.dart';

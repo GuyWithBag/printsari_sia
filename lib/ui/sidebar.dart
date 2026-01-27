@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:printsari_sia/shared/data/sitemap_items.dart';
+import 'package:svg_pic_editor/svg_pic_editor.dart';
 
 class Sidebar extends StatelessWidget {
   const Sidebar({super.key});
@@ -59,15 +61,28 @@ class Sidebar extends StatelessWidget {
                         ).bodyMedium!.copyWith(fontWeight: FontWeight.bold),
                       ),
                     ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(i.icon),
-                        SizedBox(
-                          width: 17,
-                        ), // Adjust this value to control spacing
-                        Text(i.title),
-                      ],
+                    child: InkWell(
+                      onTap: () => {context.go(i.path)},
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          SvgPicEditor.asset(
+                            i.iconPath,
+                            height: 16,
+                            width: 16,
+                            modifications: [
+                              ElementEdit(
+                                querySelector: 'lucide',
+                                strokeWidth: 2,
+                              ),
+                            ],
+                          ),
+                          SizedBox(
+                            width: 17,
+                          ), // Adjust this value to control spacing
+                          Text(i.title),
+                        ],
+                      ),
                     ),
                   ),
               ],
@@ -90,7 +105,7 @@ class Sidebar extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text("John Doe"),
+                      Text("John Doe", style: TextTheme.of(context).bodyMedium),
                       Text("Owner", style: TextTheme.of(context).bodySmall),
                     ],
                   ),

@@ -3,15 +3,15 @@ import 'package:printsari_sia/ui/app_page.dart';
 
 // '/'
 
-class Home extends StatelessWidget {
-  const Home({super.key});
+class ActivityLogPage extends StatelessWidget {
+  const ActivityLogPage({super.key});
   @override
   Widget build(BuildContext context) {
-    return const AppPage(
+    return AppPage(
       // alignment: Alignment.topCenter,
       // padding: const EdgeInsets.all(20),
       // isChildSliver: false,
-      child: SizedBox(),
+      child: Text("ActivityLog Page", style: TextTheme.of(context).bodyLarge),
     );
   }
 }
