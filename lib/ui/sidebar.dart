@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:printsari_sia/controllers/controllers.dart';
 import 'package:printsari_sia/shared/data/sitemap_items.dart';
+import 'package:provider/provider.dart';
 import 'package:svg_pic_editor/svg_pic_editor.dart';
 
 class Sidebar extends StatelessWidget {
@@ -52,7 +54,9 @@ class Sidebar extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               spacing: 10,
               children: [
-                for (var i in siteMapItems)
+                for (var i in siteMapItems.where(
+                  (item) => item == siteMapItems[1],
+                ))
                   TextButton(
                     onPressed: () {},
                     style: TextButtonTheme.of(context).style!.copyWith(
@@ -112,8 +116,13 @@ class Sidebar extends StatelessWidget {
                   ),
                 ),
                 ElevatedButton.icon(
-                  onPressed: () {},
-                  label: Text("Logout"),
+                  onPressed: () {
+                    context.read<AuthController>().signOut(context);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Signed out successfully.')),
+                    );
+                  },
+                  label: Text("Sign Out"),
                   icon: Icon(Icons.logout),
                 ),
               ],
