@@ -54,9 +54,7 @@ class Sidebar extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               spacing: 10,
               children: [
-                for (var i in siteMapItems.where(
-                  (item) => item == siteMapItems[1],
-                ))
+                for (var i in siteMapItems)
                   TextButton(
                     onPressed: () {},
                     style: TextButtonTheme.of(context).style!.copyWith(
