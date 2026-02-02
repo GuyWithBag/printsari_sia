@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 const textColor = Colors.black;
 
 ThemeData mainTheme = ThemeData(
+  brightness: Brightness.light,
+  scaffoldBackgroundColor: Colors.grey[200],
   // Define the primary swatch
   colorScheme: ColorScheme.fromSwatch(
     backgroundColor: Colors.grey[200],

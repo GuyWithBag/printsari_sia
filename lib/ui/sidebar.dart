@@ -11,6 +11,7 @@ class Sidebar extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         border: Border(right: Divider.createBorderSide(context, width: 1)),
+        color: Theme.of(context).cardColor,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

@@ -9,6 +9,11 @@ class AppPage extends HookWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(child: child ?? const SizedBox());
+    return Container(
+      decoration: BoxDecoration(
+        color: Theme.of(context).scaffoldBackgroundColor,
+      ),
+      child: child ?? const SizedBox(),
+    );
   }
 }
