@@ -85,7 +85,7 @@ class LoginPage extends HookWidget {
                   const SizedBox(height: 48),
 
                   Text(
-                    'Username',
+                    'Email',
                     style: Theme.of(context).textTheme.titleSmall!.copyWith(
                       fontWeight: FontWeight.bold,
                     ),
