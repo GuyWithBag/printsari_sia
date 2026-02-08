@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:printsari_sia/ui/app_page.dart';
+import 'package:printsari_sia/widgets/app_page.dart';
 
 // '/'
 
@@ -11,7 +11,10 @@ class BusinessExpensesPage extends StatelessWidget {
       // alignment: Alignment.topCenter,
       // padding: const EdgeInsets.all(20),
       // isChildSliver: false,
-      child: Text("BusinessExpenses Page", style: TextTheme.of(context).bodyLarge),
+      child: Text(
+        "BusinessExpenses Page",
+        style: TextTheme.of(context).bodyLarge,
+      ),
     );
   }
 }

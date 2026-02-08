@@ -3,7 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:printsari_sia/controllers/auth_controller.dart';
 import 'package:printsari_sia/pages/login_page.dart';
 import 'package:printsari_sia/pages/pages.dart'; // ← assuming LoginPage is here
-import 'package:printsari_sia/ui/sidebar.dart';
+import 'package:printsari_sia/widgets/sidebar.dart';
 import 'package:provider/provider.dart';
 
 final router = GoRouter(
