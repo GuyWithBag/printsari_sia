@@ -5,11 +5,53 @@ import 'package:printsari_sia/shared/data/sitemap_items.dart';
 import 'package:provider/provider.dart';
 import 'package:svg_pic_editor/svg_pic_editor.dart';
 
+import '../shared/types/types.dart';
+
 class Sidebar extends StatelessWidget {
   const Sidebar({super.key});
 
   @override
   Widget build(BuildContext context) {
+    final auth = context.read<AuthController>();
+    List<Widget> buildSitemapItems(List<SiteMapItem> items) {
+      final widgets = <Widget>[];
+      for (var i in items.where((item) {
+        return auth.hasRoles(item.roles);
+      })) {
+        widgets.add(
+          TextButton(
+            onPressed: () {},
+            style: TextButtonTheme.of(context).style!.copyWith(
+              textStyle: WidgetStatePropertyAll(
+                TextTheme.of(
+                  context,
+                ).bodyMedium!.copyWith(fontWeight: FontWeight.bold),
+              ),
+            ),
+            child: InkWell(
+              onTap: () => {context.go(i.path)},
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  SvgPicEditor.asset(
+                    i.iconPath,
+                    height: 16,
+                    width: 16,
+                    modifications: [
+                      ElementEdit(querySelector: 'lucide', strokeWidth: 2),
+                    ],
+                  ),
+                  SizedBox(width: 17), // Adjust this value to control spacing
+                  Text(i.title),
+                ],
+              ),
+            ),
+          ),
+        );
+      }
+      return widgets;
+    }
+
     return Container(
       decoration: BoxDecoration(
         border: Border(right: Divider.createBorderSide(context, width: 1)),
@@ -53,42 +95,7 @@ class Sidebar extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.start,
               crossAxisAlignment: CrossAxisAlignment.start,
               spacing: 10,
-              children: [
-                for (var i in siteMapItems)
-                  TextButton(
-                    onPressed: () {},
-                    style: TextButtonTheme.of(context).style!.copyWith(
-                      textStyle: WidgetStatePropertyAll(
-                        TextTheme.of(
-                          context,
-                        ).bodyMedium!.copyWith(fontWeight: FontWeight.bold),
-                      ),
-                    ),
-                    child: InkWell(
-                      onTap: () => {context.go(i.path)},
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          SvgPicEditor.asset(
-                            i.iconPath,
-                            height: 16,
-                            width: 16,
-                            modifications: [
-                              ElementEdit(
-                                querySelector: 'lucide',
-                                strokeWidth: 2,
-                              ),
-                            ],
-                          ),
-                          SizedBox(
-                            width: 17,
-                          ), // Adjust this value to control spacing
-                          Text(i.title),
-                        ],
-                      ),
-                    ),
-                  ),
-              ],
+              children: buildSitemapItems(siteMapItems),
             ),
           ),
           Spacer(),
