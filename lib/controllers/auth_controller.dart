@@ -8,6 +8,7 @@ class AuthController extends ChangeNotifier {
   final supabase = Supabase.instance.client;
   Session? session;
   User? user;
+  Profile? userProfile;
 
   Future<void> signIn(String email, String password) async {
     final response = await supabase.auth.signInWithPassword(
@@ -16,6 +17,13 @@ class AuthController extends ChangeNotifier {
     );
     session = response.session;
     user = response.user;
+    final query = await supabase
+        .from('profiles')
+        .select()
+        .eq('user_id', user!.id)
+        .single();
+    final result = query;
+    userProfile = Profile(username: result['username'], role: result['role']);
     notifyListeners();
   }
 
@@ -24,23 +32,20 @@ class AuthController extends ChangeNotifier {
     await supabase.auth.signOut();
     session = null;
     user = null;
+    userProfile = null;
     router.go('/login');
     notifyListeners();
   }
 
   bool get isAuthenticated => user != null;
-  // Future<bool>? isRole(String role) async {
-  //   if (isAuthenticated == false) return false;
-  //   final int userId = user!.appMetadata['id'];
-  //   final profile = await supabase.from('profiles').select('user_id').eq('user_id', userId);
-  //   final userRole = profile.;
-  //   return userRole == role;
-  // }
+  bool isRole(Role role) {
+    if (isAuthenticated == false) return false;
+    return userProfile!.getRole == role;
+  }
 
   bool hasRoles(List<Role> roles) {
     if (isAuthenticated == false) return false;
-    final userRoleString = user!.appMetadata['role'];
-    final userRole = Role.values.asNameMap()[userRoleString];
-    return roles.contains(userRole);
+
+    return roles.contains(userProfile!.getRole);
   }
 }
