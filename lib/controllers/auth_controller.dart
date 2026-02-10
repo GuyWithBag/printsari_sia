@@ -23,7 +23,16 @@ class AuthController extends ChangeNotifier {
         .eq('user_id', user!.id)
         .single();
     final result = query;
-    userProfile = Profile(username: result['username'], role: result['role']);
+    userProfile = Profile(
+      username: result['username'],
+      role: result['role'],
+      id: result['id'],
+      userId: result['user_id'],
+      name: result['name'],
+      roleId: result['role_id'],
+      createdAt: DateTime.parse(result['created_at']),
+      updatedAt: DateTime.parse(result['updated_at']),
+    );
     notifyListeners();
   }
 
@@ -38,14 +47,14 @@ class AuthController extends ChangeNotifier {
   }
 
   bool get isAuthenticated => user != null;
-  bool isRole(Role role) {
+  bool isRole(UserRole role) {
     if (isAuthenticated == false) return false;
-    return userProfile!.getRole == role;
+    return userProfile!.role == role;
   }
 
-  bool hasRoles(List<Role> roles) {
+  bool hasRoles(List<UserRole> roles) {
     if (isAuthenticated == false) return false;
 
-    return roles.contains(userProfile!.getRole);
+    return roles.contains(userProfile!.role);
   }
 }
