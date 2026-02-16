@@ -115,7 +115,10 @@ class Sidebar extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text("John Doe", style: TextTheme.of(context).bodyMedium),
+                      Text(
+                        auth.userProfile!.name,
+                        style: TextTheme.of(context).bodyMedium,
+                      ),
                       Text("Owner", style: TextTheme.of(context).bodySmall),
                     ],
                   ),

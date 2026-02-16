@@ -1,4 +1,8 @@
+import 'package:flutter/material.dart';
+import 'package:printsari_sia/controllers/controllers.dart';
 import 'package:printsari_sia/shared/types/types.dart';
+import 'package:provider/provider.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class Profile {
   final int id;
@@ -18,9 +22,6 @@ class Profile {
   final DateTime createdAt;
   final DateTime updatedAt;
 
-  // Optional joined data
-  final UserRole? role;
-
   Profile({
     required this.id,
     required this.userId,
@@ -38,7 +39,6 @@ class Profile {
     this.addressCountry,
     required this.createdAt,
     required this.updatedAt,
-    this.role,
   });
 
   Address? get address {
@@ -80,9 +80,6 @@ class Profile {
       addressCountry: json['address_country'] as String?,
       createdAt: DateTime.parse(json['created_at'] as String),
       updatedAt: DateTime.parse(json['updated_at'] as String),
-      role: json['user_roles'] != null
-          ? UserRole.fromJson(json['user_roles'] as Map<String, dynamic>)
-          : null,
     );
   }
 
@@ -105,6 +102,17 @@ class Profile {
       'created_at': createdAt.toIso8601String(),
       'updated_at': updatedAt.toIso8601String(),
     };
+  }
+
+  Future<UserRoleType> getRoleType(Profile profile) async {
+    final query = await Supabase.instance.client
+        .from('user_roles')
+        .select()
+        .eq('id', profile.roleId)
+        .single();
+    final role = UserRole.fromJson(query);
+    final roleName = role.roleName;
+    return UserRoleType.fromString(roleName)!;
   }
 
   Map<String, dynamic> toInsertJson() {

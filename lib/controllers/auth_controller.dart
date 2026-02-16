@@ -1,3 +1,5 @@
+import 'dart:developer';
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -9,6 +11,7 @@ class AuthController extends ChangeNotifier {
   Session? session;
   User? user;
   Profile? userProfile;
+  UserRoleType? userRoleType;
 
   Future<void> signIn(String email, String password) async {
     final response = await supabase.auth.signInWithPassword(
@@ -23,17 +26,11 @@ class AuthController extends ChangeNotifier {
         .eq('user_id', user!.id)
         .single();
     final result = query;
-    userProfile = Profile(
-      username: result['username'],
-      role: result['role'],
-      id: result['id'],
-      userId: result['user_id'],
-      name: result['name'],
-      roleId: result['role_id'],
-      createdAt: DateTime.parse(result['created_at']),
-      updatedAt: DateTime.parse(result['updated_at']),
-    );
+    userProfile = Profile.fromJson(result);
+    userRoleType = await userProfile!.getRoleType(userProfile!);
     notifyListeners();
+    log(result.toString());
+    log(userProfile.toString());
   }
 
   void signOut(BuildContext context) async {
@@ -47,14 +44,14 @@ class AuthController extends ChangeNotifier {
   }
 
   bool get isAuthenticated => user != null;
-  bool isRole(UserRole role) {
+  bool isRole(UserRoleType role) {
     if (isAuthenticated == false) return false;
-    return userProfile!.role == role;
+    return userRoleType == role;
   }
 
-  bool hasRoles(List<UserRole> roles) {
+  bool hasRoles(List<UserRoleType> roles) {
     if (isAuthenticated == false) return false;
 
-    return roles.contains(userProfile!.role);
+    return roles.contains(userRoleType);
   }
 }
