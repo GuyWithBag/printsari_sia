@@ -4,7 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 class InventoryProvider extends ChangeNotifier {
   final supabase = Supabase.instance.client;
 
-  PostgrestFilterBuilder<List<Map<String, dynamic>>> getItems() {
-    return supabase.from('inventory_items').select();
+  Future<List<Map<String, dynamic>>> getItems() async {
+    return await supabase.from('inventory_items').select();
   }
 }
