@@ -1,3 +1,5 @@
+import 'dart:developer';
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -9,6 +11,7 @@ class AuthController extends ChangeNotifier {
   Session? session;
   User? user;
   Profile? userProfile;
+  UserRoleType? userRoleType;
 
   Future<void> signIn(String email, String password) async {
     final response = await supabase.auth.signInWithPassword(
@@ -23,8 +26,11 @@ class AuthController extends ChangeNotifier {
         .eq('user_id', user!.id)
         .single();
     final result = query;
-    userProfile = Profile(username: result['username'], role: result['role']);
+    userProfile = Profile.fromJson(result);
+    userRoleType = await userProfile!.getRoleType(userProfile!);
     notifyListeners();
+    log(result.toString());
+    log(userProfile.toString());
   }
 
   void signOut(BuildContext context) async {
@@ -38,14 +44,14 @@ class AuthController extends ChangeNotifier {
   }
 
   bool get isAuthenticated => user != null;
-  bool isRole(Role role) {
+  bool isRole(UserRoleType role) {
     if (isAuthenticated == false) return false;
-    return userProfile!.getRole == role;
+    return userRoleType == role;
   }
 
-  bool hasRoles(List<Role> roles) {
+  bool hasRoles(List<UserRoleType> roles) {
     if (isAuthenticated == false) return false;
 
-    return roles.contains(userProfile!.getRole);
+    return roles.contains(userRoleType);
   }
 }

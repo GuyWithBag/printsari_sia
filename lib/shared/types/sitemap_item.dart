@@ -1,10 +1,10 @@
-import 'package:printsari_sia/shared/types/role.dart';
+import 'package:printsari_sia/shared/types/types.dart';
 
 class SiteMapItem {
   final String title;
   final String iconPath;
   final String path;
-  final List<Role> roles;
+  final List<UserRoleType> roles;
 
   const SiteMapItem({
     required this.title,
