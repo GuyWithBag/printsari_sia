@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:printsari_sia/controllers/auth_controller.dart';
 import 'package:printsari_sia/pages/login_page.dart';
 import 'package:printsari_sia/pages/pages.dart'; // ← assuming LoginPage is here
+import 'package:printsari_sia/providers/inventory_provider.dart';
 import 'package:printsari_sia/widgets/sidebar.dart';
 import 'package:provider/provider.dart';
 
@@ -11,7 +12,10 @@ final router = GoRouter(
   routes: [
     ShellRoute(
       builder: (context, state, child) => MultiProvider(
-        providers: [ChangeNotifierProvider(create: (_) => AuthController())],
+        providers: [
+          ChangeNotifierProvider(create: (_) => AuthController()),
+          ChangeNotifierProvider(create: (_) => InventoryProvider()),
+        ],
         child: child,
       ),
       routes: [
