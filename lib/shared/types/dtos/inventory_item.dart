@@ -11,6 +11,8 @@ class InventoryItem {
   final DateTime createdAt;
   final DateTime updatedAt;
 
+  var _product;
+
   // Optional joined data
   final Product? product;
 

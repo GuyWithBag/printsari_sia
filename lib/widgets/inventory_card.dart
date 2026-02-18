@@ -1,27 +1,28 @@
 import 'package:flutter/material.dart';
+import 'package:printsari_sia/shared/types/dtos/inventory_item.dart';
 
 class InventoryCard extends StatelessWidget {
-  final String title;
-  final String subtitle;
-  final String stockLevel;
-  final String price;
-  final String? expiry;
+  final InventoryItem item;
   final VoidCallback onEdit;
 
   const InventoryCard({
     Key? key,
-    required this.title,
-    required this.subtitle,
-    required this.stockLevel,
-    required this.price,
+
+    required this.item,
     required this.onEdit,
-    this.expiry,
+
   }) : super(key: key);
+
+
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-
+  final String title = item.;
+  final String subtitle;
+  final String stockLevel;
+  final String price;
+  final String? expiry;
     return Container(
       width: 320,
       padding: const EdgeInsets.all(16.0),
