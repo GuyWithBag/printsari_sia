@@ -46,95 +46,98 @@ class InventoryPage extends HookWidget {
           ),
         ),
       ),
-      body: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          CircularTabBar(
-            tabController: tabController,
-            children: [
-              CircularTab(
-                tabController: tabController,
-                index: 0,
-                label: 'Store Products',
-                icon: Icons.inventory_2_outlined,
-                indexState: currentIndex,
-              ),
-              CircularTab(
-                tabController: tabController,
-                index: 1,
-                label: 'Printing Supplies',
-                icon: Icons.inventory_2_outlined,
-                indexState: currentIndex,
-              ),
-            ],
-          ),
-          const SizedBox(height: 24),
-          Expanded(
-            child: TabBarView(
-              controller: tabController,
+      body: Padding(
+        padding: const EdgeInsets.all(10.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            CircularTabBar(
+              tabController: tabController,
               children: [
-                // Center(child: Text('TSADD')),
-                // Center(child: Text('TSADD')),
-                Wrap(
-                  spacing: 16.0,
-                  runSpacing: 16.0,
-                  children: [
-                    InventoryCard(
-                      title: 'Coca Cola 1L',
-                      subtitle: 'Soft drink',
-                      stockLevel: '50 units',
-                      price: '₱45.00',
-                      onEdit: () {},
-                    ),
-                    InventoryCard(
-                      title: 'Lucky Me Instant Noodles',
-                      subtitle: 'Pancit Canton',
-                      stockLevel: '100 units',
-                      price: '₱15.00',
-                      onEdit: () {},
-                    ),
-                    InventoryCard(
-                      title: 'White Bread',
-                      subtitle: 'Tasty loaf',
-                      stockLevel: '20 units',
-                      price: '₱50.00',
-                      expiry: '10/20/2025',
-                      onEdit: () {},
-                    ),
-                  ],
+                CircularTab(
+                  tabController: tabController,
+                  index: 0,
+                  label: 'Store Products',
+                  icon: Icons.inventory_2_outlined,
+                  indexState: currentIndex,
                 ),
-                Wrap(
-                  spacing: 16.0,
-                  runSpacing: 16.0,
-                  children: [
-                    InventoryCard(
-                      title: 'Coca Cola 1L',
-                      subtitle: 'Soft drink',
-                      stockLevel: '50 units',
-                      price: '₱45.00',
-                      onEdit: () {},
-                    ),
-                    InventoryCard(
-                      title: 'Lucky Me Instant Noodles',
-                      subtitle: 'Pancit Canton',
-                      stockLevel: '100 units',
-                      price: '₱15.00',
-                      onEdit: () {},
-                    ),
-                    InventoryCard(
-                      title: 'White Bread',
-                      subtitle: 'Tasty loaf',
-                      stockLevel: '20 units',
-                      price: '₱50.00',
-                      expiry: '10/20/2025',
-                      onEdit: () {},
-                    ),
-                  ],
+                CircularTab(
+                  tabController: tabController,
+                  index: 1,
+                  label: 'Printing Supplies',
+                  icon: Icons.inventory_2_outlined,
+                  indexState: currentIndex,
                 ),
               ],
             ),
-          ),
-        ],
+            const SizedBox(height: 24),
+            Expanded(
+              child: TabBarView(
+                controller: tabController,
+                children: [
+                  // Center(child: Text('TSADD')),
+                  // Center(child: Text('TSADD')),
+                  Wrap(
+                    spacing: 16.0,
+                    runSpacing: 16.0,
+                    children: [
+                      InventoryCard(
+                        title: 'Coca Cola 1L',
+                        subtitle: 'Soft drink',
+                        stockLevel: '50 units',
+                        price: '₱45.00',
+                        onEdit: () {},
+                      ),
+                      InventoryCard(
+                        title: 'Lucky Me Instant Noodles',
+                        subtitle: 'Pancit Canton',
+                        stockLevel: '100 units',
+                        price: '₱15.00',
+                        onEdit: () {},
+                      ),
+                      InventoryCard(
+                        title: 'White Bread',
+                        subtitle: 'Tasty loaf',
+                        stockLevel: '20 units',
+                        price: '₱50.00',
+                        expiry: '10/20/2025',
+                        onEdit: () {},
+                      ),
+                    ],
+                  ),
+                  Wrap(
+                    spacing: 16.0,
+                    runSpacing: 16.0,
+                    children: [
+                      InventoryCard(
+                        title: 'Coca Cola 1L',
+                        subtitle: 'Soft drink',
+                        stockLevel: '50 units',
+                        price: '₱45.00',
+                        onEdit: () {},
+                      ),
+                      InventoryCard(
+                        title: 'Lucky Me Instant Noodles',
+                        subtitle: 'Pancit Canton',
+                        stockLevel: '100 units',
+                        price: '₱15.00',
+                        onEdit: () {},
+                      ),
+                      InventoryCard(
+                        title: 'White Bread',
+                        subtitle: 'Tasty loaf',
+                        stockLevel: '20 units',
+                        price: '₱50.00',
+                        expiry: '10/20/2025',
+                        onEdit: () {},
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
