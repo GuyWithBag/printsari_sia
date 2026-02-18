@@ -11,7 +11,7 @@ class DashboardPage extends StatelessWidget {
       // alignment: Alignment.topCenter,
       // padding: const EdgeInsets.all(20),
       // isChildSliver: false,
-      child: Text("Dashboard Page", style: TextTheme.of(context).bodyLarge),
+      body: Text("Dashboard Page", style: TextTheme.of(context).bodyLarge),
     );
   }
 }

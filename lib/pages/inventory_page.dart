@@ -11,7 +11,7 @@ class InventoryPage extends StatelessWidget {
       // alignment: Alignment.topCenter,
       // padding: const EdgeInsets.all(20),
       // isChildSliver: false,
-      child: Text("Inventory Page", style: TextTheme.of(context).bodyLarge),
+      body: Text("Inventory Page", style: TextTheme.of(context).bodyLarge),
     );
   }
 }

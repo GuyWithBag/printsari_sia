@@ -11,10 +11,7 @@ class UserManagementPage extends StatelessWidget {
       // alignment: Alignment.topCenter,
       // padding: const EdgeInsets.all(20),
       // isChildSliver: false,
-      child: Text(
-        "UserManagement Page",
-        style: TextTheme.of(context).bodyLarge,
-      ),
+      body: Text("UserManagement Page", style: TextTheme.of(context).bodyLarge),
     );
   }
 }

@@ -11,7 +11,7 @@ class POSTerminalPage extends StatelessWidget {
       // alignment: Alignment.topCenter,
       // padding: const EdgeInsets.all(20),
       // isChildSliver: false,
-      child: Text("POSTerminal Page", style: TextTheme.of(context).bodyLarge),
+      body: Text("POSTerminal Page", style: TextTheme.of(context).bodyLarge),
     );
   }
 }

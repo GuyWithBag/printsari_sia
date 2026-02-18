@@ -11,7 +11,7 @@ class FinancialReportsPage extends StatelessWidget {
       // alignment: Alignment.topCenter,
       // padding: const EdgeInsets.all(20),
       // isChildSliver: false,
-      child: Text(
+      body: Text(
         "FinancialReports Page",
         style: TextTheme.of(context).bodyLarge,
       ),
