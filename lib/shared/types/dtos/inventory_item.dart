@@ -1,4 +1,5 @@
 import 'package:printsari_sia/shared/types/types.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class InventoryItem {
   final int id;
@@ -11,9 +12,6 @@ class InventoryItem {
   final DateTime createdAt;
   final DateTime updatedAt;
 
-  // Optional joined data
-  final Product? product;
-
   InventoryItem({
     required this.id,
     required this.productId,
@@ -24,8 +22,18 @@ class InventoryItem {
     this.lastRestocked,
     required this.createdAt,
     required this.updatedAt,
-    this.product,
   });
+
+  static Future<Product> getProduct(InventoryItem item) async {
+    final supabase = Supabase.instance.client;
+    final query = await supabase
+        .from('products')
+        .select()
+        .eq('id', item.productId)
+        .single();
+    final result = Product.fromJson(query);
+    return result;
+  }
 
   factory InventoryItem.fromJson(Map<String, dynamic> json) {
     return InventoryItem(
@@ -42,9 +50,6 @@ class InventoryItem {
           : null,
       createdAt: DateTime.parse(json['created_at'] as String),
       updatedAt: DateTime.parse(json['updated_at'] as String),
-      product: json['products'] != null
-          ? Product.fromJson(json['products'] as Map<String, dynamic>)
-          : null,
     );
   }
 
