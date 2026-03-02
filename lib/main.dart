@@ -11,8 +11,3 @@ void main() async {
   );
   runApp(const App());
 }
-<<<<<<< db-card-status
-
-final supabase = Supabase.instance.client;
-=======
->>>>>>> development

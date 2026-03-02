@@ -12,8 +12,7 @@ class DashboardPage extends StatelessWidget {
     final textTheme = theme.textTheme;
 
     return AppPage(
-<<<<<<< db-card-status
-      child: SingleChildScrollView(
+      body: SingleChildScrollView(
         padding: const EdgeInsets.all(24),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -102,12 +101,6 @@ class DashboardPage extends StatelessWidget {
           ],
         ),
       ),
-=======
-      // alignment: Alignment.topCenter,
-      // padding: const EdgeInsets.all(20),
-      // isChildSliver: false,
-      body: Text("Dashboard Page", style: TextTheme.of(context).bodyLarge),
->>>>>>> development
     );
   }
 }
