@@ -11,7 +11,7 @@ class ActivityLogPage extends StatelessWidget {
       // alignment: Alignment.topCenter,
       // padding: const EdgeInsets.all(20),
       // isChildSliver: false,
-      child: Text("ActivityLog Page", style: TextTheme.of(context).bodyLarge),
+      body: Text("ActivityLog Page", style: TextTheme.of(context).bodyLarge),
     );
   }
 }

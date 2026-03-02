@@ -55,7 +55,7 @@ class LoginPage extends HookWidget {
     }
 
     return AppPage(
-      child: Center(
+      body: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 420),
 

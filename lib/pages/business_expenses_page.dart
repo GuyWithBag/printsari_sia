@@ -11,7 +11,7 @@ class BusinessExpensesPage extends StatelessWidget {
       // alignment: Alignment.topCenter,
       // padding: const EdgeInsets.all(20),
       // isChildSliver: false,
-      child: Text(
+      body: Text(
         "BusinessExpenses Page",
         style: TextTheme.of(context).bodyLarge,
       ),
