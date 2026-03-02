@@ -30,7 +30,7 @@ class InventoryCard extends StatelessWidget {
           }
           final data = asyncSnapshot.data!;
           final String title = data.name;
-          final String subtitle = data.category;
+          final String subtitle = data.category?.categoryName ?? "";
           final String stockLevel = item.stock.toString();
           final String price = item.retailPrice.toString();
           final String expiry = data.expiryDate.toString();
