@@ -137,7 +137,7 @@ class _StatusCard extends StatelessWidget {
             Text(
               title,
               style: textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.bold,
+                fontWeight: FontWeight.w500,
                 color: Colors.grey[900],
               ),
             ),
@@ -189,7 +189,7 @@ class _StatusRow extends StatelessWidget {
                 Text(
                   title,
                   style: textTheme.bodyLarge?.copyWith(
-                    fontWeight: FontWeight.bold,
+                    fontWeight: FontWeight.w500,
                     color: Colors.grey[900],
                   ),
                 ),
@@ -209,7 +209,7 @@ class _StatusRow extends StatelessWidget {
               Text(
                 quantity,
                 style: textTheme.bodyLarge?.copyWith(
-                  fontWeight: FontWeight.bold,
+                  fontWeight: FontWeight.w500,
                   color: Colors.grey[900],
                 ),
               ),
