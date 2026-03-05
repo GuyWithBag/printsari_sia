@@ -66,6 +66,7 @@ class AuthController extends ChangeNotifier {
       phone: phone,
       password: password,
     );
+    profile.userId = user!.id;
     supabase.from('profiles').upsert(profile);
     return res;
   }

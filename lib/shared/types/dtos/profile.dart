@@ -3,7 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 class Profile {
   final int? id;
-  final String userId;
+  late final String? userId;
   final String username;
   final int roleId;
   final String name;
@@ -21,7 +21,7 @@ class Profile {
 
   Profile({
     this.id,
-    required this.userId,
+    this.userId,
     required this.username,
     required this.roleId,
     required this.name,
