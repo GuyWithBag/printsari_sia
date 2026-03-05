@@ -11,7 +11,6 @@ class InventoryProvider extends ChangeNotifier {
       query.length,
       (i) => InventoryItem.fromJson(query[i]),
     );
-    print(result.toString());
     return result;
   }
 }
