@@ -5,8 +5,7 @@ class InventoryCard extends StatelessWidget {
   final InventoryItem item;
   final VoidCallback onEdit;
 
-  const InventoryCard({Key? key, required this.item, required this.onEdit})
-    : super(key: key);
+  const InventoryCard({super.key, required this.item, required this.onEdit});
 
   @override
   Widget build(BuildContext context) {
@@ -19,7 +18,7 @@ class InventoryCard extends StatelessWidget {
         color: theme.colorScheme.surface,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: theme.colorScheme.outlineVariant.withOpacity(0.5),
+          color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5),
         ),
       ),
       child: FutureBuilder(
@@ -81,9 +80,9 @@ class InventoryCard extends StatelessWidget {
               _buildDataRow(context, 'Stock Level:', stockLevel),
               const SizedBox(height: 12),
               _buildDataRow(context, 'Price:', price),
-              if (expiry != null) ...[
+              ...[
                 const SizedBox(height: 12),
-                _buildDataRow(context, 'Expiry:', expiry!),
+                _buildDataRow(context, 'Expiry:', expiry),
               ],
             ],
           );
