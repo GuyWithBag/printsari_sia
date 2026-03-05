@@ -1,11 +1,8 @@
-import 'package:flutter/material.dart';
-import 'package:printsari_sia/controllers/controllers.dart';
 import 'package:printsari_sia/shared/types/types.dart';
-import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class Profile {
-  final int id;
+  final int? id;
   final String userId;
   final String username;
   final int roleId;
@@ -23,7 +20,7 @@ class Profile {
   final DateTime updatedAt;
 
   Profile({
-    required this.id,
+    this.id,
     required this.userId,
     required this.username,
     required this.roleId,

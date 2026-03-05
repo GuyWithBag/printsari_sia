@@ -54,4 +54,19 @@ class AuthController extends ChangeNotifier {
 
     return roles.contains(userRoleType);
   }
+
+  Future<AuthResponse> signUp({
+    String? email,
+    String? phone,
+    required String password,
+    required Profile profile,
+  }) async {
+    final res = await supabase.auth.signUp(
+      email: email,
+      phone: phone,
+      password: password,
+    );
+    supabase.from('profiles').upsert(profile);
+    return res;
+  }
 }
