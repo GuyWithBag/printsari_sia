@@ -1,25 +1,16 @@
-// const int _pallete1AccentValue = 0xFF2937FF;
 import 'package:flutter/material.dart';
 
-const MaterialColor primaryGreen = MaterialColor(
-  0xFFBDFA65, // Base color (bright green)
-  <int, Color>{
-    50: Color(0xFFF7FDEB), // Very light green (almost white)
-    100: Color(0xFFEFFCD4), // Lighter green
-    200: Color(0xFFE4FBA9), // Light green
-    300: Color(0xFFD9F97F), // Slightly darker light green
-    400: Color(0xFFCDF964), // A bit darker green
-    500: Color(0xFFBDFA65), // Base color from your request
-    600: Color(0xFFA4D95B), // Darker green
-    700: Color(0xFF8CC852), // Darker green
-    800: Color(0xFF75B849), // Much darker green
-    900: Color(0xFF588F37), // Very dark green (for accents)
-  },
-);
+// POS Design System v2.0
+const Color posBg = Color(0xFF0B0E14);
+const Color posSurface = Color(0xFF151A23);
+const Color posSurfaceLight = Color(0xFF232936);
+const Color posCream = Color(0xFFFFF8F0);
+const Color posPrimary = Color(0xFFD9643A);
+const Color posPrimaryDark = Color(0xFFB34E2A);
+const Color posAccent = Color(0xFFFAD8B0);
+const Color posTextMain = Color(0xFF2D2420);
+const Color posTextMuted = Color(0xFF94A3B8);
 
+// Legacy aliases
 const Color black = Color(0xFF1A252A);
 const Color white = Color(0xFFF6F6F6);
-
-// 'bg-red-400'
-
-// primaryGreen['400']

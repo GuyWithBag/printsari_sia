@@ -47,6 +47,8 @@ dependencies:
   particles_flutter: 2.0.2
 
   svg_pic_editor: 3.2.3
+  google_fonts: 8.0.2
+  intl: any
 
 dev_dependencies:
   flutter_test:

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:go_router/go_router.dart';
 import 'package:printsari_sia/controllers/auth_controller.dart';
+import 'package:printsari_sia/shared/themes/colors.dart';
 import 'package:printsari_sia/widgets/app_page.dart';
 import 'package:provider/provider.dart';
 
@@ -10,28 +11,29 @@ class LoginPage extends HookWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Local-only state — very declarative and readable
     final emailController = useTextEditingController();
     final passwordController = useTextEditingController();
     final isLoading = useState(false);
     final obscurePassword = useState(true);
 
-    // Optional: auto-dispose is handled by hooks
-
     Future<void> handleLogin() async {
       isLoading.value = true;
-      if (emailController.text.toLowerCase() == "admin") {
-        context.go('/');
-        return;
-      }
 
-      // await auth.signIn(emailController.text, passwordController.text);
       final authController = context.read<AuthController>();
 
-      await authController.signIn(
-        emailController.text,
-        passwordController.text,
-      );
+      try {
+        await authController.signIn(
+          emailController.text,
+          passwordController.text,
+        );
+      } catch (e) {
+        if (!context.mounted) return;
+        isLoading.value = false;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Login failed: $e')),
+        );
+        return;
+      }
 
       if (!context.mounted) return;
       if (authController.user == null) {
@@ -40,115 +42,170 @@ class LoginPage extends HookWidget {
           const SnackBar(content: Text('Login failed. Please try again.')),
         );
         return;
-      } else {
-        context.go('/');
       }
 
       isLoading.value = false;
-
-      // On success → navigate
-      // context.go('/');
-
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text('Succesfully logged in!')));
+      ).showSnackBar(const SnackBar(content: Text('Successfully logged in!')));
+      context.go('/');
     }
 
     return AppPage(
-      body: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 420),
-
-          child: Card(
-            child: Padding(
-              padding: const EdgeInsets.all(32.0),
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: RadialGradient(
+            center: Alignment(-0.8, -0.8),
+            radius: 1.2,
+            colors: [Color(0x14D9643A), Colors.transparent],
+          ),
+        ),
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 420),
+            child: Container(
+              decoration: BoxDecoration(
+                color: posSurface,
+                borderRadius: BorderRadius.circular(28),
+                border: Border.all(
+                  color: Colors.white.withValues(alpha: 0.08),
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.4),
+                    blurRadius: 40,
+                    offset: const Offset(0, 20),
+                  ),
+                ],
+              ),
+              padding: const EdgeInsets.all(36),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
+                  // Brand
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: posPrimary.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Icon(
+                          Icons.storefront_outlined,
+                          color: posPrimary,
+                          size: 22,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 20),
                   const Text(
                     'PrintSari POS',
                     style: TextStyle(
-                      fontSize: 36,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.blueGrey,
+                      fontSize: 28,
+                      fontWeight: FontWeight.w800,
+                      color: Colors.white,
                     ),
                     textAlign: TextAlign.center,
                   ),
-                  const SizedBox(height: 8),
-                  Text(
+                  const SizedBox(height: 6),
+                  const Text(
                     'Sign in to access the POS',
-                    style: Theme.of(context).textTheme.bodyMedium,
+                    style: TextStyle(color: posTextMuted, fontSize: 14),
                     textAlign: TextAlign.center,
                   ),
 
-                  const SizedBox(height: 48),
+                  const SizedBox(height: 40),
 
-                  Text(
-                    'Email',
-                    style: Theme.of(context).textTheme.titleSmall!.copyWith(
-                      fontWeight: FontWeight.bold,
+                  // Email label
+                  const Text(
+                    'EMAIL',
+                    style: TextStyle(
+                      color: posTextMuted,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 1.5,
                     ),
                   ),
                   const SizedBox(height: 8),
                   TextField(
                     controller: emailController,
+                    style: const TextStyle(color: Colors.white),
                     decoration: const InputDecoration(
-                      border: OutlineInputBorder(),
                       hintText: 'Enter your email',
                       prefixIcon: Icon(Icons.email_outlined),
                     ),
                     textInputAction: TextInputAction.next,
-                    onSubmitted: (value) => handleLogin(),
+                    onSubmitted: (_) => handleLogin(),
                   ),
 
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 20),
 
-                  Text(
-                    'Password',
-                    style: Theme.of(context).textTheme.titleSmall!.copyWith(
-                      fontWeight: FontWeight.bold,
+                  // Password label
+                  const Text(
+                    'PASSWORD',
+                    style: TextStyle(
+                      color: posTextMuted,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 1.5,
                     ),
                   ),
                   const SizedBox(height: 8),
                   TextField(
                     controller: passwordController,
                     obscureText: obscurePassword.value,
+                    style: const TextStyle(color: Colors.white),
                     decoration: InputDecoration(
-                      border: const OutlineInputBorder(),
                       hintText: 'Enter your password',
                       prefixIcon: const Icon(Icons.lock_outline),
                       suffixIcon: IconButton(
                         icon: Icon(
                           obscurePassword.value
-                              ? Icons.visibility_off
-                              : Icons.visibility,
+                              ? Icons.visibility_off_outlined
+                              : Icons.visibility_outlined,
                         ),
                         onPressed: () =>
                             obscurePassword.value = !obscurePassword.value,
                       ),
                     ),
                     textInputAction: TextInputAction.done,
-                    onSubmitted: (value) => handleLogin(),
+                    onSubmitted: (_) => handleLogin(),
                   ),
 
-                  const SizedBox(height: 40),
+                  const SizedBox(height: 32),
 
                   ElevatedButton(
                     onPressed: isLoading.value ? null : handleLogin,
                     style: ElevatedButton.styleFrom(
                       padding: const EdgeInsets.symmetric(vertical: 16),
-                      textStyle: Theme.of(context).textTheme.titleMedium,
-                      backgroundColor: Colors.black,
+                      backgroundColor: posPrimary,
                       foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      elevation: 0,
+                      shadowColor: posPrimary.withValues(alpha: 0.4),
                     ),
                     child: isLoading.value
                         ? const SizedBox(
                             height: 20,
                             width: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2.5),
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2.5,
+                              color: Colors.white,
+                            ),
                           )
-                        : const Text('Sign In'),
+                        : const Text(
+                            'Sign In',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w700,
+                              fontSize: 15,
+                            ),
+                          ),
                   ),
                 ],
               ),

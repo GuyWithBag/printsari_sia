@@ -11,7 +11,7 @@ class App extends StatelessWidget {
     return MaterialApp.router(
       title: 'PrintSari',
       theme: mainTheme,
-      themeMode: ThemeMode.light,
+      themeMode: ThemeMode.dark,
       debugShowCheckedModeBanner: false,
       routerConfig: router,
     );

@@ -2,19 +2,32 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:printsari_sia/controllers/auth_controller.dart';
 import 'package:printsari_sia/pages/login_page.dart';
-import 'package:printsari_sia/pages/pages.dart'; // ← assuming LoginPage is here
-import 'package:printsari_sia/providers/inventory_provider.dart';
+import 'package:printsari_sia/pages/pages.dart';
+import 'package:printsari_sia/providers/providers.dart';
 import 'package:printsari_sia/widgets/sidebar.dart';
 import 'package:provider/provider.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 final router = GoRouter(
-  initialLocation: '/login', // ← optional but often useful
+  initialLocation: '/login',
+  redirect: (context, state) {
+    final session = Supabase.instance.client.auth.currentSession;
+    final isOnLogin = state.uri.toString() == '/login';
+
+    if (session == null && !isOnLogin) return '/login';
+    if (session != null && isOnLogin) return '/';
+    return null;
+  },
   routes: [
     ShellRoute(
       builder: (context, state, child) => MultiProvider(
         providers: [
           ChangeNotifierProvider(create: (_) => AuthController()),
           ChangeNotifierProvider(create: (_) => InventoryProvider()),
+          ChangeNotifierProvider(create: (_) => TransactionProvider()),
+          ChangeNotifierProvider(create: (_) => ProductProvider()),
+          ChangeNotifierProvider(create: (_) => ExpenseProvider()),
+          ChangeNotifierProvider(create: (_) => ActivityLogProvider()),
         ],
         child: child,
       ),
