@@ -27,6 +27,10 @@ class BusinessExpensesPage extends HookWidget {
     final snapshot = useFuture(expensesFuture);
 
     void refresh() => refreshKey.value++;
+    void hardRefresh() {
+      expenseProvider.clearCache();
+      refreshKey.value++;
+    }
 
     return AppPage(
       appBar: AppBar(
@@ -40,6 +44,13 @@ class BusinessExpensesPage extends HookWidget {
             color: Colors.white,
           ),
         ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh_rounded, color: Colors.white),
+            tooltip: 'Refresh from server',
+            onPressed: hardRefresh,
+          ),
+        ],
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(30),
           child: Padding(

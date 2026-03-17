@@ -1,9 +1,20 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:hive_ce/hive.dart';
 import 'package:printsari_sia/shared/types/types.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class TransactionProvider extends ChangeNotifier {
   final supabase = Supabase.instance.client;
+
+  static const _transactionsKey = 'transactions';
+  List<Transaction>? _transactions;
+  Box<String> get _box => Hive.box<String>('app_cache');
+
+  void clearTransactionsCache() {
+    _transactions = null;
+    _box.delete(_transactionsKey);
+  }
 
   List<TransactionItem> _cart = [];
 
@@ -199,8 +210,10 @@ class TransactionProvider extends ChangeNotifier {
         }
       }
 
-      // Clear cart
+      // Clear cart and invalidate transactions cache (new transaction added)
       _cart = [];
+      _transactions = null;
+      _box.delete(_transactionsKey);
       notifyListeners();
 
       return Transaction.fromJson(insertedTransaction);
@@ -211,17 +224,29 @@ class TransactionProvider extends ChangeNotifier {
   }
 
   Future<List<Transaction>> getTransactions() async {
+    if (_transactions != null) return _transactions!;
+
+    final cached = _box.get(_transactionsKey);
+    if (cached != null) {
+      try {
+        final raw = jsonDecode(cached) as List;
+        _transactions = raw.map((r) => Transaction.fromJson(r as Map<String, dynamic>)).toList();
+        return _transactions!;
+      } catch (e) {
+        debugPrint('Transactions cache parse error: $e');
+        _box.delete(_transactionsKey);
+      }
+    }
+
     final query = await supabase
         .from('transactions')
         .select(
           '*, transaction_statuses(*), payment_methods(*), profiles(*), customers(*), transaction_items(*)',
         )
         .order('created_at', ascending: false);
-    final result = List.generate(
-      query.length,
-      (i) => Transaction.fromJson(query[i]),
-    );
-    return result;
+    _transactions = query.map((r) => Transaction.fromJson(r)).toList();
+    await _box.put(_transactionsKey, jsonEncode(query));
+    return _transactions!;
   }
 
   Future<Transaction?> getTransaction(int id) async {

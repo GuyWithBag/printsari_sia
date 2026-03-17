@@ -25,6 +25,12 @@ class InventoryPage extends HookWidget {
     final inventory = context.read<InventoryProvider>();
     final productProvider = context.read<ProductProvider>();
 
+    void hardRefresh() {
+      inventory.clearCache();
+      productProvider.clearAllCache();
+      refreshKey.value++;
+    }
+
     final dataFuture = useMemoized(
       () => Future.wait([
         inventory.getItems(),
@@ -69,6 +75,13 @@ class InventoryPage extends HookWidget {
             color: theme.colorScheme.onSurface,
           ),
         ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh_rounded, color: Colors.white),
+            tooltip: 'Refresh from server',
+            onPressed: hardRefresh,
+          ),
+        ],
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(30),
           child: Padding(

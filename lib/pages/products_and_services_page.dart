@@ -9,6 +9,7 @@ import 'package:printsari_sia/shared/types/types.dart';
 import 'package:printsari_sia/widgets/app_page.dart';
 import 'package:printsari_sia/widgets/circular_tab.dart';
 import 'package:printsari_sia/widgets/circular_tab_bar.dart';
+import 'package:printsari_sia/providers/activity_log_provider.dart';
 import 'package:provider/provider.dart';
 import 'package:skeletonizer/skeletonizer.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -22,6 +23,15 @@ class ProductsAndServicesPage extends HookWidget {
     final currentIndex = useState(0);
     final refreshKey = useState(0);
 
+    final productProvider = context.read<ProductProvider>();
+    final inventoryProvider = context.read<InventoryProvider>();
+
+    void hardRefresh() {
+      productProvider.clearAllCache();
+      inventoryProvider.clearCache();
+      refreshKey.value++;
+    }
+
     return AppPage(
       appBar: AppBar(
         elevation: 0,
@@ -34,6 +44,13 @@ class ProductsAndServicesPage extends HookWidget {
             color: Colors.white,
           ),
         ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh_rounded, color: Colors.white),
+            tooltip: 'Refresh from server',
+            onPressed: hardRefresh,
+          ),
+        ],
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(30),
           child: Padding(
@@ -287,8 +304,9 @@ Future<void> _showProductDialog(
   // Category dropdown: 1 = store, 2 = printing
   int selectedCategoryId = product?.categoryId ?? 1;
 
-  // Capture provider from the page context (which has access to the provider tree)
+  // Capture providers from the page context (which has access to the provider tree)
   final productProviderRef = Provider.of<ProductProvider>(context, listen: false);
+  final activityLogRef = Provider.of<ActivityLogProvider>(context, listen: false);
 
   await showDialog(
     context: context,
@@ -364,9 +382,10 @@ Future<void> _showProductDialog(
                 return;
               }
               try {
+                final productName = nameController.text;
                 if (isEditing) {
                   await productProviderRef.updateProduct(product.id, {
-                    'name': nameController.text,
+                    'name': productName,
                     'description': descController.text,
                     'purchase_price':
                         double.tryParse(priceController.text) ?? 0,
@@ -378,13 +397,17 @@ Future<void> _showProductDialog(
                         ? null
                         : supplierController.text,
                   });
+                  activityLogRef.log(
+                    actionName: 'Product Updated',
+                    description: 'Updated product: $productName',
+                  );
                 } else {
                   final now = DateTime.now();
                   await productProviderRef.createProduct(Product(
                     id: 0,
-                    name: nameController.text,
+                    name: productName,
                     description: descController.text.isEmpty
-                        ? nameController.text
+                        ? productName
                         : descController.text,
                     categoryId: selectedCategoryId,
                     purchasePrice:
@@ -398,6 +421,10 @@ Future<void> _showProductDialog(
                     createdAt: now,
                     updatedAt: now,
                   ));
+                  activityLogRef.log(
+                    actionName: 'Product Added',
+                    description: 'Added new product: $productName',
+                  );
                 }
                 if (ctx.mounted) Navigator.pop(ctx);
                 onRefresh();
@@ -431,6 +458,7 @@ Future<void> _showDeleteProductDialog(
   VoidCallback onRefresh,
 ) async {
   final productProviderRef = Provider.of<ProductProvider>(context, listen: false);
+  final activityLogRef = Provider.of<ActivityLogProvider>(context, listen: false);
   await showDialog(
     context: context,
     builder: (ctx) => AlertDialog(
@@ -453,6 +481,10 @@ Future<void> _showDeleteProductDialog(
           onPressed: () async {
             try {
               await productProviderRef.deleteProduct(product.id);
+              activityLogRef.log(
+                actionName: 'Product Deleted',
+                description: 'Deleted product: ${product.name}',
+              );
               if (ctx.mounted) Navigator.pop(ctx);
               onRefresh();
             } catch (e) {
@@ -657,8 +689,9 @@ Future<void> _showPrintServiceDialog(
   int selectedPaperSizeId = service?.paperSizeId ?? (paperSizes.isNotEmpty ? paperSizes.first.id : 1);
   int selectedColorModeId = service?.colorModeId ?? (colorModes.isNotEmpty ? colorModes.first.id : 1);
 
-  // Capture provider from the page context
+  // Capture providers from the page context
   final productProviderRef = Provider.of<ProductProvider>(context, listen: false);
+  final activityLogRef = Provider.of<ActivityLogProvider>(context, listen: false);
 
   if (!context.mounted) return;
 
@@ -791,9 +824,10 @@ Future<void> _showPrintServiceDialog(
               final totalCost = inkCost + paperCost + elecCost + maintCost;
 
               try {
+                final serviceName = nameController.text;
                 if (isEditing) {
                   await provider.updatePrintService(service.id, {
-                    'name': nameController.text,
+                    'name': serviceName,
                     'description': descController.text,
                     'base_price':
                         double.tryParse(basePriceController.text) ?? 0,
@@ -805,13 +839,17 @@ Future<void> _showPrintServiceDialog(
                     'maintenance_cost_per_page': maintCost,
                     'total_cost_per_page': totalCost,
                   });
+                  activityLogRef.log(
+                    actionName: 'Print Service Updated',
+                    description: 'Updated print service: $serviceName',
+                  );
                 } else {
                   final now = DateTime.now();
                   await provider.createPrintService(PrintService(
                     id: 0,
-                    name: nameController.text,
+                    name: serviceName,
                     description: descController.text.isEmpty
-                        ? nameController.text
+                        ? serviceName
                         : descController.text,
                     paperSizeId: selectedPaperSizeId,
                     colorModeId: selectedColorModeId,
@@ -825,6 +863,10 @@ Future<void> _showPrintServiceDialog(
                     createdAt: now,
                     updatedAt: now,
                   ));
+                  activityLogRef.log(
+                    actionName: 'Print Service Added',
+                    description: 'Added new print service: $serviceName',
+                  );
                 }
                 if (ctx.mounted) Navigator.pop(ctx);
                 onRefresh();
@@ -858,6 +900,7 @@ Future<void> _showDeleteServiceDialog(
   VoidCallback onRefresh,
 ) async {
   final productProviderRef = Provider.of<ProductProvider>(context, listen: false);
+  final activityLogRef = Provider.of<ActivityLogProvider>(context, listen: false);
   await showDialog(
     context: context,
     builder: (ctx) => AlertDialog(
@@ -878,9 +921,12 @@ Future<void> _showDeleteServiceDialog(
         ),
         FilledButton(
           onPressed: () async {
-            final provider = productProviderRef;
             try {
-              await provider.deletePrintService(service.id);
+              await productProviderRef.deletePrintService(service.id);
+              activityLogRef.log(
+                actionName: 'Print Service Deleted',
+                description: 'Deleted print service: ${service.name}',
+              );
               if (ctx.mounted) Navigator.pop(ctx);
               onRefresh();
             } catch (e) {

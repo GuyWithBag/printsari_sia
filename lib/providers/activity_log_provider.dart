@@ -35,4 +35,53 @@ class ActivityLogProvider extends ChangeNotifier {
     });
     notifyListeners();
   }
+
+  /// Log by action name instead of ID. Looks up the action_id from activity_actions table.
+  Future<void> log({
+    required String actionName,
+    required String description,
+    Map<String, dynamic>? metadata,
+  }) async {
+    try {
+      final actionRow = await supabase
+          .from('activity_actions')
+          .select('id')
+          .eq('action_name', actionName)
+          .maybeSingle();
+      if (actionRow == null) {
+        debugPrint('[ActivityLog] action "$actionName" not found in activity_actions table');
+        return;
+      }
+
+      // Get current user profile
+      final userId = supabase.auth.currentUser?.id;
+      String? performedBy;
+      int? performedById;
+      if (userId != null) {
+        final profile = await supabase
+            .from('profiles')
+            .select('id, name')
+            .eq('user_id', userId)
+            .maybeSingle();
+        if (profile != null) {
+          performedBy = profile['name'] as String;
+          performedById = profile['id'] as int;
+        }
+      }
+
+      debugPrint('[ActivityLog] Inserting log: $actionName — $description (user: $performedBy, id: $performedById)');
+      await supabase.from('activity_logs').insert({
+        'action_id': actionRow['id'],
+        'description': description,
+        'timestamp': DateTime.now().toIso8601String(),
+        'performed_by': performedBy,
+        'performed_by_id': performedById,
+        'metadata': metadata,
+      });
+      debugPrint('[ActivityLog] Insert success');
+      notifyListeners();
+    } catch (e) {
+      debugPrint('[ActivityLog] Error logging "$actionName": $e');
+    }
+  }
 }

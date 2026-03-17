@@ -22,11 +22,19 @@ class DashboardPage extends HookWidget {
   Widget build(BuildContext context) {
     final now = DateTime.now();
     final dateLabel = DateFormat('EEEE, MMMM d, yyyy').format(now);
+    final refreshKey = useState(0);
 
     final transactionProvider = context.read<TransactionProvider>();
     final expenseProvider = context.read<ExpenseProvider>();
     final inventoryProvider = context.read<InventoryProvider>();
     final activityLogProvider = context.read<ActivityLogProvider>();
+
+    void hardRefresh() {
+      transactionProvider.clearTransactionsCache();
+      expenseProvider.clearCache();
+      inventoryProvider.clearCache();
+      refreshKey.value++;
+    }
 
     final dataFuture = useMemoized(
       () => Future.wait([
@@ -35,7 +43,7 @@ class DashboardPage extends HookWidget {
         inventoryProvider.getItems(),
         activityLogProvider.getLogs(limit: 5),
       ]),
-      [],
+      [refreshKey.value],
     );
 
     final snapshot = useFuture(dataFuture);
@@ -85,19 +93,34 @@ class DashboardPage extends HookWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Title
-              Text(
-                'Dashboard',
-                style: GoogleFonts.outfit(
-                  fontSize: 28,
-                  fontWeight: FontWeight.w700,
-                  color: Colors.white,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                dateLabel,
-                style: GoogleFonts.outfit(fontSize: 14, color: posTextMuted),
+              // Title row
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Dashboard',
+                        style: GoogleFonts.outfit(
+                          fontSize: 28,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        dateLabel,
+                        style: GoogleFonts.outfit(fontSize: 14, color: posTextMuted),
+                      ),
+                    ],
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.refresh_rounded, color: Colors.white),
+                    tooltip: 'Refresh from server',
+                    onPressed: hardRefresh,
+                  ),
+                ],
               ),
               const SizedBox(height: 24),
 
