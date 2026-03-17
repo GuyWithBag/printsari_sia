@@ -11,6 +11,7 @@ import 'package:printsari_sia/widgets/circular_tab.dart';
 import 'package:printsari_sia/widgets/circular_tab_bar.dart';
 import 'package:provider/provider.dart';
 import 'package:skeletonizer/skeletonizer.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class ProductsAndServicesPage extends HookWidget {
   const ProductsAndServicesPage({Key? key}) : super(key: key);
@@ -277,107 +278,149 @@ Future<void> _showProductDialog(
   final descController =
       TextEditingController(text: product?.description ?? '');
   final priceController = TextEditingController(
-    text: product?.purchasePrice.toString() ?? '',
+    text: isEditing ? product.purchasePrice.toString() : '',
   );
   final skuController = TextEditingController(text: product?.sku ?? '');
   final supplierController =
       TextEditingController(text: product?.supplier ?? '');
-  final categoryIdController = TextEditingController(
-    text: product?.categoryId.toString() ?? '1',
-  );
+
+  // Category dropdown: 1 = store, 2 = printing
+  int selectedCategoryId = product?.categoryId ?? 1;
+
+  // Capture provider from the page context (which has access to the provider tree)
+  final productProviderRef = Provider.of<ProductProvider>(context, listen: false);
 
   await showDialog(
     context: context,
-    builder: (ctx) => AlertDialog(
-      backgroundColor: posSurface,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      title: Text(
-        isEditing ? 'Edit Product' : 'Add Product',
-        style: GoogleFonts.outfit(color: Colors.white, fontWeight: FontWeight.bold),
-      ),
-      content: SizedBox(
-        width: 400,
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              _dialogField('Name', nameController),
-              _dialogField('Description', descController),
-              _dialogField('Purchase Price', priceController,
-                  keyboardType: TextInputType.number),
-              _dialogField('Category ID', categoryIdController,
-                  keyboardType: TextInputType.number),
-              _dialogField('SKU', skuController),
-              _dialogField('Supplier', supplierController),
-            ],
+    builder: (ctx) => StatefulBuilder(
+      builder: (ctx, setDialogState) => AlertDialog(
+        backgroundColor: posSurface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text(
+          isEditing ? 'Edit Product' : 'Add Product',
+          style: GoogleFonts.outfit(color: Colors.white, fontWeight: FontWeight.bold),
+        ),
+        content: SizedBox(
+          width: 400,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _dialogField('Name', nameController),
+                _dialogField('Description', descController),
+                _dialogField('Purchase Price', priceController,
+                    keyboardType: TextInputType.number),
+                // Category dropdown
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: DropdownButtonFormField<int>(
+                    value: selectedCategoryId,
+                    dropdownColor: posSurfaceLight,
+                    style: GoogleFonts.outfit(color: Colors.white),
+                    decoration: InputDecoration(
+                      labelText: 'Category',
+                      labelStyle: GoogleFonts.outfit(color: posTextMuted),
+                      filled: true,
+                      fillColor: posSurfaceLight,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        borderSide: BorderSide.none,
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        borderSide: const BorderSide(color: posPrimary, width: 1.5),
+                      ),
+                      contentPadding:
+                          const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                    ),
+                    items: const [
+                      DropdownMenuItem(value: 1, child: Text('Store')),
+                      DropdownMenuItem(value: 2, child: Text('Printing')),
+                    ],
+                    onChanged: (value) {
+                      if (value != null) {
+                        setDialogState(() => selectedCategoryId = value);
+                      }
+                    },
+                  ),
+                ),
+                _dialogField('SKU (optional)', skuController),
+                _dialogField('Supplier (optional)', supplierController),
+              ],
+            ),
           ),
         ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(ctx),
-          child: Text('Cancel', style: GoogleFonts.outfit(color: posTextMuted)),
-        ),
-        FilledButton(
-          onPressed: () async {
-            final provider =
-                Provider.of<ProductProvider>(ctx, listen: false);
-            try {
-              if (isEditing) {
-                await provider.updateProduct(product.id, {
-                  'name': nameController.text,
-                  'description': descController.text,
-                  'purchase_price':
-                      double.tryParse(priceController.text) ?? 0,
-                  'category_id':
-                      int.tryParse(categoryIdController.text) ?? 1,
-                  'sku': skuController.text.isEmpty
-                      ? null
-                      : skuController.text,
-                  'supplier': supplierController.text.isEmpty
-                      ? null
-                      : supplierController.text,
-                });
-              } else {
-                final now = DateTime.now();
-                await provider.createProduct(Product(
-                  id: 0,
-                  name: nameController.text,
-                  description: descController.text,
-                  categoryId:
-                      int.tryParse(categoryIdController.text) ?? 1,
-                  purchasePrice:
-                      double.tryParse(priceController.text) ?? 0,
-                  sku: skuController.text.isEmpty
-                      ? null
-                      : skuController.text,
-                  supplier: supplierController.text.isEmpty
-                      ? null
-                      : supplierController.text,
-                  createdAt: now,
-                  updatedAt: now,
-                ));
-              }
-              if (ctx.mounted) Navigator.pop(ctx);
-              onRefresh();
-            } catch (e) {
-              if (ctx.mounted) {
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text('Cancel', style: GoogleFonts.outfit(color: posTextMuted)),
+          ),
+          FilledButton(
+            onPressed: () async {
+              if (nameController.text.isEmpty) {
                 ScaffoldMessenger.of(ctx).showSnackBar(
-                  SnackBar(content: Text('Error: $e')),
+                  const SnackBar(content: Text('Name is required')),
                 );
+                return;
               }
-            }
-          },
-          style: FilledButton.styleFrom(
-            backgroundColor: posPrimary,
-            foregroundColor: Colors.white,
+              try {
+                if (isEditing) {
+                  await productProviderRef.updateProduct(product.id, {
+                    'name': nameController.text,
+                    'description': descController.text,
+                    'purchase_price':
+                        double.tryParse(priceController.text) ?? 0,
+                    'category_id': selectedCategoryId,
+                    'sku': skuController.text.isEmpty
+                        ? null
+                        : skuController.text,
+                    'supplier': supplierController.text.isEmpty
+                        ? null
+                        : supplierController.text,
+                  });
+                } else {
+                  final now = DateTime.now();
+                  await productProviderRef.createProduct(Product(
+                    id: 0,
+                    name: nameController.text,
+                    description: descController.text.isEmpty
+                        ? nameController.text
+                        : descController.text,
+                    categoryId: selectedCategoryId,
+                    purchasePrice:
+                        double.tryParse(priceController.text) ?? 0,
+                    sku: skuController.text.isEmpty
+                        ? null
+                        : skuController.text,
+                    supplier: supplierController.text.isEmpty
+                        ? null
+                        : supplierController.text,
+                    createdAt: now,
+                    updatedAt: now,
+                  ));
+                }
+                if (ctx.mounted) Navigator.pop(ctx);
+                onRefresh();
+              } catch (e) {
+                debugPrint('Error: $e');
+                if (ctx.mounted) {
+                  ScaffoldMessenger.of(ctx).showSnackBar(
+                    SnackBar(content: Text('Error: $e')),
+                  );
+                }
+              }
+            },
+            style: FilledButton.styleFrom(
+              backgroundColor: posPrimary,
+              foregroundColor: Colors.white,
+            ),
+            child: Text(
+              isEditing ? 'Update' : 'Create',
+              style: GoogleFonts.outfit(),
+            ),
           ),
-          child: Text(
-            isEditing ? 'Update' : 'Create',
-            style: GoogleFonts.outfit(),
-          ),
-        ),
-      ],
+        ],
+      ),
     ),
   );
 }
@@ -387,6 +430,7 @@ Future<void> _showDeleteProductDialog(
   Product product,
   VoidCallback onRefresh,
 ) async {
+  final productProviderRef = Provider.of<ProductProvider>(context, listen: false);
   await showDialog(
     context: context,
     builder: (ctx) => AlertDialog(
@@ -407,13 +451,12 @@ Future<void> _showDeleteProductDialog(
         ),
         FilledButton(
           onPressed: () async {
-            final provider =
-                Provider.of<ProductProvider>(ctx, listen: false);
             try {
-              await provider.deleteProduct(product.id);
+              await productProviderRef.deleteProduct(product.id);
               if (ctx.mounted) Navigator.pop(ctx);
               onRefresh();
             } catch (e) {
+              debugPrint('Delete product error: $e');
               if (ctx.mounted) {
                 ScaffoldMessenger.of(ctx).showSnackBar(
                   SnackBar(content: Text('Error: $e')),
@@ -588,137 +631,223 @@ Future<void> _showPrintServiceDialog(
   final nameController = TextEditingController(text: service?.name ?? '');
   final descController =
       TextEditingController(text: service?.description ?? '');
-  final basePriceController =
-      TextEditingController(text: service?.basePrice.toString() ?? '');
-  final inkCostController =
-      TextEditingController(text: service?.inkCostPerPage.toString() ?? '');
-  final paperCostController =
-      TextEditingController(text: service?.paperCostPerPage.toString() ?? '');
+  final basePriceController = TextEditingController(
+    text: isEditing ? service.basePrice.toString() : '',
+  );
+  final inkCostController = TextEditingController(
+    text: isEditing ? service.inkCostPerPage.toString() : '',
+  );
+  final paperCostController = TextEditingController(
+    text: isEditing ? service.paperCostPerPage.toString() : '',
+  );
   final electricityCostController = TextEditingController(
-    text: service?.electricityCostPerPage.toString() ?? '',
+    text: isEditing ? service.electricityCostPerPage.toString() : '',
   );
   final maintenanceCostController = TextEditingController(
-    text: service?.maintenanceCostPerPage.toString() ?? '',
+    text: isEditing ? service.maintenanceCostPerPage.toString() : '',
   );
-  final paperSizeIdController = TextEditingController(
-    text: service?.paperSizeId.toString() ?? '1',
-  );
-  final colorModeIdController = TextEditingController(
-    text: service?.colorModeId.toString() ?? '1',
-  );
+
+  // Fetch lookup data for dropdowns
+  final supabase = Supabase.instance.client;
+  final paperSizesRaw = await supabase.from('paper_sizes').select().order('id');
+  final colorModesRaw = await supabase.from('color_modes').select().order('id');
+  final paperSizes = paperSizesRaw.map((r) => PaperSize.fromJson(r)).toList();
+  final colorModes = colorModesRaw.map((r) => ColorMode.fromJson(r)).toList();
+
+  int selectedPaperSizeId = service?.paperSizeId ?? (paperSizes.isNotEmpty ? paperSizes.first.id : 1);
+  int selectedColorModeId = service?.colorModeId ?? (colorModes.isNotEmpty ? colorModes.first.id : 1);
+
+  // Capture provider from the page context
+  final productProviderRef = Provider.of<ProductProvider>(context, listen: false);
+
+  if (!context.mounted) return;
 
   await showDialog(
     context: context,
-    builder: (ctx) => AlertDialog(
-      backgroundColor: posSurface,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      title: Text(
-        isEditing ? 'Edit Print Service' : 'Add Print Service',
-        style: GoogleFonts.outfit(color: Colors.white, fontWeight: FontWeight.bold),
-      ),
-      content: SizedBox(
-        width: 400,
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              _dialogField('Name', nameController),
-              _dialogField('Description', descController),
-              _dialogField('Base Price', basePriceController,
-                  keyboardType: TextInputType.number),
-              _dialogField('Paper Size ID', paperSizeIdController,
-                  keyboardType: TextInputType.number),
-              _dialogField('Color Mode ID', colorModeIdController,
-                  keyboardType: TextInputType.number),
-              _dialogField('Ink Cost/Page', inkCostController,
-                  keyboardType: TextInputType.number),
-              _dialogField('Paper Cost/Page', paperCostController,
-                  keyboardType: TextInputType.number),
-              _dialogField('Electricity Cost/Page', electricityCostController,
-                  keyboardType: TextInputType.number),
-              _dialogField('Maintenance Cost/Page', maintenanceCostController,
-                  keyboardType: TextInputType.number),
-            ],
+    builder: (ctx) => StatefulBuilder(
+      builder: (ctx, setDialogState) => AlertDialog(
+        backgroundColor: posSurface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text(
+          isEditing ? 'Edit Print Service' : 'Add Print Service',
+          style: GoogleFonts.outfit(color: Colors.white, fontWeight: FontWeight.bold),
+        ),
+        content: SizedBox(
+          width: 400,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _dialogField('Name', nameController),
+                _dialogField('Description', descController),
+                _dialogField('Base Price', basePriceController,
+                    keyboardType: TextInputType.number),
+                // Paper Size dropdown
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: DropdownButtonFormField<int>(
+                    value: selectedPaperSizeId,
+                    dropdownColor: posSurfaceLight,
+                    style: GoogleFonts.outfit(color: Colors.white),
+                    decoration: InputDecoration(
+                      labelText: 'Paper Size',
+                      labelStyle: GoogleFonts.outfit(color: posTextMuted),
+                      filled: true,
+                      fillColor: posSurfaceLight,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        borderSide: BorderSide.none,
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        borderSide: const BorderSide(color: posPrimary, width: 1.5),
+                      ),
+                      contentPadding:
+                          const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                    ),
+                    items: paperSizes
+                        .map((ps) => DropdownMenuItem(
+                              value: ps.id,
+                              child: Text(ps.sizeName),
+                            ))
+                        .toList(),
+                    onChanged: (value) {
+                      if (value != null) {
+                        setDialogState(() => selectedPaperSizeId = value);
+                      }
+                    },
+                  ),
+                ),
+                // Color Mode dropdown
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: DropdownButtonFormField<int>(
+                    value: selectedColorModeId,
+                    dropdownColor: posSurfaceLight,
+                    style: GoogleFonts.outfit(color: Colors.white),
+                    decoration: InputDecoration(
+                      labelText: 'Color Mode',
+                      labelStyle: GoogleFonts.outfit(color: posTextMuted),
+                      filled: true,
+                      fillColor: posSurfaceLight,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        borderSide: BorderSide.none,
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        borderSide: const BorderSide(color: posPrimary, width: 1.5),
+                      ),
+                      contentPadding:
+                          const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                    ),
+                    items: colorModes
+                        .map((cm) => DropdownMenuItem(
+                              value: cm.id,
+                              child: Text(cm.modeName),
+                            ))
+                        .toList(),
+                    onChanged: (value) {
+                      if (value != null) {
+                        setDialogState(() => selectedColorModeId = value);
+                      }
+                    },
+                  ),
+                ),
+                _dialogField('Ink Cost/Page', inkCostController,
+                    keyboardType: TextInputType.number),
+                _dialogField('Paper Cost/Page', paperCostController,
+                    keyboardType: TextInputType.number),
+                _dialogField('Electricity Cost/Page', electricityCostController,
+                    keyboardType: TextInputType.number),
+                _dialogField('Maintenance Cost/Page', maintenanceCostController,
+                    keyboardType: TextInputType.number),
+              ],
+            ),
           ),
         ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(ctx),
-          child: Text('Cancel', style: GoogleFonts.outfit(color: posTextMuted)),
-        ),
-        FilledButton(
-          onPressed: () async {
-            final provider =
-                Provider.of<ProductProvider>(ctx, listen: false);
-            final inkCost =
-                double.tryParse(inkCostController.text) ?? 0;
-            final paperCost =
-                double.tryParse(paperCostController.text) ?? 0;
-            final elecCost =
-                double.tryParse(electricityCostController.text) ?? 0;
-            final maintCost =
-                double.tryParse(maintenanceCostController.text) ?? 0;
-            final totalCost = inkCost + paperCost + elecCost + maintCost;
-
-            try {
-              if (isEditing) {
-                await provider.updatePrintService(service.id, {
-                  'name': nameController.text,
-                  'description': descController.text,
-                  'base_price':
-                      double.tryParse(basePriceController.text) ?? 0,
-                  'paper_size_id':
-                      int.tryParse(paperSizeIdController.text) ?? 1,
-                  'color_mode_id':
-                      int.tryParse(colorModeIdController.text) ?? 1,
-                  'ink_cost_per_page': inkCost,
-                  'paper_cost_per_page': paperCost,
-                  'electricity_cost_per_page': elecCost,
-                  'maintenance_cost_per_page': maintCost,
-                  'total_cost_per_page': totalCost,
-                });
-              } else {
-                final now = DateTime.now();
-                await provider.createPrintService(PrintService(
-                  id: 0,
-                  name: nameController.text,
-                  description: descController.text,
-                  paperSizeId:
-                      int.tryParse(paperSizeIdController.text) ?? 1,
-                  colorModeId:
-                      int.tryParse(colorModeIdController.text) ?? 1,
-                  basePrice:
-                      double.tryParse(basePriceController.text) ?? 0,
-                  inkCostPerPage: inkCost,
-                  paperCostPerPage: paperCost,
-                  electricityCostPerPage: elecCost,
-                  maintenanceCostPerPage: maintCost,
-                  totalCostPerPage: totalCost,
-                  createdAt: now,
-                  updatedAt: now,
-                ));
-              }
-              if (ctx.mounted) Navigator.pop(ctx);
-              onRefresh();
-            } catch (e) {
-              if (ctx.mounted) {
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text('Cancel', style: GoogleFonts.outfit(color: posTextMuted)),
+          ),
+          FilledButton(
+            onPressed: () async {
+              if (nameController.text.isEmpty) {
                 ScaffoldMessenger.of(ctx).showSnackBar(
-                  SnackBar(content: Text('Error: $e')),
+                  const SnackBar(content: Text('Name is required')),
                 );
+                return;
               }
-            }
-          },
-          style: FilledButton.styleFrom(
-            backgroundColor: posPrimary,
-            foregroundColor: Colors.white,
+              final provider = productProviderRef;
+              final inkCost =
+                  double.tryParse(inkCostController.text) ?? 0;
+              final paperCost =
+                  double.tryParse(paperCostController.text) ?? 0;
+              final elecCost =
+                  double.tryParse(electricityCostController.text) ?? 0;
+              final maintCost =
+                  double.tryParse(maintenanceCostController.text) ?? 0;
+              final totalCost = inkCost + paperCost + elecCost + maintCost;
+
+              try {
+                if (isEditing) {
+                  await provider.updatePrintService(service.id, {
+                    'name': nameController.text,
+                    'description': descController.text,
+                    'base_price':
+                        double.tryParse(basePriceController.text) ?? 0,
+                    'paper_size_id': selectedPaperSizeId,
+                    'color_mode_id': selectedColorModeId,
+                    'ink_cost_per_page': inkCost,
+                    'paper_cost_per_page': paperCost,
+                    'electricity_cost_per_page': elecCost,
+                    'maintenance_cost_per_page': maintCost,
+                    'total_cost_per_page': totalCost,
+                  });
+                } else {
+                  final now = DateTime.now();
+                  await provider.createPrintService(PrintService(
+                    id: 0,
+                    name: nameController.text,
+                    description: descController.text.isEmpty
+                        ? nameController.text
+                        : descController.text,
+                    paperSizeId: selectedPaperSizeId,
+                    colorModeId: selectedColorModeId,
+                    basePrice:
+                        double.tryParse(basePriceController.text) ?? 0,
+                    inkCostPerPage: inkCost,
+                    paperCostPerPage: paperCost,
+                    electricityCostPerPage: elecCost,
+                    maintenanceCostPerPage: maintCost,
+                    totalCostPerPage: totalCost,
+                    createdAt: now,
+                    updatedAt: now,
+                  ));
+                }
+                if (ctx.mounted) Navigator.pop(ctx);
+                onRefresh();
+              } catch (e) {
+                debugPrint('Error: $e');
+                if (ctx.mounted) {
+                  ScaffoldMessenger.of(ctx).showSnackBar(
+                    SnackBar(content: Text('Error: $e')),
+                  );
+                }
+              }
+            },
+            style: FilledButton.styleFrom(
+              backgroundColor: posPrimary,
+              foregroundColor: Colors.white,
+            ),
+            child: Text(
+              isEditing ? 'Update' : 'Create',
+              style: GoogleFonts.outfit(),
+            ),
           ),
-          child: Text(
-            isEditing ? 'Update' : 'Create',
-            style: GoogleFonts.outfit(),
-          ),
-        ),
-      ],
+        ],
+      ),
     ),
   );
 }
@@ -728,6 +857,7 @@ Future<void> _showDeleteServiceDialog(
   PrintService service,
   VoidCallback onRefresh,
 ) async {
+  final productProviderRef = Provider.of<ProductProvider>(context, listen: false);
   await showDialog(
     context: context,
     builder: (ctx) => AlertDialog(
@@ -748,13 +878,13 @@ Future<void> _showDeleteServiceDialog(
         ),
         FilledButton(
           onPressed: () async {
-            final provider =
-                Provider.of<ProductProvider>(ctx, listen: false);
+            final provider = productProviderRef;
             try {
               await provider.deletePrintService(service.id);
               if (ctx.mounted) Navigator.pop(ctx);
               onRefresh();
             } catch (e) {
+              debugPrint('Delete service error: $e');
               if (ctx.mounted) {
                 ScaffoldMessenger.of(ctx).showSnackBar(
                   SnackBar(content: Text('Error: $e')),

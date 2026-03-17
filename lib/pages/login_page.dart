@@ -27,6 +27,7 @@ class LoginPage extends HookWidget {
           passwordController.text,
         );
       } catch (e) {
+        debugPrint('Login error: $e');
         if (!context.mounted) return;
         isLoading.value = false;
         ScaffoldMessenger.of(context).showSnackBar(

@@ -125,7 +125,7 @@ class DashboardPage extends HookWidget {
                     physics: const NeverScrollableScrollPhysics(),
                     mainAxisSpacing: 16,
                     crossAxisSpacing: 16,
-                    childAspectRatio: 2.2,
+                    childAspectRatio: 2.0,
                     children: [
                       _MetricCard(
                         icon: Icons.trending_up_rounded,
@@ -247,28 +247,31 @@ class _MetricCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return _GlassPanel(
-      padding: const EdgeInsets.all(18),
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(16),
+      child: _GlassPanel(
+      padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisAlignment: MainAxisAlignment.center,
+        mainAxisSize: MainAxisSize.min,
         children: [
           Row(
             children: [
               Container(
-                padding: const EdgeInsets.all(8),
+                padding: const EdgeInsets.all(6),
                 decoration: BoxDecoration(
                   color: iconColor.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius: BorderRadius.circular(8),
                 ),
-                child: Icon(icon, color: iconColor, size: 20),
+                child: Icon(icon, color: iconColor, size: 18),
               ),
-              const SizedBox(width: 10),
+              const SizedBox(width: 8),
               Expanded(
                 child: Text(
                   title,
                   style: GoogleFonts.outfit(
-                    fontSize: 12,
+                    fontSize: 11,
                     color: posTextMuted,
                     fontWeight: FontWeight.w500,
                   ),
@@ -277,22 +280,26 @@ class _MetricCard extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 12),
-          Text(
-            value,
-            style: GoogleFonts.outfit(
-              fontSize: 22,
-              fontWeight: FontWeight.w700,
-              color: Colors.white,
+          const SizedBox(height: 8),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(
+              value,
+              style: GoogleFonts.outfit(
+                fontSize: 20,
+                fontWeight: FontWeight.w700,
+                color: Colors.white,
+              ),
             ),
           ),
           const SizedBox(height: 2),
           Text(
             subtitle,
-            style: GoogleFonts.outfit(fontSize: 11, color: posTextMuted),
+            style: GoogleFonts.outfit(fontSize: 10, color: posTextMuted),
           ),
         ],
       ),
+    ),
     );
   }
 }

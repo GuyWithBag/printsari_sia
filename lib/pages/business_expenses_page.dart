@@ -473,6 +473,7 @@ Future<void> _showExpenseDialog(
                 if (ctx.mounted) Navigator.pop(ctx);
                 onRefresh();
               } catch (e) {
+                debugPrint('Error: $e');
                 if (ctx.mounted) {
                   ScaffoldMessenger.of(ctx).showSnackBar(
                     SnackBar(content: Text('Error: $e')),
@@ -531,6 +532,7 @@ Future<void> _showDeleteExpenseDialog(
               if (ctx.mounted) Navigator.pop(ctx);
               onRefresh();
             } catch (e) {
+              debugPrint('Error: $e');
               if (ctx.mounted) {
                 ScaffoldMessenger.of(ctx).showSnackBar(
                   SnackBar(content: Text('Error: $e')),

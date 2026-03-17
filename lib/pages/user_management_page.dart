@@ -8,7 +8,7 @@ import 'package:skeletonizer/skeletonizer.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class UserManagementPage extends HookWidget {
-  const UserManagementPage({Key? key}) : super(key: key);
+  const UserManagementPage({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -64,22 +64,44 @@ class UserManagementPage extends HookWidget {
         enabled: !snapshot.hasData,
         child: Padding(
           padding: const EdgeInsets.all(16.0),
-          child: snapshot.hasData
-              ? _UserTable(
-                  profilesData: snapshot.data!,
-                  currentUserId: currentUserId,
-                  onRefresh: refresh,
-                )
-              : snapshot.hasError
-                  ? Center(
-                      child: Text(
-                        'Error loading users: ${snapshot.error}',
-                        style: GoogleFonts.outfit(color: posTextMuted),
-                      ),
-                    )
-                  : const Center(
-                      child: CircularProgressIndicator(color: posPrimary),
+          child: Column(
+            children: [
+              Align(
+                alignment: Alignment.centerRight,
+                child: FilledButton.icon(
+                  onPressed: () => _showAddUserDialog(context, refresh),
+                  icon: const Icon(Icons.person_add, size: 18),
+                  label: Text('Add User', style: GoogleFonts.outfit()),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: posPrimary,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
                     ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              Expanded(
+                child: snapshot.hasData
+                    ? _UserTable(
+                        profilesData: snapshot.data!,
+                        currentUserId: currentUserId,
+                        onRefresh: refresh,
+                      )
+                    : snapshot.hasError
+                        ? Center(
+                            child: Text(
+                              'Error loading users: ${snapshot.error}',
+                              style: GoogleFonts.outfit(color: posTextMuted),
+                            ),
+                          )
+                        : const Center(
+                            child: CircularProgressIndicator(color: posPrimary),
+                          ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -162,7 +184,7 @@ class _UserTable extends StatelessWidget {
                               vertical: 2,
                             ),
                             decoration: BoxDecoration(
-                              color: posPrimary.withOpacity(0.15),
+                              color: posPrimary.withValues(alpha: 0.15),
                               borderRadius: BorderRadius.circular(8),
                             ),
                             child: Text(
@@ -187,8 +209,8 @@ class _UserTable extends StatelessWidget {
                       ),
                       decoration: BoxDecoration(
                         color: role?.roleName == 'owner'
-                            ? posPrimary.withOpacity(0.15)
-                            : const Color(0xFF3B82F6).withOpacity(0.15),
+                            ? posPrimary.withValues(alpha: 0.15)
+                            : const Color(0xFF3B82F6).withValues(alpha: 0.15),
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Text(
@@ -229,6 +251,150 @@ class _UserTable extends StatelessWidget {
   }
 }
 
+Future<void> _showAddUserDialog(
+  BuildContext context,
+  VoidCallback onRefresh,
+) async {
+  final emailController = TextEditingController();
+  final passwordController = TextEditingController();
+  final nameController = TextEditingController();
+  final usernameController = TextEditingController();
+  final phoneController = TextEditingController();
+  int selectedRoleId = 2; // default to cashier
+
+  await showDialog(
+    context: context,
+    builder: (ctx) => StatefulBuilder(
+      builder: (ctx, setDialogState) => AlertDialog(
+        backgroundColor: posSurface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text(
+          'Add User',
+          style: GoogleFonts.outfit(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        content: SizedBox(
+          width: 400,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _userField('Email', emailController,
+                    keyboardType: TextInputType.emailAddress),
+                _userField('Password', passwordController),
+                _userField('Full Name', nameController),
+                _userField('Username', usernameController),
+                _userField('Phone (optional)', phoneController,
+                    keyboardType: TextInputType.phone),
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: DropdownButtonFormField<int>(
+                    value: selectedRoleId,
+                    dropdownColor: posSurfaceLight,
+                    style: GoogleFonts.outfit(color: Colors.white),
+                    decoration: InputDecoration(
+                      labelText: 'Role',
+                      labelStyle: GoogleFonts.outfit(color: posTextMuted),
+                      filled: true,
+                      fillColor: posSurfaceLight,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        borderSide: BorderSide.none,
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        borderSide: const BorderSide(color: posPrimary, width: 1.5),
+                      ),
+                      contentPadding:
+                          const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                    ),
+                    items: const [
+                      DropdownMenuItem(value: 1, child: Text('Owner')),
+                      DropdownMenuItem(value: 2, child: Text('Cashier')),
+                    ],
+                    onChanged: (value) {
+                      if (value != null) {
+                        setDialogState(() => selectedRoleId = value);
+                      }
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child:
+                Text('Cancel', style: GoogleFonts.outfit(color: posTextMuted)),
+          ),
+          FilledButton(
+            onPressed: () async {
+              if (emailController.text.isEmpty ||
+                  passwordController.text.isEmpty ||
+                  nameController.text.isEmpty ||
+                  usernameController.text.isEmpty) {
+                ScaffoldMessenger.of(ctx).showSnackBar(
+                  const SnackBar(
+                    content: Text('Email, password, name, and username are required'),
+                  ),
+                );
+                return;
+              }
+
+              final supabase = Supabase.instance.client;
+              try {
+                // Sign up the new user via Supabase Auth
+                final authResponse = await supabase.auth.admin.createUser(
+                  AdminUserAttributes(
+                    email: emailController.text,
+                    password: passwordController.text,
+                    emailConfirm: true,
+                  ),
+                );
+
+                final newUserId = authResponse.user?.id;
+                if (newUserId == null) {
+                  throw Exception('Failed to create auth user');
+                }
+
+                // Create the profile
+                await supabase.from('profiles').insert({
+                  'user_id': newUserId,
+                  'username': usernameController.text,
+                  'role_id': selectedRoleId,
+                  'name': nameController.text,
+                  'phone': phoneController.text.isEmpty
+                      ? null
+                      : phoneController.text,
+                });
+
+                if (ctx.mounted) Navigator.pop(ctx);
+                onRefresh();
+              } catch (e) {
+                debugPrint('Error: $e');
+                if (ctx.mounted) {
+                  ScaffoldMessenger.of(ctx).showSnackBar(
+                    SnackBar(content: Text('Error: $e')),
+                  );
+                }
+              }
+            },
+            style: FilledButton.styleFrom(
+              backgroundColor: posPrimary,
+              foregroundColor: Colors.white,
+            ),
+            child: Text('Create User', style: GoogleFonts.outfit()),
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
 Future<void> _showEditUserDialog(
   BuildContext context,
   Profile profile,
@@ -237,71 +403,103 @@ Future<void> _showEditUserDialog(
 ) async {
   final nameController = TextEditingController(text: profile.name);
   final phoneController = TextEditingController(text: profile.phone ?? '');
-  final roleIdController =
-      TextEditingController(text: profile.roleId.toString());
+  int selectedRoleId = profile.roleId;
 
   await showDialog(
     context: context,
-    builder: (ctx) => AlertDialog(
-      backgroundColor: posSurface,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      title: Text(
-        'Edit User',
-        style: GoogleFonts.outfit(
-          color: Colors.white,
-          fontWeight: FontWeight.bold,
-        ),
-      ),
-      content: SizedBox(
-        width: 400,
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              _userField('Name', nameController),
-              _userField('Phone', phoneController,
-                  keyboardType: TextInputType.phone),
-              _userField('Role ID (1=owner, 2=cashier)', roleIdController,
-                  keyboardType: TextInputType.number),
-            ],
+    builder: (ctx) => StatefulBuilder(
+      builder: (ctx, setDialogState) => AlertDialog(
+        backgroundColor: posSurface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text(
+          'Edit User',
+          style: GoogleFonts.outfit(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
           ),
         ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(ctx),
-          child:
-              Text('Cancel', style: GoogleFonts.outfit(color: posTextMuted)),
+        content: SizedBox(
+          width: 400,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _userField('Name', nameController),
+                _userField('Phone', phoneController,
+                    keyboardType: TextInputType.phone),
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: DropdownButtonFormField<int>(
+                    value: selectedRoleId,
+                    dropdownColor: posSurfaceLight,
+                    style: GoogleFonts.outfit(color: Colors.white),
+                    decoration: InputDecoration(
+                      labelText: 'Role',
+                      labelStyle: GoogleFonts.outfit(color: posTextMuted),
+                      filled: true,
+                      fillColor: posSurfaceLight,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        borderSide: BorderSide.none,
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        borderSide: const BorderSide(color: posPrimary, width: 1.5),
+                      ),
+                      contentPadding:
+                          const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                    ),
+                    items: const [
+                      DropdownMenuItem(value: 1, child: Text('Owner')),
+                      DropdownMenuItem(value: 2, child: Text('Cashier')),
+                    ],
+                    onChanged: (value) {
+                      if (value != null) {
+                        setDialogState(() => selectedRoleId = value);
+                      }
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
-        FilledButton(
-          onPressed: () async {
-            final supabase = Supabase.instance.client;
-            try {
-              await supabase.from('profiles').update({
-                'name': nameController.text,
-                'phone': phoneController.text.isEmpty
-                    ? null
-                    : phoneController.text,
-                'role_id': int.tryParse(roleIdController.text) ??
-                    profile.roleId,
-              }).eq('id', profile.id);
-              if (ctx.mounted) Navigator.pop(ctx);
-              onRefresh();
-            } catch (e) {
-              if (ctx.mounted) {
-                ScaffoldMessenger.of(ctx).showSnackBar(
-                  SnackBar(content: Text('Error: $e')),
-                );
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child:
+                Text('Cancel', style: GoogleFonts.outfit(color: posTextMuted)),
+          ),
+          FilledButton(
+            onPressed: () async {
+              final supabase = Supabase.instance.client;
+              try {
+                await supabase.from('profiles').update({
+                  'name': nameController.text,
+                  'phone': phoneController.text.isEmpty
+                      ? null
+                      : phoneController.text,
+                  'role_id': selectedRoleId,
+                }).eq('id', profile.id);
+                if (ctx.mounted) Navigator.pop(ctx);
+                onRefresh();
+              } catch (e) {
+                debugPrint('Error: $e');
+                if (ctx.mounted) {
+                  ScaffoldMessenger.of(ctx).showSnackBar(
+                    SnackBar(content: Text('Error: $e')),
+                  );
+                }
               }
-            }
-          },
-          style: FilledButton.styleFrom(
-            backgroundColor: posPrimary,
-            foregroundColor: Colors.white,
+            },
+            style: FilledButton.styleFrom(
+              backgroundColor: posPrimary,
+              foregroundColor: Colors.white,
+            ),
+            child: Text('Update', style: GoogleFonts.outfit()),
           ),
-          child: Text('Update', style: GoogleFonts.outfit()),
-        ),
-      ],
+        ],
+      ),
     ),
   );
 }

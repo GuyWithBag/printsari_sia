@@ -507,6 +507,7 @@ class _LeftPanel extends HookWidget {
       );
       transactionProvider.addToCart(item);
     } catch (e) {
+      debugPrint('Print order error: $e');
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -1102,6 +1103,7 @@ class _RightPanel extends HookWidget {
         );
       }
     } catch (e) {
+      debugPrint('Checkout error: $e');
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
