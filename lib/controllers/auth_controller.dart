@@ -40,7 +40,21 @@ class AuthController extends ChangeNotifier {
     return false;
   }
 
-  Future<void> signIn(String email, String password) async {
+  Future<void> signIn(String identifier, String password) async {
+    String email = identifier;
+
+    // If the input doesn't contain '@', treat it as a username and resolve the email via RPC
+    if (!identifier.contains('@')) {
+      final result = await supabase.rpc(
+        'get_email_by_username',
+        params: {'lookup_username': identifier},
+      );
+      if (result == null || (result as String).isEmpty) {
+        throw Exception('No account found with username "$identifier"');
+      }
+      email = result;
+    }
+
     final response = await supabase.auth.signInWithPassword(
       email: email,
       password: password,
@@ -52,12 +66,9 @@ class AuthController extends ChangeNotifier {
         .select()
         .eq('user_id', user!.id)
         .single();
-    final result = query;
-    userProfile = Profile.fromJson(result);
+    userProfile = Profile.fromJson(query);
     userRoleType = await userProfile!.getRoleType(userProfile!);
     notifyListeners();
-    log(result.toString());
-    log(userProfile.toString());
   }
 
   void signOut(BuildContext context) async {

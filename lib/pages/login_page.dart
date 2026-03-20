@@ -121,9 +121,9 @@ class LoginPage extends HookWidget {
 
                   const SizedBox(height: 40),
 
-                  // Email label
+                  // Email / Username label
                   const Text(
-                    'EMAIL',
+                    'EMAIL OR USERNAME',
                     style: TextStyle(
                       color: posTextMuted,
                       fontSize: 10,
@@ -136,7 +136,7 @@ class LoginPage extends HookWidget {
                     controller: emailController,
                     style: const TextStyle(color: Colors.white),
                     decoration: const InputDecoration(
-                      hintText: 'Enter your email',
+                      hintText: 'Enter your email or username',
                       prefixIcon: Icon(Icons.email_outlined),
                     ),
                     textInputAction: TextInputAction.next,
