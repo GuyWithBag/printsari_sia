@@ -30,11 +30,11 @@ class ActivityLog {
   factory ActivityLog.fromJson(Map<String, dynamic> json) {
     return ActivityLog(
       id: json['id'] as int,
-      actionId: json['action_id'] as int,
-      description: json['description'] as String,
+      actionId: (json['action_id'] as int?) ?? 0,
+      description: (json['description'] as String?) ?? '',
       timestamp: DateTime.parse(json['timestamp'] as String),
-      performedBy: json['performed_by'] as String,
-      performedById: json['performed_by_id'] as int,
+      performedBy: (json['performed_by'] as String?) ?? 'Unknown',
+      performedById: (json['performed_by_id'] as int?) ?? 0,
       metadata: json['metadata'] as Map<String, dynamic>?,
       createdAt: DateTime.parse(json['created_at'] as String),
       action: json['activity_actions'] != null

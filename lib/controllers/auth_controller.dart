@@ -13,6 +13,33 @@ class AuthController extends ChangeNotifier {
   Profile? userProfile;
   UserRoleType? userRoleType;
 
+  Future<bool> restoreSession() async {
+    final currentSession = supabase.auth.currentSession;
+    final currentUser = supabase.auth.currentUser;
+    if (currentSession != null && currentUser != null) {
+      session = currentSession;
+      user = currentUser;
+      try {
+        final query = await supabase
+            .from('profiles')
+            .select()
+            .eq('user_id', currentUser.id)
+            .single();
+        userProfile = Profile.fromJson(query);
+        userRoleType = await userProfile!.getRoleType(userProfile!);
+        notifyListeners();
+        return true;
+      } catch (e) {
+        log('Failed to restore profile: $e');
+        session = null;
+        user = null;
+        userProfile = null;
+        userRoleType = null;
+      }
+    }
+    return false;
+  }
+
   Future<void> signIn(String email, String password) async {
     final response = await supabase.auth.signInWithPassword(
       email: email,

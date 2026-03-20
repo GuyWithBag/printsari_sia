@@ -55,22 +55,22 @@ class Transaction {
 
   factory Transaction.fromJson(Map<String, dynamic> json) {
     return Transaction(
-      id: json['id'] as int,
-      transactionNumber: json['transaction_number'] as String,
-      subtotal: (json['subtotal'] as num).toDouble(),
+      id: (json['id'] as int?) ?? 0,
+      transactionNumber: (json['transaction_number'] as String?) ?? '',
+      subtotal: (json['subtotal'] as num?)?.toDouble() ?? 0.0,
       tax: json['tax'] != null ? (json['tax'] as num).toDouble() : null,
       discount: json['discount'] != null
           ? (json['discount'] as num).toDouble()
           : null,
-      total: (json['total'] as num).toDouble(),
+      total: (json['total'] as num?)?.toDouble() ?? 0.0,
       date: DateTime.parse(json['date'] as String),
-      statusId: json['status_id'] as int,
-      paymentMethodId: json['payment_method_id'] as int,
-      cashierId: json['cashier_id'] as int,
+      statusId: (json['status_id'] as int?) ?? 0,
+      paymentMethodId: (json['payment_method_id'] as int?) ?? 0,
+      cashierId: (json['cashier_id'] as int?) ?? 0,
       customerId: json['customer_id'] as int?,
       notes: json['notes'] as String?,
-      storeRevenue: (json['store_revenue'] as num).toDouble(),
-      printingRevenue: (json['printing_revenue'] as num).toDouble(),
+      storeRevenue: (json['store_revenue'] as num?)?.toDouble() ?? 0.0,
+      printingRevenue: (json['printing_revenue'] as num?)?.toDouble() ?? 0.0,
       totalCost: json['total_cost'] != null
           ? (json['total_cost'] as num).toDouble()
           : null,

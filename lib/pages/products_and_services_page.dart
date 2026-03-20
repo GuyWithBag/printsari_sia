@@ -129,6 +129,8 @@ class _StoreProductsTab extends HookWidget {
   Widget build(BuildContext context) {
     final productProvider = context.watch<ProductProvider>();
     final inventoryProvider = context.watch<InventoryProvider>();
+    final searchController = useTextEditingController();
+    final searchQuery = useState('');
 
     final dataFuture = useMemoized(
       () => Future.wait([
@@ -143,20 +145,41 @@ class _StoreProductsTab extends HookWidget {
       enabled: !snapshot.hasData,
       child: Column(
         children: [
-          Align(
-            alignment: Alignment.centerRight,
-            child: FilledButton.icon(
-              onPressed: () => _showProductDialog(context, null, onRefresh),
-              icon: const Icon(Icons.add, size: 18),
-              label: Text('Add Product', style: GoogleFonts.outfit()),
-              style: FilledButton.styleFrom(
-                backgroundColor: posPrimary,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: searchController,
+                  onChanged: (value) => searchQuery.value = value,
+                  style: GoogleFonts.outfit(color: Colors.white),
+                  decoration: InputDecoration(
+                    hintText: 'Search products...',
+                    hintStyle: GoogleFonts.outfit(color: posTextMuted),
+                    prefixIcon: const Icon(Icons.search, color: posTextMuted),
+                    filled: true,
+                    fillColor: posSurfaceLight,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: BorderSide.none,
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  ),
                 ),
               ),
-            ),
+              const SizedBox(width: 12),
+              FilledButton.icon(
+                onPressed: () => _showProductDialog(context, null, onRefresh),
+                icon: const Icon(Icons.add, size: 18),
+                label: Text('Add Product', style: GoogleFonts.outfit()),
+                style: FilledButton.styleFrom(
+                  backgroundColor: posPrimary,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 12),
           Expanded(
@@ -165,6 +188,7 @@ class _StoreProductsTab extends HookWidget {
                     context,
                     snapshot.data![0] as List<Product>,
                     snapshot.data![1] as List<InventoryItem>,
+                    searchQuery.value,
                   )
                 : const Center(
                     child: CircularProgressIndicator(color: posPrimary),
@@ -179,11 +203,31 @@ class _StoreProductsTab extends HookWidget {
     BuildContext context,
     List<Product> products,
     List<InventoryItem> inventory,
+    String searchQuery,
   ) {
     if (products.isEmpty) {
       return Center(
         child: Text(
           'No products yet',
+          style: GoogleFonts.outfit(color: posTextMuted),
+        ),
+      );
+    }
+
+    final filteredProducts = searchQuery.isEmpty
+        ? products
+        : products.where((p) {
+            final query = searchQuery.toLowerCase();
+            return p.name.toLowerCase().contains(query) ||
+                p.description.toLowerCase().contains(query) ||
+                (p.sku?.toLowerCase().contains(query) ?? false) ||
+                (p.supplier?.toLowerCase().contains(query) ?? false);
+          }).toList();
+
+    if (filteredProducts.isEmpty) {
+      return Center(
+        child: Text(
+          'No products match your search',
           style: GoogleFonts.outfit(color: posTextMuted),
         ),
       );
@@ -222,7 +266,7 @@ class _StoreProductsTab extends HookWidget {
                 DataColumn(label: Text('Supplier')),
                 DataColumn(label: Text('Actions')),
               ],
-              rows: products.map((product) {
+              rows: filteredProducts.map((product) {
                 final stock = inventory
                     .where((i) => i.productId == product.id)
                     .fold(0.0, (sum, i) => sum + i.stock);
@@ -519,6 +563,8 @@ class _PrintServicesTab extends HookWidget {
   @override
   Widget build(BuildContext context) {
     final productProvider = context.watch<ProductProvider>();
+    final searchController = useTextEditingController();
+    final searchQuery = useState('');
 
     final servicesFuture = useMemoized(
       () => productProvider.getPrintServices(),
@@ -530,26 +576,47 @@ class _PrintServicesTab extends HookWidget {
       enabled: !snapshot.hasData,
       child: Column(
         children: [
-          Align(
-            alignment: Alignment.centerRight,
-            child: FilledButton.icon(
-              onPressed: () =>
-                  _showPrintServiceDialog(context, null, onRefresh),
-              icon: const Icon(Icons.add, size: 18),
-              label: Text('Add Print Service', style: GoogleFonts.outfit()),
-              style: FilledButton.styleFrom(
-                backgroundColor: posPrimary,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: searchController,
+                  onChanged: (value) => searchQuery.value = value,
+                  style: GoogleFonts.outfit(color: Colors.white),
+                  decoration: InputDecoration(
+                    hintText: 'Search services...',
+                    hintStyle: GoogleFonts.outfit(color: posTextMuted),
+                    prefixIcon: const Icon(Icons.search, color: posTextMuted),
+                    filled: true,
+                    fillColor: posSurfaceLight,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: BorderSide.none,
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  ),
                 ),
               ),
-            ),
+              const SizedBox(width: 12),
+              FilledButton.icon(
+                onPressed: () =>
+                    _showPrintServiceDialog(context, null, onRefresh),
+                icon: const Icon(Icons.add, size: 18),
+                label: Text('Add Print Service', style: GoogleFonts.outfit()),
+                style: FilledButton.styleFrom(
+                  backgroundColor: posPrimary,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 12),
           Expanded(
             child: snapshot.hasData
-                ? _buildServiceTable(context, snapshot.data!)
+                ? _buildServiceTable(context, snapshot.data!, searchQuery.value)
                 : const Center(
                     child: CircularProgressIndicator(color: posPrimary),
                   ),
@@ -562,11 +629,29 @@ class _PrintServicesTab extends HookWidget {
   Widget _buildServiceTable(
     BuildContext context,
     List<PrintService> services,
+    String searchQuery,
   ) {
     if (services.isEmpty) {
       return Center(
         child: Text(
           'No print services yet',
+          style: GoogleFonts.outfit(color: posTextMuted),
+        ),
+      );
+    }
+
+    final filteredServices = searchQuery.isEmpty
+        ? services
+        : services.where((s) {
+            final query = searchQuery.toLowerCase();
+            return s.name.toLowerCase().contains(query) ||
+                s.description.toLowerCase().contains(query);
+          }).toList();
+
+    if (filteredServices.isEmpty) {
+      return Center(
+        child: Text(
+          'No services match your search',
           style: GoogleFonts.outfit(color: posTextMuted),
         ),
       );
@@ -604,7 +689,7 @@ class _PrintServicesTab extends HookWidget {
                 DataColumn(label: Text('Cost/Page'), numeric: true),
                 DataColumn(label: Text('Actions')),
               ],
-              rows: services.map((svc) {
+              rows: filteredServices.map((svc) {
                 return DataRow(cells: [
                   DataCell(Text(svc.name)),
                   DataCell(Text(svc.paperSize?.sizeName ?? 'N/A')),

@@ -19,8 +19,8 @@ class FinancialReportsPage extends HookWidget {
   Widget build(BuildContext context) {
     final tabController = useTabController(initialLength: 3);
     final currentIndex = useState(0);
-    final transactionProvider = context.watch<TransactionProvider>();
-    final expenseProvider = context.watch<ExpenseProvider>();
+    final transactionProvider = context.read<TransactionProvider>();
+    final expenseProvider = context.read<ExpenseProvider>();
 
     final dataFuture = useMemoized(
       () => Future.wait([
@@ -61,76 +61,109 @@ class FinancialReportsPage extends HookWidget {
           ),
         ),
       ),
-      body: Skeletonizer(
-        enabled: !snapshot.hasData,
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              CircularTabBar(
-                tabController: tabController,
+      body: snapshot.hasError
+          ? Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  CircularTab(
-                    tabController: tabController,
-                    index: 0,
-                    label: 'Daily',
-                    icon: Icons.today_outlined,
-                    indexState: currentIndex,
+                  const Icon(Icons.error_outline,
+                      color: Colors.redAccent, size: 48),
+                  const SizedBox(height: 12),
+                  Text(
+                    'Failed to load financial data',
+                    style: GoogleFonts.outfit(
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
-                  CircularTab(
-                    tabController: tabController,
-                    index: 1,
-                    label: 'Weekly',
-                    icon: Icons.date_range_outlined,
-                    indexState: currentIndex,
-                  ),
-                  CircularTab(
-                    tabController: tabController,
-                    index: 2,
-                    label: 'Monthly',
-                    icon: Icons.calendar_month_outlined,
-                    indexState: currentIndex,
+                  const SizedBox(height: 4),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 32),
+                    child: Text(
+                      '${snapshot.error}',
+                      style: GoogleFonts.outfit(
+                          color: posTextMuted, fontSize: 13),
+                      textAlign: TextAlign.center,
+                    ),
                   ),
                 ],
               ),
-              const SizedBox(height: 24),
-              Expanded(
-                child: snapshot.hasData
-                    ? TabBarView(
-                        controller: tabController,
-                        children: [
-                          _ReportView(
-                            transactions:
-                                snapshot.data![0] as List<Transaction>,
-                            expenses: snapshot.data![1] as List<Expense>,
-                            periodDays: 0,
-                            periodLabel: 'Today',
-                          ),
-                          _ReportView(
-                            transactions:
-                                snapshot.data![0] as List<Transaction>,
-                            expenses: snapshot.data![1] as List<Expense>,
-                            periodDays: 7,
-                            periodLabel: 'Last 7 Days',
-                          ),
-                          _ReportView(
-                            transactions:
-                                snapshot.data![0] as List<Transaction>,
-                            expenses: snapshot.data![1] as List<Expense>,
-                            periodDays: 30,
-                            periodLabel: 'Last 30 Days',
-                          ),
-                        ],
-                      )
-                    : const Center(
-                        child: CircularProgressIndicator(color: posPrimary),
-                      ),
+            )
+          : Skeletonizer(
+              enabled: !snapshot.hasData,
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    CircularTabBar(
+                      tabController: tabController,
+                      children: [
+                        CircularTab(
+                          tabController: tabController,
+                          index: 0,
+                          label: 'Daily',
+                          icon: Icons.today_outlined,
+                          indexState: currentIndex,
+                        ),
+                        CircularTab(
+                          tabController: tabController,
+                          index: 1,
+                          label: 'Weekly',
+                          icon: Icons.date_range_outlined,
+                          indexState: currentIndex,
+                        ),
+                        CircularTab(
+                          tabController: tabController,
+                          index: 2,
+                          label: 'Monthly',
+                          icon: Icons.calendar_month_outlined,
+                          indexState: currentIndex,
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 24),
+                    Expanded(
+                      child: snapshot.hasData
+                          ? TabBarView(
+                              controller: tabController,
+                              children: [
+                                _ReportView(
+                                  transactions:
+                                      snapshot.data![0] as List<Transaction>,
+                                  expenses:
+                                      snapshot.data![1] as List<Expense>,
+                                  periodDays: 0,
+                                  periodLabel: 'Today',
+                                ),
+                                _ReportView(
+                                  transactions:
+                                      snapshot.data![0] as List<Transaction>,
+                                  expenses:
+                                      snapshot.data![1] as List<Expense>,
+                                  periodDays: 7,
+                                  periodLabel: 'Last 7 Days',
+                                ),
+                                _ReportView(
+                                  transactions:
+                                      snapshot.data![0] as List<Transaction>,
+                                  expenses:
+                                      snapshot.data![1] as List<Expense>,
+                                  periodDays: 30,
+                                  periodLabel: 'Last 30 Days',
+                                ),
+                              ],
+                            )
+                          : const Center(
+                              child: CircularProgressIndicator(
+                                  color: posPrimary),
+                            ),
+                    ),
+                  ],
+                ),
               ),
-            ],
-          ),
-        ),
-      ),
+            ),
     );
   }
 }
@@ -321,7 +354,7 @@ class _ReportView extends StatelessWidget {
                               vertical: 4,
                             ),
                             decoration: BoxDecoration(
-                              color: posPrimary.withOpacity(0.15),
+                              color: posPrimary.withValues(alpha: 0.15),
                               borderRadius: BorderRadius.circular(8),
                             ),
                             child: Text(

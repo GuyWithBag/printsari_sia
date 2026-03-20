@@ -8,17 +8,15 @@ import 'package:printsari_sia/shared/types/types.dart';
 import 'package:printsari_sia/widgets/app_page.dart';
 import 'package:provider/provider.dart';
 import 'package:skeletonizer/skeletonizer.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class BusinessExpensesPage extends HookWidget {
   const BusinessExpensesPage({Key? key}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
-    final expenseProvider = context.watch<ExpenseProvider>();
+    final expenseProvider = context.read<ExpenseProvider>();
     final refreshKey = useState(0);
-    final searchController = useTextEditingController();
-    final searchQuery = useState('');
-    final sourceFilter = useState<String>('All');
 
     final expensesFuture = useMemoized(
       () => expenseProvider.getExpenses(),
@@ -32,18 +30,35 @@ class BusinessExpensesPage extends HookWidget {
       refreshKey.value++;
     }
 
+    final expenses = snapshot.data ?? [];
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+
+    final todayExpenses =
+        expenses.where((e) => e.date.isAfter(today.subtract(const Duration(seconds: 1))) && e.date.isBefore(today.add(const Duration(days: 1)))).toList();
+    final thisMonthExpenses =
+        expenses.where((e) => e.date.year == now.year && e.date.month == now.month).toList();
+
+    final todayTotal = todayExpenses.fold<double>(0, (sum, e) => sum + e.amount);
+    final monthTotal = thisMonthExpenses.fold<double>(0, (sum, e) => sum + e.amount);
+    final allTotal = expenses.fold<double>(0, (sum, e) => sum + e.amount);
+
+    final currencyFormat =
+        NumberFormat.currency(symbol: '\u20B1', decimalDigits: 2);
+    final dateFormat = DateFormat('MMM dd, yyyy');
+
+    // Group expenses by category
+    final Map<String, double> categoryTotals = {};
+    for (final e in expenses) {
+      final catName = e.category?.categoryName ?? 'Uncategorized';
+      categoryTotals[catName] = (categoryTotals[catName] ?? 0) + e.amount;
+    }
+
     return AppPage(
       appBar: AppBar(
         elevation: 0,
         scrolledUnderElevation: 0,
         backgroundColor: Colors.transparent,
-        title: Text(
-          'Business Expenses',
-          style: GoogleFonts.outfit(
-            fontWeight: FontWeight.bold,
-            color: Colors.white,
-          ),
-        ),
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh_rounded, color: Colors.white),
@@ -51,117 +66,287 @@ class BusinessExpensesPage extends HookWidget {
             onPressed: hardRefresh,
           ),
         ],
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(30),
-          child: Padding(
-            padding: const EdgeInsets.only(
-              left: 16.0,
-              right: 16.0,
-              bottom: 12.0,
-            ),
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: Text(
-                'Track manual and auto-generated business expenses',
-                style: GoogleFonts.outfit(color: posTextMuted),
-              ),
-            ),
-          ),
-        ),
       ),
       body: Skeletonizer(
         enabled: !snapshot.hasData,
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
           child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Filter row
+              // Header row
               Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Expanded(
-                    flex: 3,
-                    child: TextField(
-                      controller: searchController,
-                      onChanged: (value) => searchQuery.value = value,
-                      style: GoogleFonts.outfit(color: Colors.white),
-                      decoration: InputDecoration(
-                        hintText: 'Search expenses...',
-                        hintStyle: GoogleFonts.outfit(color: posTextMuted),
-                        prefixIcon:
-                            const Icon(Icons.search, color: posTextMuted),
-                        filled: true,
-                        fillColor: posSurfaceLight,
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(10),
-                          borderSide: BorderSide.none,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Business Expenses',
+                          style: GoogleFonts.outfit(
+                            fontSize: 28,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
                         ),
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 14,
-                          vertical: 12,
+                        const SizedBox(height: 4),
+                        Text(
+                          'Track and manage your business costs',
+                          style: GoogleFonts.outfit(
+                            fontSize: 14,
+                            color: posTextMuted,
+                          ),
                         ),
-                      ),
+                      ],
                     ),
                   ),
-                  const SizedBox(width: 12),
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: posSurfaceLight,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: DropdownButtonHideUnderline(
-                      child: DropdownButton<String>(
-                        value: sourceFilter.value,
-                        dropdownColor: posSurfaceLight,
-                        style: GoogleFonts.outfit(
-                          color: Colors.white,
-                          fontSize: 14,
-                        ),
-                        items: ['All', 'Manual', 'Auto-generated']
-                            .map(
-                              (s) => DropdownMenuItem(
-                                value: s,
-                                child: Text(s),
-                              ),
-                            )
-                            .toList(),
-                        onChanged: (val) {
-                          if (val != null) sourceFilter.value = val;
-                        },
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
                   FilledButton.icon(
                     onPressed: () =>
                         _showExpenseDialog(context, null, refresh),
                     icon: const Icon(Icons.add, size: 18),
-                    label: Text('Add Expense', style: GoogleFonts.outfit()),
+                    label: Text('Record Expense',
+                        style: GoogleFonts.outfit(fontWeight: FontWeight.w500)),
                     style: FilledButton.styleFrom(
                       backgroundColor: posPrimary,
                       foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 20, vertical: 14),
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
+                        borderRadius: BorderRadius.circular(12),
                       ),
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: 16),
-              // Expense table
-              Expanded(
-                child: snapshot.hasData
-                    ? _ExpenseTable(
-                        expenses: snapshot.data!,
-                        searchQuery: searchQuery.value,
-                        sourceFilter: sourceFilter.value,
-                        onRefresh: refresh,
-                      )
-                    : const Center(
-                        child: CircularProgressIndicator(color: posPrimary),
-                      ),
+              const SizedBox(height: 24),
+
+              // Summary cards row
+              Row(
+                children: [
+                  Expanded(
+                    child: _SummaryCard(
+                      icon: Icons.attach_money_rounded,
+                      iconColor: const Color(0xFF22C55E),
+                      title: "Today's Expenses",
+                      amount: currencyFormat.format(todayTotal),
+                      subtitle:
+                          '${todayExpenses.length} transaction${todayExpenses.length == 1 ? '' : 's'}',
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: _SummaryCard(
+                      icon: Icons.bar_chart_rounded,
+                      iconColor: const Color(0xFF3B82F6),
+                      title: 'This Month',
+                      amount: currencyFormat.format(monthTotal),
+                      subtitle:
+                          '${thisMonthExpenses.length} expense${thisMonthExpenses.length == 1 ? '' : 's'}',
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: _SummaryCard(
+                      icon: Icons.account_balance_wallet_rounded,
+                      iconColor: posPrimary,
+                      title: 'Total Expenses',
+                      amount: currencyFormat.format(allTotal),
+                      subtitle: 'All time',
+                    ),
+                  ),
+                ],
               ),
+              const SizedBox(height: 28),
+
+              // Expenses by Category
+              Text(
+                'Expenses by Category',
+                style: GoogleFonts.outfit(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.white,
+                ),
+              ),
+              const SizedBox(height: 12),
+              if (categoryTotals.isEmpty)
+                _GlassPanel(
+                  child: Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Center(
+                      child: Text(
+                        'No expense categories yet',
+                        style: GoogleFonts.outfit(color: posTextMuted),
+                      ),
+                    ),
+                  ),
+                )
+              else
+                Wrap(
+                  spacing: 12,
+                  runSpacing: 12,
+                  children: categoryTotals.entries.map((entry) {
+                    return _GlassPanel(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 20, vertical: 16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              entry.key,
+                              style: GoogleFonts.outfit(
+                                fontSize: 13,
+                                color: posTextMuted,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              currencyFormat.format(entry.value),
+                              style: GoogleFonts.outfit(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                ),
+              const SizedBox(height: 28),
+
+              // Recent Expenses
+              Text(
+                'Recent Expenses',
+                style: GoogleFonts.outfit(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.white,
+                ),
+              ),
+              const SizedBox(height: 12),
+              if (expenses.isEmpty)
+                _GlassPanel(
+                  child: Padding(
+                    padding: const EdgeInsets.all(32),
+                    child: Center(
+                      child: Text(
+                        'No expenses recorded yet',
+                        style: GoogleFonts.outfit(color: posTextMuted),
+                      ),
+                    ),
+                  ),
+                )
+              else
+                ...expenses.map((expense) {
+                  final isManual = expense.sourceId == 1;
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: _GlassPanel(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 14),
+                        child: Row(
+                          children: [
+                            // Left side: description, category badge, date
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    expense.description,
+                                    style: GoogleFonts.outfit(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w600,
+                                      color: Colors.white,
+                                    ),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  const SizedBox(height: 6),
+                                  Row(
+                                    children: [
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal: 10, vertical: 4),
+                                        decoration: BoxDecoration(
+                                          color:
+                                              posPrimary.withValues(alpha: 0.15),
+                                          borderRadius:
+                                              BorderRadius.circular(8),
+                                        ),
+                                        child: Text(
+                                          expense.category?.categoryName ??
+                                              'Uncategorized',
+                                          style: GoogleFonts.outfit(
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.w500,
+                                            color: posPrimary,
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 10),
+                                      Text(
+                                        dateFormat.format(expense.date),
+                                        style: GoogleFonts.outfit(
+                                          fontSize: 12,
+                                          color: posTextMuted,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
+                            // Right side: amount + action buttons
+                            Text(
+                              currencyFormat.format(expense.amount),
+                              style: GoogleFonts.outfit(
+                                fontSize: 15,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
+                            ),
+                            if (isManual) ...[
+                              const SizedBox(width: 8),
+                              IconButton(
+                                icon: const Icon(
+                                  Icons.edit_outlined,
+                                  size: 18,
+                                  color: posAccent,
+                                ),
+                                tooltip: 'Edit',
+                                onPressed: () => _showExpenseDialog(
+                                  context,
+                                  expense,
+                                  refresh,
+                                ),
+                                visualDensity: VisualDensity.compact,
+                              ),
+                              IconButton(
+                                icon: const Icon(
+                                  Icons.delete_outline,
+                                  size: 18,
+                                  color: Color(0xFFEF4444),
+                                ),
+                                tooltip: 'Delete',
+                                onPressed: () => _showDeleteExpenseDialog(
+                                  context,
+                                  expense,
+                                  refresh,
+                                ),
+                                visualDensity: VisualDensity.compact,
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                    ),
+                  );
+                }),
+              const SizedBox(height: 24),
             ],
           ),
         ),
@@ -170,162 +355,99 @@ class BusinessExpensesPage extends HookWidget {
   }
 }
 
-class _ExpenseTable extends StatelessWidget {
-  final List<Expense> expenses;
-  final String searchQuery;
-  final String sourceFilter;
-  final VoidCallback onRefresh;
+// -- Reusable widgets --
 
-  const _ExpenseTable({
-    required this.expenses,
-    required this.searchQuery,
-    required this.sourceFilter,
-    required this.onRefresh,
+class _SummaryCard extends StatelessWidget {
+  final IconData icon;
+  final Color iconColor;
+  final String title;
+  final String amount;
+  final String subtitle;
+
+  const _SummaryCard({
+    required this.icon,
+    required this.iconColor,
+    required this.title,
+    required this.amount,
+    required this.subtitle,
   });
 
   @override
   Widget build(BuildContext context) {
-    var filtered = expenses.where((e) {
-      // Source filter
-      if (sourceFilter == 'Manual' && e.sourceId != 1) return false;
-      if (sourceFilter == 'Auto-generated' && e.sourceId != 2) return false;
-      // Search filter
-      if (searchQuery.isNotEmpty) {
-        final q = searchQuery.toLowerCase();
-        return e.description.toLowerCase().contains(q) ||
-            (e.vendor?.toLowerCase().contains(q) ?? false) ||
-            (e.category?.categoryName.toLowerCase().contains(q) ?? false);
-      }
-      return true;
-    }).toList();
-
-    if (filtered.isEmpty) {
-      return Center(
-        child: Text(
-          'No expenses found',
-          style: GoogleFonts.outfit(color: posTextMuted),
-        ),
-      );
-    }
-
-    final currencyFormat = NumberFormat.currency(symbol: 'P', decimalDigits: 2);
-    final dateFormat = DateFormat('MMM dd, yyyy');
-
-    return Container(
-      decoration: BoxDecoration(
-        color: posSurface,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(12),
-        child: SingleChildScrollView(
-          child: SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: DataTable(
-              headingRowColor: WidgetStateProperty.all(posSurfaceLight),
-              dataRowColor: WidgetStateProperty.all(posSurface),
-              headingTextStyle: GoogleFonts.outfit(
-                color: posTextMuted,
-                fontWeight: FontWeight.w600,
-                fontSize: 13,
-              ),
-              dataTextStyle: GoogleFonts.outfit(
-                color: Colors.white,
-                fontSize: 13,
-              ),
-              columns: const [
-                DataColumn(label: Text('Date')),
-                DataColumn(label: Text('Description')),
-                DataColumn(label: Text('Category')),
-                DataColumn(label: Text('Amount'), numeric: true),
-                DataColumn(label: Text('Source')),
-                DataColumn(label: Text('Vendor')),
-                DataColumn(label: Text('Actions')),
+    return _GlassPanel(
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: iconColor.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(icon, size: 20, color: iconColor),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    title,
+                    style: GoogleFonts.outfit(
+                      fontSize: 13,
+                      color: posTextMuted,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
               ],
-              rows: filtered.map((expense) {
-                final isAuto = expense.sourceId == 2;
-                return DataRow(cells: [
-                  DataCell(Text(dateFormat.format(expense.date))),
-                  DataCell(
-                    SizedBox(
-                      width: 200,
-                      child: Text(
-                        expense.description,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                  ),
-                  DataCell(
-                    Text(expense.category?.categoryName ?? 'N/A'),
-                  ),
-                  DataCell(Text(currencyFormat.format(expense.amount))),
-                  DataCell(
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: isAuto
-                            ? posPrimary.withOpacity(0.15)
-                            : const Color(0xFF3B82F6).withOpacity(0.15),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text(
-                        isAuto ? 'Auto' : 'Manual',
-                        style: GoogleFonts.outfit(
-                          color: isAuto
-                              ? posPrimary
-                              : const Color(0xFF3B82F6),
-                          fontSize: 12,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ),
-                  ),
-                  DataCell(Text(expense.vendor ?? '-')),
-                  DataCell(
-                    isAuto
-                        ? const SizedBox.shrink()
-                        : Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              IconButton(
-                                icon: const Icon(
-                                  Icons.edit_outlined,
-                                  size: 18,
-                                  color: posAccent,
-                                ),
-                                onPressed: () => _showExpenseDialog(
-                                  context,
-                                  expense,
-                                  onRefresh,
-                                ),
-                              ),
-                              IconButton(
-                                icon: const Icon(
-                                  Icons.delete_outline,
-                                  size: 18,
-                                  color: Color(0xFFEF4444),
-                                ),
-                                onPressed: () => _showDeleteExpenseDialog(
-                                  context,
-                                  expense,
-                                  onRefresh,
-                                ),
-                              ),
-                            ],
-                          ),
-                  ),
-                ]);
-              }).toList(),
             ),
-          ),
+            const SizedBox(height: 14),
+            Text(
+              amount,
+              style: GoogleFonts.outfit(
+                fontSize: 22,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              subtitle,
+              style: GoogleFonts.outfit(
+                fontSize: 12,
+                color: posTextMuted,
+              ),
+            ),
+          ],
         ),
       ),
     );
   }
 }
+
+class _GlassPanel extends StatelessWidget {
+  final Widget child;
+  const _GlassPanel({required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: posSurface,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: posSurfaceLight.withValues(alpha: 0.6),
+          width: 1,
+        ),
+      ),
+      child: child,
+    );
+  }
+}
+
+// -- Dialogs (kept as-is) --
 
 Future<void> _showExpenseDialog(
   BuildContext context,
@@ -337,9 +459,7 @@ Future<void> _showExpenseDialog(
       TextEditingController(text: expense?.description ?? '');
   final amountController =
       TextEditingController(text: expense?.amount.toString() ?? '');
-  final categoryIdController = TextEditingController(
-    text: expense?.categoryId.toString() ?? '1',
-  );
+  int selectedCategoryId = expense?.categoryId ?? 1;
   final vendorController =
       TextEditingController(text: expense?.vendor ?? '');
   final receiptController =
@@ -371,8 +491,60 @@ Future<void> _showExpenseDialog(
                 _expenseField('Description', descController),
                 _expenseField('Amount', amountController,
                     keyboardType: TextInputType.number),
-                _expenseField('Category ID', categoryIdController,
-                    keyboardType: TextInputType.number),
+                // Category dropdown
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: FutureBuilder<List<ExpenseCategory>>(
+                    future: Supabase.instance.client
+                        .from('expense_categories')
+                        .select()
+                        .then((data) => (data as List)
+                            .map((e) => ExpenseCategory.fromJson(
+                                e as Map<String, dynamic>))
+                            .toList()),
+                    builder: (context, snap) {
+                      final categories = snap.data ?? [];
+                      return DropdownButtonFormField<int>(
+                        value: categories.any((c) => c.id == selectedCategoryId)
+                            ? selectedCategoryId
+                            : (categories.isNotEmpty
+                                ? categories.first.id
+                                : null),
+                        dropdownColor: posSurfaceLight,
+                        style: GoogleFonts.outfit(color: Colors.white),
+                        decoration: InputDecoration(
+                          labelText: 'Category',
+                          labelStyle:
+                              GoogleFonts.outfit(color: posTextMuted),
+                          filled: true,
+                          fillColor: posSurfaceLight,
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                            borderSide: BorderSide.none,
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                            borderSide: const BorderSide(
+                                color: posPrimary, width: 1.5),
+                          ),
+                          contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 14, vertical: 12),
+                        ),
+                        items: categories
+                            .map((c) => DropdownMenuItem(
+                                  value: c.id,
+                                  child: Text(c.categoryName),
+                                ))
+                            .toList(),
+                        onChanged: (val) {
+                          if (val != null) {
+                            setState(() => selectedCategoryId = val);
+                          }
+                        },
+                      );
+                    },
+                  ),
+                ),
                 // Date picker row
                 Padding(
                   padding: const EdgeInsets.only(bottom: 12),
@@ -445,8 +617,7 @@ Future<void> _showExpenseDialog(
                     'description': descController.text,
                     'amount':
                         double.tryParse(amountController.text) ?? 0,
-                    'category_id':
-                        int.tryParse(categoryIdController.text) ?? 1,
+                    'category_id': selectedCategoryId,
                     'date': selectedDate.value.toIso8601String(),
                     'vendor': vendorController.text.isEmpty
                         ? null
@@ -464,8 +635,7 @@ Future<void> _showExpenseDialog(
                     id: 0,
                     description: descController.text,
                     amount: double.tryParse(amountController.text) ?? 0,
-                    categoryId:
-                        int.tryParse(categoryIdController.text) ?? 1,
+                    categoryId: selectedCategoryId,
                     date: selectedDate.value,
                     receiptNumber: receiptController.text.isEmpty
                         ? null

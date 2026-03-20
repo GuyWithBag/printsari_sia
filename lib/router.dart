@@ -4,6 +4,7 @@ import 'package:printsari_sia/controllers/auth_controller.dart';
 import 'package:printsari_sia/pages/login_page.dart';
 import 'package:printsari_sia/pages/pages.dart';
 import 'package:printsari_sia/providers/providers.dart';
+import 'package:printsari_sia/shared/themes/colors.dart';
 import 'package:printsari_sia/widgets/sidebar.dart';
 import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -41,11 +42,19 @@ final router = GoRouter(
             ),
             ShellRoute(
               builder: (context, state, child) {
-                return Row(
-                  children: [
-                    const SizedBox(width: 250, child: Sidebar()),
-                    Expanded(child: child),
-                  ],
+                // Restore session/profile if we have a Supabase session but AuthController hasn't loaded yet
+                final auth = context.read<AuthController>();
+                if (auth.userProfile == null && Supabase.instance.client.auth.currentSession != null) {
+                  auth.restoreSession();
+                }
+                return Container(
+                  color: posBg,
+                  child: Row(
+                    children: [
+                      const SizedBox(width: 250, child: Sidebar()),
+                      Expanded(child: child),
+                    ],
+                  ),
                 );
               },
               routes: [

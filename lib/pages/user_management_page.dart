@@ -1,9 +1,14 @@
+import 'dart:typed_data';
+
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:printsari_sia/controllers/controllers.dart';
 import 'package:printsari_sia/shared/themes/colors.dart';
 import 'package:printsari_sia/shared/types/types.dart';
 import 'package:printsari_sia/widgets/app_page.dart';
+import 'package:provider/provider.dart';
 import 'package:skeletonizer/skeletonizer.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -30,75 +35,130 @@ class UserManagementPage extends HookWidget {
 
     void refresh() => refreshKey.value++;
 
+    // Parse profiles and roles
+    final List<_UserData> users = [];
+    if (snapshot.hasData) {
+      for (final data in snapshot.data!) {
+        final map = data as Map<String, dynamic>;
+        final profile = Profile.fromJson(map);
+        UserRole? role;
+        if (map['user_roles'] != null) {
+          role = UserRole.fromJson(map['user_roles'] as Map<String, dynamic>);
+        }
+        users.add(_UserData(profile: profile, role: role));
+      }
+    }
+
+    final owners = users.where((u) => u.role?.roleName == 'owner').toList();
+    final cashiers = users.where((u) => u.role?.roleName != 'owner').toList();
+
     return AppPage(
-      appBar: AppBar(
-        elevation: 0,
-        scrolledUnderElevation: 0,
-        backgroundColor: Colors.transparent,
-        title: Text(
-          'User Management',
-          style: GoogleFonts.outfit(
-            fontWeight: FontWeight.bold,
-            color: Colors.white,
-          ),
-        ),
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(30),
-          child: Padding(
-            padding: const EdgeInsets.only(
-              left: 16.0,
-              right: 16.0,
-              bottom: 12.0,
-            ),
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: Text(
-                'View and manage user profiles and roles',
-                style: GoogleFonts.outfit(color: posTextMuted),
-              ),
-            ),
-          ),
-        ),
-      ),
       body: Skeletonizer(
-        enabled: !snapshot.hasData,
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
+        enabled: !snapshot.hasData && !snapshot.hasError,
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(24),
           child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Align(
-                alignment: Alignment.centerRight,
-                child: FilledButton.icon(
-                  onPressed: () => _showAddUserDialog(context, refresh),
-                  icon: const Icon(Icons.person_add, size: 18),
-                  label: Text('Add User', style: GoogleFonts.outfit()),
-                  style: FilledButton.styleFrom(
-                    backgroundColor: posPrimary,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
+              // Header
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'User Management',
+                        style: GoogleFonts.outfit(
+                          fontSize: 28,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Manage user accounts and permissions',
+                        style: GoogleFonts.outfit(
+                          fontSize: 14,
+                          color: posTextMuted,
+                        ),
+                      ),
+                    ],
+                  ),
+                  FilledButton.icon(
+                    onPressed: () => _showAddUserDialog(context, refresh),
+                    icon: const Icon(Icons.add, size: 18),
+                    label: Text('Add User', style: GoogleFonts.outfit()),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: posPrimary,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
                     ),
                   ),
-                ),
+                ],
               ),
-              const SizedBox(height: 12),
-              Expanded(
-                child: snapshot.hasData
-                    ? _UserTable(
-                        profilesData: snapshot.data!,
-                        currentUserId: currentUserId,
-                        onRefresh: refresh,
-                      )
-                    : snapshot.hasError
-                        ? Center(
-                            child: Text(
-                              'Error loading users: ${snapshot.error}',
-                              style: GoogleFonts.outfit(color: posTextMuted),
-                            ),
-                          )
-                        : const Center(
-                            child: CircularProgressIndicator(color: posPrimary),
-                          ),
+              const SizedBox(height: 24),
+
+              // Summary cards
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final crossCount = constraints.maxWidth > 700 ? 3 : 1;
+                  return GridView.count(
+                    crossAxisCount: crossCount,
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    mainAxisSpacing: 12,
+                    crossAxisSpacing: 12,
+                    childAspectRatio: 2.5,
+                    children: [
+                      _SummaryCard(
+                        label: 'Total Users',
+                        count: users.length,
+                        subtitle: 'Active accounts',
+                        icon: Icons.people_outlined,
+                        iconColor: posTextMuted,
+                      ),
+                      _SummaryCard(
+                        label: 'Owners',
+                        count: owners.length,
+                        subtitle: 'Full access',
+                        icon: Icons.shield_outlined,
+                        iconColor: const Color(0xFF60A5FA),
+                      ),
+                      _SummaryCard(
+                        label: 'Cashiers',
+                        count: cashiers.length,
+                        subtitle: 'Limited access',
+                        icon: Icons.person_outline,
+                        iconColor: const Color(0xFF4ADE80),
+                      ),
+                    ],
+                  );
+                },
+              ),
+              const SizedBox(height: 24),
+
+              // Owner Accounts
+              _UserGroupPanel(
+                title: 'Owner Accounts',
+                icon: Icons.shield_outlined,
+                iconColor: const Color(0xFF60A5FA),
+                users: owners,
+                currentUserId: currentUserId,
+                onRefresh: refresh,
+              ),
+              const SizedBox(height: 16),
+
+              // Cashier Accounts
+              _UserGroupPanel(
+                title: 'Cashier Accounts',
+                icon: Icons.person_outline,
+                iconColor: const Color(0xFF4ADE80),
+                users: cashiers,
+                currentUserId: currentUserId,
+                onRefresh: refresh,
               ),
             ],
           ),
@@ -108,144 +168,252 @@ class UserManagementPage extends HookWidget {
   }
 }
 
-class _UserTable extends StatelessWidget {
-  final List<dynamic> profilesData;
+class _UserData {
+  final Profile profile;
+  final UserRole? role;
+  const _UserData({required this.profile, this.role});
+}
+
+// ---------- Summary card ----------
+
+class _SummaryCard extends StatelessWidget {
+  final String label;
+  final int count;
+  final String subtitle;
+  final IconData icon;
+  final Color iconColor;
+
+  const _SummaryCard({
+    required this.label,
+    required this.count,
+    required this.subtitle,
+    required this.icon,
+    required this.iconColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: posSurface,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  label,
+                  style: GoogleFonts.outfit(
+                    fontSize: 13,
+                    color: posTextMuted,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  '$count',
+                  style: GoogleFonts.outfit(
+                    fontSize: 22,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white,
+                  ),
+                ),
+                Text(
+                  subtitle,
+                  style: GoogleFonts.outfit(fontSize: 11, color: posTextMuted),
+                ),
+              ],
+            ),
+          ),
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: iconColor.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(icon, color: iconColor, size: 24),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ---------- User group panel ----------
+
+class _UserGroupPanel extends StatelessWidget {
+  final String title;
+  final IconData icon;
+  final Color iconColor;
+  final List<_UserData> users;
   final String? currentUserId;
   final VoidCallback onRefresh;
 
-  const _UserTable({
-    required this.profilesData,
+  const _UserGroupPanel({
+    required this.title,
+    required this.icon,
+    required this.iconColor,
+    required this.users,
     required this.currentUserId,
     required this.onRefresh,
   });
 
   @override
   Widget build(BuildContext context) {
-    if (profilesData.isEmpty) {
-      return Center(
-        child: Text(
-          'No users found',
-          style: GoogleFonts.outfit(color: posTextMuted),
-        ),
-      );
-    }
-
     return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: posSurface,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
       ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(12),
-        child: SingleChildScrollView(
-          child: SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: DataTable(
-              headingRowColor: WidgetStateProperty.all(posSurfaceLight),
-              dataRowColor: WidgetStateProperty.all(posSurface),
-              headingTextStyle: GoogleFonts.outfit(
-                color: posTextMuted,
-                fontWeight: FontWeight.w600,
-                fontSize: 13,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(icon, color: iconColor, size: 20),
+              const SizedBox(width: 8),
+              Text(
+                title,
+                style: GoogleFonts.outfit(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.white,
+                ),
               ),
-              dataTextStyle: GoogleFonts.outfit(
-                color: Colors.white,
-                fontSize: 13,
+            ],
+          ),
+          const SizedBox(height: 16),
+          if (users.isEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              child: Text(
+                'No users in this group.',
+                style: GoogleFonts.outfit(color: posTextMuted, fontSize: 13),
               ),
-              columns: const [
-                DataColumn(label: Text('Name')),
-                DataColumn(label: Text('Username')),
-                DataColumn(label: Text('Role')),
-                DataColumn(label: Text('Phone')),
-                DataColumn(label: Text('Actions')),
-              ],
-              rows: profilesData.map((data) {
-                final map = data as Map<String, dynamic>;
-                final profile = Profile.fromJson(map);
-                UserRole? role;
-                if (map['user_roles'] != null) {
-                  role = UserRole.fromJson(
-                    map['user_roles'] as Map<String, dynamic>,
-                  );
-                }
-                final isCurrentUser = profile.userId == currentUserId;
+            )
+          else
+            ...users.map((u) {
+              final roleName = u.role?.roleName ?? 'N/A';
+              final isOwner = roleName == 'owner';
+              final isCurrentUser = u.profile.userId == currentUserId;
 
-                return DataRow(cells: [
-                  DataCell(
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(profile.name),
-                        if (isCurrentUser) ...[
-                          const SizedBox(width: 8),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 2,
-                            ),
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: Row(
+                  children: [
+                    // Avatar
+                    u.profile.profilePicture != null && u.profile.profilePicture!.isNotEmpty
+                        ? CircleAvatar(
+                            radius: 20,
+                            backgroundImage: NetworkImage(u.profile.profilePicture!),
+                            backgroundColor: iconColor.withValues(alpha: 0.12),
+                          )
+                        : Container(
+                            width: 40,
+                            height: 40,
                             decoration: BoxDecoration(
-                              color: posPrimary.withValues(alpha: 0.15),
-                              borderRadius: BorderRadius.circular(8),
+                              color: iconColor.withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(20),
                             ),
-                            child: Text(
-                              'You',
-                              style: GoogleFonts.outfit(
-                                color: posPrimary,
-                                fontSize: 11,
-                                fontWeight: FontWeight.w600,
+                            child: Center(
+                              child: Text(
+                                u.profile.name.isNotEmpty
+                                    ? u.profile.name[0].toUpperCase()
+                                    : '?',
+                                style: TextStyle(
+                                  color: iconColor,
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 16,
+                                ),
                               ),
                             ),
                           ),
+                    const SizedBox(width: 12),
+                    // Name + username
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Text(
+                                u.profile.name,
+                                style: GoogleFonts.outfit(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.white,
+                                ),
+                              ),
+                              if (isCurrentUser) ...[
+                                const SizedBox(width: 6),
+                                Text(
+                                  '(You)',
+                                  style: GoogleFonts.outfit(
+                                    fontSize: 12,
+                                    color: posPrimary,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                          Text(
+                            '@${u.profile.username}',
+                            style: GoogleFonts.outfit(
+                              fontSize: 12,
+                              color: posTextMuted,
+                            ),
+                          ),
                         ],
-                      ],
+                      ),
                     ),
-                  ),
-                  DataCell(Text(profile.username)),
-                  DataCell(
+                    // Role badge
                     Container(
                       padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 4,
-                      ),
+                          horizontal: 10, vertical: 4),
                       decoration: BoxDecoration(
-                        color: role?.roleName == 'owner'
-                            ? posPrimary.withValues(alpha: 0.15)
-                            : const Color(0xFF3B82F6).withValues(alpha: 0.15),
+                        color: isOwner
+                            ? const Color(0xFF60A5FA).withValues(alpha: 0.12)
+                            : const Color(0xFF4ADE80).withValues(alpha: 0.12),
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Text(
-                        role?.roleName ?? 'N/A',
+                        roleName[0].toUpperCase() + roleName.substring(1),
                         style: GoogleFonts.outfit(
-                          color: role?.roleName == 'owner'
-                              ? posPrimary
-                              : const Color(0xFF3B82F6),
                           fontSize: 12,
-                          fontWeight: FontWeight.w500,
+                          fontWeight: FontWeight.w600,
+                          color: isOwner
+                              ? const Color(0xFF60A5FA)
+                              : const Color(0xFF4ADE80),
                         ),
                       ),
                     ),
-                  ),
-                  DataCell(Text(profile.phone ?? '-')),
-                  DataCell(
+                    const SizedBox(width: 8),
+                    // Edit button
                     IconButton(
-                      icon: const Icon(
-                        Icons.edit_outlined,
-                        size: 18,
-                        color: posAccent,
-                      ),
+                      icon: const Icon(Icons.edit_outlined,
+                          size: 18, color: posAccent),
                       onPressed: () => _showEditUserDialog(
                         context,
-                        profile,
-                        role,
+                        u.profile,
+                        u.role,
                         onRefresh,
                       ),
                     ),
-                  ),
-                ]);
-              }).toList(),
-            ),
-          ),
-        ),
+                  ],
+                ),
+              );
+            }),
+        ],
       ),
     );
   }
@@ -261,6 +429,8 @@ Future<void> _showAddUserDialog(
   final usernameController = TextEditingController();
   final phoneController = TextEditingController();
   int selectedRoleId = 2; // default to cashier
+  bool obscurePassword = true;
+  bool isCreating = false;
 
   await showDialog(
     context: context,
@@ -283,7 +453,38 @@ Future<void> _showAddUserDialog(
               children: [
                 _userField('Email', emailController,
                     keyboardType: TextInputType.emailAddress),
-                _userField('Password', passwordController),
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: TextField(
+                    controller: passwordController,
+                    obscureText: obscurePassword,
+                    style: GoogleFonts.outfit(color: Colors.white),
+                    decoration: InputDecoration(
+                      labelText: 'Password',
+                      labelStyle: GoogleFonts.outfit(color: posTextMuted),
+                      filled: true,
+                      fillColor: posSurfaceLight,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        borderSide: BorderSide.none,
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        borderSide: const BorderSide(color: posPrimary, width: 1.5),
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      suffixIcon: IconButton(
+                        icon: Icon(
+                          obscurePassword ? Icons.visibility_off : Icons.visibility,
+                          color: posTextMuted,
+                        ),
+                        onPressed: () {
+                          setDialogState(() => obscurePassword = !obscurePassword);
+                        },
+                      ),
+                    ),
+                  ),
+                ),
                 _userField('Full Name', nameController),
                 _userField('Username', usernameController),
                 _userField('Phone (optional)', phoneController,
@@ -332,62 +533,77 @@ Future<void> _showAddUserDialog(
                 Text('Cancel', style: GoogleFonts.outfit(color: posTextMuted)),
           ),
           FilledButton(
-            onPressed: () async {
-              if (emailController.text.isEmpty ||
-                  passwordController.text.isEmpty ||
-                  nameController.text.isEmpty ||
-                  usernameController.text.isEmpty) {
-                ScaffoldMessenger.of(ctx).showSnackBar(
-                  const SnackBar(
-                    content: Text('Email, password, name, and username are required'),
-                  ),
-                );
-                return;
-              }
+            onPressed: isCreating
+                ? null
+                : () async {
+                    if (emailController.text.isEmpty ||
+                        passwordController.text.isEmpty ||
+                        nameController.text.isEmpty ||
+                        usernameController.text.isEmpty) {
+                      ScaffoldMessenger.of(ctx).showSnackBar(
+                        const SnackBar(
+                          content: Text(
+                              'Email, password, name, and username are required'),
+                        ),
+                      );
+                      return;
+                    }
 
-              final supabase = Supabase.instance.client;
-              try {
-                // Sign up the new user via Supabase Auth
-                final authResponse = await supabase.auth.admin.createUser(
-                  AdminUserAttributes(
-                    email: emailController.text,
-                    password: passwordController.text,
-                    emailConfirm: true,
-                  ),
-                );
+                    setDialogState(() => isCreating = true);
 
-                final newUserId = authResponse.user?.id;
-                if (newUserId == null) {
-                  throw Exception('Failed to create auth user');
-                }
+                    final supabase = Supabase.instance.client;
+                    try {
+                      // Sign up the new user via Supabase Auth
+                      final authResponse = await supabase.auth.signUp(
+                        email: emailController.text,
+                        password: passwordController.text,
+                      );
 
-                // Create the profile
-                await supabase.from('profiles').insert({
-                  'user_id': newUserId,
-                  'username': usernameController.text,
-                  'role_id': selectedRoleId,
-                  'name': nameController.text,
-                  'phone': phoneController.text.isEmpty
-                      ? null
-                      : phoneController.text,
-                });
+                      final newUserId = authResponse.user?.id;
+                      if (newUserId == null) {
+                        throw Exception('Failed to create auth user');
+                      }
 
-                if (ctx.mounted) Navigator.pop(ctx);
-                onRefresh();
-              } catch (e) {
-                debugPrint('Error: $e');
-                if (ctx.mounted) {
-                  ScaffoldMessenger.of(ctx).showSnackBar(
-                    SnackBar(content: Text('Error: $e')),
-                  );
-                }
-              }
-            },
+                      // Create the profile
+                      await supabase.from('profiles').insert({
+                        'user_id': newUserId,
+                        'username': usernameController.text,
+                        'role_id': selectedRoleId,
+                        'name': nameController.text,
+                        'phone': phoneController.text.isEmpty
+                            ? null
+                            : phoneController.text,
+                      });
+
+                      if (ctx.mounted) Navigator.pop(ctx);
+                      onRefresh();
+                    } catch (e) {
+                      debugPrint('Error creating user: $e');
+                      if (ctx.mounted) {
+                        setDialogState(() => isCreating = false);
+                        ScaffoldMessenger.of(ctx).showSnackBar(
+                          SnackBar(
+                            content: Text('Error: $e'),
+                            backgroundColor: const Color(0xFFEF4444),
+                          ),
+                        );
+                      }
+                    }
+                  },
             style: FilledButton.styleFrom(
               backgroundColor: posPrimary,
               foregroundColor: Colors.white,
             ),
-            child: Text('Create User', style: GoogleFonts.outfit()),
+            child: isCreating
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white,
+                    ),
+                  )
+                : Text('Create User', style: GoogleFonts.outfit()),
           ),
         ],
       ),
@@ -404,6 +620,10 @@ Future<void> _showEditUserDialog(
   final nameController = TextEditingController(text: profile.name);
   final phoneController = TextEditingController(text: profile.phone ?? '');
   int selectedRoleId = profile.roleId;
+  String? currentPictureUrl = profile.profilePicture;
+  Uint8List? pickedImageBytes;
+  String? pickedImageName;
+  bool isSaving = false;
 
   await showDialog(
     context: context,
@@ -424,6 +644,67 @@ Future<void> _showEditUserDialog(
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
+                // Profile picture
+                Center(
+                  child: GestureDetector(
+                    onTap: () async {
+                      final result = await FilePicker.platform.pickFiles(
+                        type: FileType.image,
+                        withData: true,
+                      );
+                      if (result != null && result.files.single.bytes != null) {
+                        setDialogState(() {
+                          pickedImageBytes = result.files.single.bytes;
+                          pickedImageName = result.files.single.name;
+                        });
+                      }
+                    },
+                    child: Stack(
+                      children: [
+                        CircleAvatar(
+                          radius: 36,
+                          backgroundColor: posPrimary.withValues(alpha: 0.2),
+                          backgroundImage: pickedImageBytes != null
+                              ? MemoryImage(pickedImageBytes!)
+                              : (currentPictureUrl != null && currentPictureUrl!.isNotEmpty
+                                  ? NetworkImage(currentPictureUrl!)
+                                  : null) as ImageProvider?,
+                          child: (pickedImageBytes == null &&
+                                  (currentPictureUrl == null || currentPictureUrl!.isEmpty))
+                              ? Text(
+                                  profile.name.isNotEmpty
+                                      ? profile.name[0].toUpperCase()
+                                      : '?',
+                                  style: const TextStyle(
+                                    color: posPrimary,
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: 28,
+                                  ),
+                                )
+                              : null,
+                        ),
+                        Positioned(
+                          bottom: 0,
+                          right: 0,
+                          child: Container(
+                            padding: const EdgeInsets.all(5),
+                            decoration: BoxDecoration(
+                              color: posPrimary,
+                              shape: BoxShape.circle,
+                              border: Border.all(color: posSurface, width: 2),
+                            ),
+                            child: const Icon(
+                              Icons.camera_alt_outlined,
+                              size: 12,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
                 _userField('Name', nameController),
                 _userField('Phone', phoneController,
                     keyboardType: TextInputType.phone),
@@ -471,32 +752,71 @@ Future<void> _showEditUserDialog(
                 Text('Cancel', style: GoogleFonts.outfit(color: posTextMuted)),
           ),
           FilledButton(
-            onPressed: () async {
-              final supabase = Supabase.instance.client;
-              try {
-                await supabase.from('profiles').update({
-                  'name': nameController.text,
-                  'phone': phoneController.text.isEmpty
-                      ? null
-                      : phoneController.text,
-                  'role_id': selectedRoleId,
-                }).eq('id', profile.id);
-                if (ctx.mounted) Navigator.pop(ctx);
-                onRefresh();
-              } catch (e) {
-                debugPrint('Error: $e');
-                if (ctx.mounted) {
-                  ScaffoldMessenger.of(ctx).showSnackBar(
-                    SnackBar(content: Text('Error: $e')),
-                  );
-                }
-              }
-            },
+            onPressed: isSaving
+                ? null
+                : () async {
+                    setDialogState(() => isSaving = true);
+                    final supabase = Supabase.instance.client;
+                    try {
+                      String? pictureUrl = currentPictureUrl;
+
+                      if (pickedImageBytes != null && pickedImageName != null) {
+                        final ext = pickedImageName!.split('.').last;
+                        final path = 'profile_pictures/${profile.id}.$ext';
+                        await supabase.storage
+                            .from('avatars')
+                            .uploadBinary(
+                              path,
+                              pickedImageBytes!,
+                              fileOptions: const FileOptions(upsert: true),
+                            );
+                        pictureUrl = supabase.storage
+                            .from('avatars')
+                            .getPublicUrl(path);
+                      }
+
+                      await supabase.from('profiles').update({
+                        'name': nameController.text,
+                        'phone': phoneController.text.isEmpty
+                            ? null
+                            : phoneController.text,
+                        'role_id': selectedRoleId,
+                        'profile_picture': pictureUrl,
+                      }).eq('id', profile.id);
+
+                      // If editing the current user, refresh the sidebar profile
+                      if (ctx.mounted) {
+                        final currentUserId = supabase.auth.currentUser?.id;
+                        if (profile.userId == currentUserId) {
+                          await ctx.read<AuthController>().restoreSession();
+                        }
+                        if (ctx.mounted) Navigator.pop(ctx);
+                      }
+                      onRefresh();
+                    } catch (e) {
+                      debugPrint('Error: $e');
+                      if (ctx.mounted) {
+                        setDialogState(() => isSaving = false);
+                        ScaffoldMessenger.of(ctx).showSnackBar(
+                          SnackBar(content: Text('Error: $e')),
+                        );
+                      }
+                    }
+                  },
             style: FilledButton.styleFrom(
               backgroundColor: posPrimary,
               foregroundColor: Colors.white,
             ),
-            child: Text('Update', style: GoogleFonts.outfit()),
+            child: isSaving
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white,
+                    ),
+                  )
+                : Text('Update', style: GoogleFonts.outfit()),
           ),
         ],
       ),

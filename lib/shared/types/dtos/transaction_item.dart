@@ -45,15 +45,15 @@ class TransactionItem {
 
   factory TransactionItem.fromJson(Map<String, dynamic> json) {
     return TransactionItem(
-      id: json['id'] as int,
-      transactionId: json['transaction_id'] as int,
+      id: (json['id'] as int?) ?? 0,
+      transactionId: (json['transaction_id'] as int?) ?? 0,
       inventoryId: json['inventory_id'] as int?,
-      productId: json['product_id'] as int,
-      productName: json['product_name'] as String,
-      quantity: (json['quantity'] as num).toDouble(),
-      unitPrice: (json['unit_price'] as num).toDouble(),
-      subtotal: (json['subtotal'] as num).toDouble(),
-      categoryId: json['category_id'] as int,
+      productId: (json['product_id'] as int?) ?? 0,
+      productName: (json['product_name'] as String?) ?? '',
+      quantity: (json['quantity'] as num?)?.toDouble() ?? 0.0,
+      unitPrice: (json['unit_price'] as num?)?.toDouble() ?? 0.0,
+      subtotal: (json['subtotal'] as num?)?.toDouble() ?? 0.0,
+      categoryId: (json['category_id'] as int?) ?? 0,
       discount: json['discount'] != null
           ? (json['discount'] as num).toDouble()
           : null,

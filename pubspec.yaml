@@ -51,6 +51,7 @@ dependencies:
   intl: any
   hive_ce: ^2.19.3
   hive_ce_flutter: ^2.3.4
+  file_picker: 10.3.10
 
 dev_dependencies:
   flutter_test:

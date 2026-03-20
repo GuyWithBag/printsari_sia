@@ -11,7 +11,7 @@ import 'package:printsari_sia/widgets/app_page.dart';
 import 'package:printsari_sia/providers/transaction_provider.dart';
 import 'package:printsari_sia/providers/expense_provider.dart';
 import 'package:printsari_sia/providers/inventory_provider.dart';
-import 'package:printsari_sia/providers/activity_log_provider.dart';
+import 'package:printsari_sia/providers/product_provider.dart';
 
 // '/'
 
@@ -20,19 +20,18 @@ class DashboardPage extends HookWidget {
 
   @override
   Widget build(BuildContext context) {
-    final now = DateTime.now();
-    final dateLabel = DateFormat('EEEE, MMMM d, yyyy').format(now);
     final refreshKey = useState(0);
 
     final transactionProvider = context.read<TransactionProvider>();
     final expenseProvider = context.read<ExpenseProvider>();
     final inventoryProvider = context.read<InventoryProvider>();
-    final activityLogProvider = context.read<ActivityLogProvider>();
+    final productProvider = context.read<ProductProvider>();
 
     void hardRefresh() {
       transactionProvider.clearTransactionsCache();
       expenseProvider.clearCache();
       inventoryProvider.clearCache();
+      productProvider.clearAllCache();
       refreshKey.value++;
     }
 
@@ -41,7 +40,8 @@ class DashboardPage extends HookWidget {
         transactionProvider.getTransactions(),
         expenseProvider.getExpenses(),
         inventoryProvider.getItems(),
-        activityLogProvider.getLogs(limit: 5),
+        productProvider.getProducts(),
+        productProvider.getPrintServices(),
       ]),
       [refreshKey.value],
     );
@@ -51,18 +51,21 @@ class DashboardPage extends HookWidget {
     final isLoading = snapshot.connectionState == ConnectionState.waiting;
     final hasError = snapshot.hasError;
 
-    List<Transaction> allTransactions = [];
+    final now = DateTime.now();
     List<Transaction> todayTransactions = [];
     List<Expense> todayExpenses = [];
     List<InventoryItem> inventoryItems = [];
-    List<ActivityLog> recentLogs = [];
+    List<Product> products = [];
+    List<PrintService> printServices = [];
+    List<Transaction> recentTransactions = [];
 
     if (snapshot.hasData) {
       final data = snapshot.data!;
-      allTransactions = data[0] as List<Transaction>;
+      final allTransactions = data[0] as List<Transaction>;
       final allExpenses = data[1] as List<Expense>;
       inventoryItems = data[2] as List<InventoryItem>;
-      recentLogs = data[3] as List<ActivityLog>;
+      products = data[3] as List<Product>;
+      printServices = data[4] as List<PrintService>;
 
       todayTransactions = allTransactions.where((t) {
         return t.date.year == now.year &&
@@ -75,15 +78,31 @@ class DashboardPage extends HookWidget {
             e.date.month == now.month &&
             e.date.day == now.day;
       }).toList();
+
+      recentTransactions = allTransactions.take(5).toList();
     }
 
     final todayRevenue =
         todayTransactions.fold(0.0, (sum, t) => sum + t.total);
-    final todayProfit = todayTransactions.fold(
-            0.0, (sum, t) => sum + (t.grossProfit ?? 0)) -
+    final storeRevenue =
+        todayTransactions.fold(0.0, (sum, t) => sum + t.storeRevenue);
+    final printingRevenue =
+        todayTransactions.fold(0.0, (sum, t) => sum + t.printingRevenue);
+    final todayProfit = todayRevenue -
         todayExpenses.fold(0.0, (sum, e) => sum + e.amount);
-    final totalProducts = inventoryItems.length;
-    final recentTransactions = allTransactions.take(5).toList();
+
+    final currFmt =
+        NumberFormat.currency(symbol: '\u20B1', decimalDigits: 2);
+
+    // Split inventory into store products and print services
+    final storeProducts = products
+        .where((p) => p.category?.categoryName == 'store' || p.categoryId == 1)
+        .toList();
+    // Map productId -> InventoryItem for stock lookup
+    final inventoryByProduct = <int, InventoryItem>{};
+    for (final item in inventoryItems) {
+      inventoryByProduct[item.productId] = item;
+    }
 
     return AppPage(
       body: Skeletonizer(
@@ -93,7 +112,7 @@ class DashboardPage extends HookWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Title row
+              // Header
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -110,13 +129,19 @@ class DashboardPage extends HookWidget {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        dateLabel,
-                        style: GoogleFonts.outfit(fontSize: 14, color: posTextMuted),
+                        "Welcome back! Here's your business overview.",
+                        style: GoogleFonts.outfit(
+                          fontSize: 14,
+                          color: posTextMuted,
+                        ),
                       ),
                     ],
                   ),
                   IconButton(
-                    icon: const Icon(Icons.refresh_rounded, color: Colors.white),
+                    icon: const Icon(
+                      Icons.refresh_rounded,
+                      color: Colors.white,
+                    ),
                     tooltip: 'Refresh from server',
                     onPressed: hardRefresh,
                   ),
@@ -134,7 +159,7 @@ class DashboardPage extends HookWidget {
                   ),
                 ),
 
-              // Metric cards row
+              // Metric cards
               LayoutBuilder(
                 builder: (context, constraints) {
                   final crossCount = constraints.maxWidth > 900
@@ -148,39 +173,38 @@ class DashboardPage extends HookWidget {
                     physics: const NeverScrollableScrollPhysics(),
                     mainAxisSpacing: 16,
                     crossAxisSpacing: 16,
-                    childAspectRatio: 2.0,
+                    childAspectRatio: 1.9,
                     children: [
                       _MetricCard(
-                        icon: Icons.trending_up_rounded,
+                        icon: Icons.attach_money_rounded,
                         iconColor: const Color(0xFF4ADE80),
                         title: "Today's Revenue",
-                        value: NumberFormat.currency(
-                                symbol: '\u20B1', decimalDigits: 2)
-                            .format(todayRevenue),
-                        subtitle: '${todayTransactions.length} transactions',
+                        value: currFmt.format(todayRevenue),
+                        subtitle:
+                            '${todayTransactions.length} transactions',
                       ),
                       _MetricCard(
-                        icon: Icons.receipt_long_rounded,
+                        icon: Icons.store_rounded,
                         iconColor: const Color(0xFF60A5FA),
-                        title: "Today's Transactions",
-                        value: '${todayTransactions.length}',
-                        subtitle: 'completed today',
+                        title: 'Store Revenue',
+                        value: currFmt.format(storeRevenue),
+                        subtitle: 'Sari-sari sales',
                       ),
                       _MetricCard(
-                        icon: Icons.account_balance_wallet_rounded,
-                        iconColor: posPrimary,
+                        icon: Icons.print_rounded,
+                        iconColor: const Color(0xFFA78BFA),
+                        title: 'Printing Revenue',
+                        value: currFmt.format(printingRevenue),
+                        subtitle: 'Printing services',
+                      ),
+                      _MetricCard(
+                        icon: Icons.trending_up_rounded,
+                        iconColor: todayProfit >= 0
+                            ? const Color(0xFF4ADE80)
+                            : const Color(0xFFEF4444),
                         title: "Today's Profit",
-                        value: NumberFormat.currency(
-                                symbol: '\u20B1', decimalDigits: 2)
-                            .format(todayProfit),
-                        subtitle: 'after expenses',
-                      ),
-                      _MetricCard(
-                        icon: Icons.inventory_2_rounded,
-                        iconColor: posAccent,
-                        title: 'Total Products',
-                        value: '$totalProducts',
-                        subtitle: 'in inventory',
+                        value: currFmt.format(todayProfit),
+                        subtitle: 'Revenue - Expenses',
                       ),
                     ],
                   );
@@ -188,7 +212,11 @@ class DashboardPage extends HookWidget {
               ),
               const SizedBox(height: 24),
 
-              // Two columns: Recent Transactions + Alerts
+              // Recent Transactions
+              _RecentTransactionsPanel(transactions: recentTransactions),
+              const SizedBox(height: 24),
+
+              // Store Inventory + Printing Supplies
               LayoutBuilder(
                 builder: (context, constraints) {
                   if (constraints.maxWidth > 800) {
@@ -196,32 +224,32 @@ class DashboardPage extends HookWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Expanded(
-                          flex: 3,
-                          child: _RecentTransactionsPanel(
-                              transactions: recentTransactions),
+                          child: _StoreInventoryPanel(
+                            products: storeProducts,
+                            inventoryByProduct: inventoryByProduct,
+                          ),
                         ),
                         const SizedBox(width: 16),
                         Expanded(
-                          flex: 2,
-                          child: _AlertsPanel(items: inventoryItems),
+                          child: _PrintingSuppliesPanel(
+                            services: printServices,
+                          ),
                         ),
                       ],
                     );
                   }
                   return Column(
                     children: [
-                      _RecentTransactionsPanel(
-                          transactions: recentTransactions),
+                      _StoreInventoryPanel(
+                        products: storeProducts,
+                        inventoryByProduct: inventoryByProduct,
+                      ),
                       const SizedBox(height: 16),
-                      _AlertsPanel(items: inventoryItems),
+                      _PrintingSuppliesPanel(services: printServices),
                     ],
                   );
                 },
               ),
-              const SizedBox(height: 24),
-
-              // Recent Activity
-              _RecentActivityPanel(logs: recentLogs),
             ],
           ),
         ),
@@ -230,11 +258,12 @@ class DashboardPage extends HookWidget {
   }
 }
 
-// ---------- Glass panel wrapper ----------
+// ---------- Glass panel ----------
 
 class _GlassPanel extends StatelessWidget {
   final Widget child;
   final EdgeInsetsGeometry? padding;
+
   const _GlassPanel({required this.child, this.padding});
 
   @override
@@ -244,7 +273,7 @@ class _GlassPanel extends StatelessWidget {
       decoration: BoxDecoration(
         color: posSurface,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
       ),
       child: child,
     );
@@ -270,9 +299,7 @@ class _MetricCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(16),
-      child: _GlassPanel(
+    return _GlassPanel(
       padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -280,27 +307,20 @@ class _MetricCard extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Container(
-                padding: const EdgeInsets.all(6),
-                decoration: BoxDecoration(
-                  color: iconColor.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Icon(icon, color: iconColor, size: 18),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
+              Flexible(
                 child: Text(
                   title,
                   style: GoogleFonts.outfit(
-                    fontSize: 11,
+                    fontSize: 13,
                     color: posTextMuted,
                     fontWeight: FontWeight.w500,
                   ),
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
+              Icon(icon, color: iconColor, size: 22),
             ],
           ),
           const SizedBox(height: 8),
@@ -309,20 +329,18 @@ class _MetricCard extends StatelessWidget {
             child: Text(
               value,
               style: GoogleFonts.outfit(
-                fontSize: 20,
+                fontSize: 22,
                 fontWeight: FontWeight.w700,
                 color: Colors.white,
               ),
             ),
           ),
-          const SizedBox(height: 2),
           Text(
             subtitle,
-            style: GoogleFonts.outfit(fontSize: 10, color: posTextMuted),
+            style: GoogleFonts.outfit(fontSize: 11, color: posTextMuted),
           ),
         ],
       ),
-    ),
     );
   }
 }
@@ -360,38 +378,36 @@ class _RecentTransactionsPanel extends StatelessWidget {
             )
           else
             ...transactions.map((t) {
-              final dateStr = DateFormat('MMM d, h:mm a').format(t.date);
+              final dateStr =
+                  DateFormat('M/d/yyyy, h:mm:ss a').format(t.date);
+              final itemCount = t.items?.length ?? 0;
+              final cashierName = t.cashier?.name;
+              final currFmt = NumberFormat.currency(
+                symbol: '\u20B1',
+                decimalDigits: 2,
+              );
+
               return Padding(
                 padding: const EdgeInsets.only(bottom: 12),
                 child: Row(
                   children: [
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: posPrimary.withValues(alpha: 0.12),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: const Icon(Icons.receipt_long_rounded,
-                          color: posPrimary, size: 18),
-                    ),
-                    const SizedBox(width: 12),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            t.transactionNumber,
+                            '$itemCount items',
                             style: GoogleFonts.outfit(
-                              fontSize: 13,
+                              fontSize: 14,
                               fontWeight: FontWeight.w600,
                               color: Colors.white,
                             ),
                           ),
                           const SizedBox(height: 2),
                           Text(
-                            'Store: ${NumberFormat.currency(symbol: '\u20B1', decimalDigits: 2).format(t.storeRevenue)} | Print: ${NumberFormat.currency(symbol: '\u20B1', decimalDigits: 2).format(t.printingRevenue)}',
+                            '$dateStr${cashierName != null ? ' \u00B7 $cashierName' : ''}',
                             style: GoogleFonts.outfit(
-                              fontSize: 11,
+                              fontSize: 12,
                               color: posTextMuted,
                             ),
                           ),
@@ -402,19 +418,19 @@ class _RecentTransactionsPanel extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
                         Text(
-                          NumberFormat.currency(
-                                  symbol: '\u20B1', decimalDigits: 2)
-                              .format(t.total),
+                          currFmt.format(t.total),
                           style: GoogleFonts.outfit(
-                            fontSize: 14,
+                            fontSize: 15,
                             fontWeight: FontWeight.w700,
-                            color: const Color(0xFF4ADE80),
+                            color: Colors.white,
                           ),
                         ),
                         Text(
-                          dateStr,
+                          'Store: ${currFmt.format(t.storeRevenue)}  Print: ${currFmt.format(t.printingRevenue)}',
                           style: GoogleFonts.outfit(
-                              fontSize: 10, color: posTextMuted),
+                            fontSize: 11,
+                            color: posTextMuted,
+                          ),
                         ),
                       ],
                     ),
@@ -428,22 +444,28 @@ class _RecentTransactionsPanel extends StatelessWidget {
   }
 }
 
-// ---------- Alerts panel ----------
+// ---------- Store Inventory panel ----------
 
-class _AlertsPanel extends StatelessWidget {
-  final List<InventoryItem> items;
-  const _AlertsPanel({required this.items});
+class _StoreInventoryPanel extends StatelessWidget {
+  final List<Product> products;
+  final Map<int, InventoryItem> inventoryByProduct;
+
+  const _StoreInventoryPanel({
+    required this.products,
+    required this.inventoryByProduct,
+  });
 
   @override
   Widget build(BuildContext context) {
-    final lowStockItems = items.where((i) => i.stock < 10).toList();
+    final currFmt =
+        NumberFormat.currency(symbol: '\u20B1', decimalDigits: 0);
 
     return _GlassPanel(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Alerts',
+            'Store Inventory Status',
             style: GoogleFonts.outfit(
               fontSize: 16,
               fontWeight: FontWeight.w600,
@@ -451,233 +473,39 @@ class _AlertsPanel extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 16),
-
-          // Low stock alerts
-          if (lowStockItems.isEmpty && items.isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: Text(
-                'No alerts at this time.',
-                style: GoogleFonts.outfit(color: posTextMuted, fontSize: 13),
-              ),
-            ),
-          ...lowStockItems.map((item) => _AlertItemTile(item: item)),
-
-          // Expiring soon
-          if (items.isNotEmpty) ...[
-            const SizedBox(height: 12),
-            _ExpiringSoonSection(items: items),
-          ],
-        ],
-      ),
-    );
-  }
-}
-
-class _AlertItemTile extends StatelessWidget {
-  final InventoryItem item;
-  const _AlertItemTile({required this.item});
-
-  @override
-  Widget build(BuildContext context) {
-    return FutureBuilder<Product>(
-      future: InventoryItem.getProduct(item),
-      builder: (context, snap) {
-        final name = snap.data?.name ?? 'Product #${item.productId}';
-        return Padding(
-          padding: const EdgeInsets.only(bottom: 8),
-          child: Row(
-            children: [
-              const Icon(Icons.warning_amber_rounded,
-                  color: Color(0xFFFBBF24), size: 18),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  '$name - ${item.stock.toInt()} left',
-                  style: GoogleFonts.outfit(
-                    fontSize: 13,
-                    color: Colors.white,
-                  ),
-                ),
-              ),
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFFBBF24).withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: Text(
-                  'Low Stock',
-                  style: GoogleFonts.outfit(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w600,
-                    color: const Color(0xFFFBBF24),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-}
-
-class _ExpiringSoonSection extends StatelessWidget {
-  final List<InventoryItem> items;
-  const _ExpiringSoonSection({required this.items});
-
-  @override
-  Widget build(BuildContext context) {
-    return FutureBuilder<List<_ExpiryInfo>>(
-      future: _getExpiring(items),
-      builder: (context, snap) {
-        if (!snap.hasData || snap.data!.isEmpty) {
-          return const SizedBox.shrink();
-        }
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: snap.data!.map((info) {
-            final daysLeft =
-                info.expiryDate.difference(DateTime.now()).inDays;
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: Row(
-                children: [
-                  const Icon(Icons.access_time_rounded,
-                      color: Color(0xFFF87171), size: 18),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      '${info.name} - expires in $daysLeft days',
-                      style: GoogleFonts.outfit(
-                          fontSize: 13, color: Colors.white),
-                    ),
-                  ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 8, vertical: 3),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFF87171).withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: Text(
-                      'Expiring',
-                      style: GoogleFonts.outfit(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w600,
-                        color: const Color(0xFFF87171),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            );
-          }).toList(),
-        );
-      },
-    );
-  }
-
-  Future<List<_ExpiryInfo>> _getExpiring(List<InventoryItem> items) async {
-    final results = <_ExpiryInfo>[];
-    final now = DateTime.now();
-    final threshold = now.add(const Duration(days: 7));
-
-    for (final item in items) {
-      try {
-        final product = await InventoryItem.getProduct(item);
-        if (product.expiryDate != null &&
-            product.expiryDate!.isAfter(now) &&
-            product.expiryDate!.isBefore(threshold)) {
-          results.add(_ExpiryInfo(
-              name: product.name, expiryDate: product.expiryDate!));
-        }
-      } catch (_) {
-        // skip items whose products can't be fetched
-      }
-    }
-    return results;
-  }
-}
-
-class _ExpiryInfo {
-  final String name;
-  final DateTime expiryDate;
-  _ExpiryInfo({required this.name, required this.expiryDate});
-}
-
-// ---------- Recent Activity panel ----------
-
-class _RecentActivityPanel extends StatelessWidget {
-  final List<ActivityLog> logs;
-  const _RecentActivityPanel({required this.logs});
-
-  @override
-  Widget build(BuildContext context) {
-    return _GlassPanel(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Recent Activity',
-            style: GoogleFonts.outfit(
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-              color: Colors.white,
-            ),
-          ),
-          const SizedBox(height: 16),
-          if (logs.isEmpty)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 20),
-              child: Center(
-                child: Text(
-                  'No recent activity.',
-                  style: GoogleFonts.outfit(color: posTextMuted),
-                ),
-              ),
+          if (products.isEmpty)
+            Text(
+              'No store products.',
+              style: GoogleFonts.outfit(color: posTextMuted),
             )
           else
-            ...logs.map((log) {
-              final icon = _categoryIcon(log.action?.category);
-              final timeStr =
-                  DateFormat('MMM d, h:mm a').format(log.timestamp);
+            ...products.map((p) {
+              final inv = inventoryByProduct[p.id];
+              final stock = inv?.stock.toInt() ?? 0;
+              final price = inv?.retailPrice ?? 0;
               return Padding(
                 padding: const EdgeInsets.only(bottom: 12),
                 child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: posSurfaceLight,
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Icon(icon, color: posTextMuted, size: 18),
-                    ),
-                    const SizedBox(width: 12),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            log.action?.actionName ?? 'Action',
+                            p.name,
                             style: GoogleFonts.outfit(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w500,
                               color: Colors.white,
                             ),
                           ),
-                          const SizedBox(height: 2),
                           Text(
-                            log.description,
+                            p.description,
                             style: GoogleFonts.outfit(
                               fontSize: 12,
                               color: posTextMuted,
                             ),
-                            maxLines: 2,
+                            maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                           ),
                         ],
@@ -687,17 +515,18 @@ class _RecentActivityPanel extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
                         Text(
-                          timeStr,
+                          '$stock units',
                           style: GoogleFonts.outfit(
-                              fontSize: 10, color: posTextMuted),
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.white,
+                          ),
                         ),
-                        const SizedBox(height: 4),
                         Text(
-                          log.performedBy,
+                          currFmt.format(price),
                           style: GoogleFonts.outfit(
-                            fontSize: 10,
-                            color: posAccent,
-                            fontWeight: FontWeight.w500,
+                            fontSize: 12,
+                            color: posTextMuted,
                           ),
                         ),
                       ],
@@ -710,21 +539,94 @@ class _RecentActivityPanel extends StatelessWidget {
       ),
     );
   }
+}
 
-  IconData _categoryIcon(String? category) {
-    switch (category) {
-      case 'transaction':
-        return Icons.receipt_long_rounded;
-      case 'product':
-        return Icons.inventory_2_rounded;
-      case 'inventory':
-        return Icons.all_inbox_rounded;
-      case 'user':
-        return Icons.person_rounded;
-      case 'expense':
-        return Icons.attach_money_rounded;
-      default:
-        return Icons.info_outline_rounded;
-    }
+// ---------- Printing Supplies panel ----------
+
+class _PrintingSuppliesPanel extends StatelessWidget {
+  final List<PrintService> services;
+  const _PrintingSuppliesPanel({required this.services});
+
+  @override
+  Widget build(BuildContext context) {
+    final currFmt =
+        NumberFormat.currency(symbol: '\u20B1', decimalDigits: 0);
+
+    return _GlassPanel(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Printing Supplies Status',
+            style: GoogleFonts.outfit(
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+              color: Colors.white,
+            ),
+          ),
+          const SizedBox(height: 16),
+          if (services.isEmpty)
+            Text(
+              'No print services.',
+              style: GoogleFonts.outfit(color: posTextMuted),
+            )
+          else
+            ...services.map((s) {
+              final stock = s.paperStock?.toInt() ?? 0;
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            s.name,
+                            style: GoogleFonts.outfit(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w500,
+                              color: Colors.white,
+                            ),
+                          ),
+                          Text(
+                            s.description,
+                            style: GoogleFonts.outfit(
+                              fontSize: 12,
+                              color: posTextMuted,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ),
+                    ),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Text(
+                          '$stock units',
+                          style: GoogleFonts.outfit(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.white,
+                          ),
+                        ),
+                        Text(
+                          currFmt.format(s.basePrice),
+                          style: GoogleFonts.outfit(
+                            fontSize: 12,
+                            color: posTextMuted,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              );
+            }),
+        ],
+      ),
+    );
   }
 }

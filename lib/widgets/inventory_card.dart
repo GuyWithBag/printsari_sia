@@ -18,6 +18,7 @@ class InventoryCard extends StatelessWidget {
         final data = asyncSnapshot.data;
         final String title = data?.name ?? "";
         final String subtitle = data?.category?.categoryName ?? "";
+        final bool isOutOfStock = item.stock <= 0;
         final String stockLevel = item.stock.toString();
         final String price = item.retailPrice.toString();
         final String expiry = data?.expiryDate?.toString() ?? "";
@@ -70,6 +71,31 @@ class InventoryCard extends StatelessWidget {
                       ],
                     ),
                     const SizedBox(height: 24),
+
+                    // Out of stock badge
+                    if (isOutOfStock)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: Colors.red.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.error_outline, size: 14, color: Colors.red.shade400),
+                            const SizedBox(width: 4),
+                            Text(
+                              'Out of Stock',
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: Colors.red.shade400,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    if (isOutOfStock) const SizedBox(height: 12),
 
                     // Data Rows
                     _buildDataRow(context, 'Stock Level:', stockLevel),
