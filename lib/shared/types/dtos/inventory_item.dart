@@ -9,6 +9,7 @@ class InventoryItem {
   final double? reorderLevel;
   final String? location;
   final DateTime? lastRestocked;
+  final DateTime? expiryDate;
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -20,6 +21,7 @@ class InventoryItem {
     this.reorderLevel,
     this.location,
     this.lastRestocked,
+    this.expiryDate,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -48,6 +50,9 @@ class InventoryItem {
       lastRestocked: json['last_restocked'] != null
           ? DateTime.parse(json['last_restocked'] as String)
           : null,
+      expiryDate: json['expiry_date'] != null
+          ? DateTime.parse(json['expiry_date'] as String)
+          : null,
       createdAt: DateTime.parse(json['created_at'] as String),
       updatedAt: DateTime.parse(json['updated_at'] as String),
     );
@@ -62,6 +67,7 @@ class InventoryItem {
       'reorder_level': reorderLevel,
       'location': location,
       'last_restocked': lastRestocked?.toIso8601String(),
+      'expiry_date': expiryDate?.toIso8601String(),
       'created_at': createdAt.toIso8601String(),
       'updated_at': updatedAt.toIso8601String(),
     };
@@ -75,6 +81,7 @@ class InventoryItem {
       'reorder_level': reorderLevel,
       'location': location,
       'last_restocked': lastRestocked?.toIso8601String(),
+      'expiry_date': expiryDate?.toIso8601String(),
     };
   }
 }

@@ -8,6 +8,12 @@ const siteMapItems = <SiteMapItem>[
     roles: [UserRoleType.cashier, UserRoleType.owner],
   ),
   SiteMapItem(
+    title: 'Products & Services',
+    iconPath: 'assets/settings.svg',
+    path: '/products-services',
+    roles: [UserRoleType.cashier, UserRoleType.owner],
+  ),
+  SiteMapItem(
     title: 'POS Terminal',
     iconPath: 'assets/shopping-cart.svg',
     path: '/pos',
@@ -17,24 +23,18 @@ const siteMapItems = <SiteMapItem>[
     title: 'Activity Log',
     iconPath: 'assets/clipboard-list.svg',
     path: '/activity-log',
-    roles: [UserRoleType.cashier, UserRoleType.owner],
+    roles: [UserRoleType.owner],
   ),
   SiteMapItem(
     title: 'Inventory',
     iconPath: 'assets/package.svg',
     path: '/inventory',
-    roles: [UserRoleType.cashier, UserRoleType.owner],
+    roles: [UserRoleType.owner],
   ),
   SiteMapItem(
     title: 'Financial Reports',
     iconPath: 'assets/chart-column.svg',
     path: '/financial-reports',
-    roles: [UserRoleType.owner],
-  ),
-  SiteMapItem(
-    title: 'Products & Services',
-    iconPath: 'assets/settings.svg',
-    path: '/products-services',
     roles: [UserRoleType.owner],
   ),
   SiteMapItem(

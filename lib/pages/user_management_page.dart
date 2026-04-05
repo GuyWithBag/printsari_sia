@@ -423,7 +423,6 @@ Future<void> _showAddUserDialog(
   BuildContext context,
   VoidCallback onRefresh,
 ) async {
-  final emailController = TextEditingController();
   final passwordController = TextEditingController();
   final nameController = TextEditingController();
   final usernameController = TextEditingController();
@@ -451,8 +450,6 @@ Future<void> _showAddUserDialog(
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                _userField('Email', emailController,
-                    keyboardType: TextInputType.emailAddress),
                 Padding(
                   padding: const EdgeInsets.only(bottom: 12),
                   child: TextField(
@@ -536,14 +533,13 @@ Future<void> _showAddUserDialog(
             onPressed: isCreating
                 ? null
                 : () async {
-                    if (emailController.text.isEmpty ||
-                        passwordController.text.isEmpty ||
+                    if (passwordController.text.isEmpty ||
                         nameController.text.isEmpty ||
                         usernameController.text.isEmpty) {
                       ScaffoldMessenger.of(ctx).showSnackBar(
                         const SnackBar(
                           content: Text(
-                              'Email, password, name, and username are required'),
+                              'Password, name, and username are required'),
                         ),
                       );
                       return;
@@ -551,11 +547,17 @@ Future<void> _showAddUserDialog(
 
                     setDialogState(() => isCreating = true);
 
+                    // Generate an internal email from username to avoid Supabase
+                    // email deliverability validation on non-real domains.
+                    // Users log in with their username, not email.
+                    final username = usernameController.text.trim();
+                    final generatedEmail = '$username@printsari.internal';
+
                     final supabase = Supabase.instance.client;
                     try {
                       // Sign up the new user via Supabase Auth
                       final authResponse = await supabase.auth.signUp(
-                        email: emailController.text,
+                        email: generatedEmail,
                         password: passwordController.text,
                       );
 
@@ -567,7 +569,7 @@ Future<void> _showAddUserDialog(
                       // Create the profile
                       await supabase.from('profiles').insert({
                         'user_id': newUserId,
-                        'username': usernameController.text,
+                        'username': username,
                         'role_id': selectedRoleId,
                         'name': nameController.text,
                         'phone': phoneController.text.isEmpty

@@ -18,6 +18,33 @@ class InventoryProvider extends ChangeNotifier {
     _box.delete(_itemsKey);
   }
 
+  Future<InventoryItem> stockIn({
+    required int productId,
+    required double quantity,
+    required double retailPrice,
+    DateTime? expiryDate,
+  }) async {
+    final now = DateTime.now();
+    final inserted = await supabase
+        .from('inventory_items')
+        .insert({
+          'product_id': productId,
+          'stock': quantity,
+          'retail_price': retailPrice,
+          if (expiryDate != null)
+            'expiry_date': expiryDate.toIso8601String().substring(0, 10),
+          'last_restocked': now.toIso8601String(),
+        })
+        .select()
+        .single();
+    final newItem = InventoryItem.fromJson(inserted);
+    _items ??= [];
+    _items!.add(newItem);
+    _box.delete(_itemsKey);
+    notifyListeners();
+    return newItem;
+  }
+
   Future<List<InventoryItem>> getItems() async {
     if (_items != null) return _items!;
 

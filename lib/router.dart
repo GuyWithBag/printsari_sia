@@ -44,7 +44,8 @@ final router = GoRouter(
               builder: (context, state, child) {
                 // Restore session/profile if we have a Supabase session but AuthController hasn't loaded yet
                 final auth = context.read<AuthController>();
-                if (auth.userProfile == null && Supabase.instance.client.auth.currentSession != null) {
+                if (auth.userProfile == null &&
+                    Supabase.instance.client.auth.currentSession != null) {
                   auth.restoreSession();
                 }
                 return Container(

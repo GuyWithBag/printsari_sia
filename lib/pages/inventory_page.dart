@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:intl/intl.dart';
 import 'package:printsari_sia/providers/inventory_provider.dart';
 import 'package:printsari_sia/providers/product_provider.dart';
 import 'package:printsari_sia/shared/themes/colors.dart';
@@ -76,6 +77,24 @@ class InventoryPage extends HookWidget {
           ),
         ),
         actions: [
+          if (snapshot.hasData)
+            FilledButton.icon(
+              onPressed: () => _showNewStockInDialog(
+                context,
+                allProducts,
+                hardRefresh,
+              ),
+              icon: const Icon(Icons.add_box_outlined, size: 16),
+              label: Text('Stock In', style: GoogleFonts.outfit()),
+              style: FilledButton.styleFrom(
+                backgroundColor: posPrimary,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+            ),
+          const SizedBox(width: 8),
           IconButton(
             icon: const Icon(Icons.refresh_rounded, color: Colors.white),
             tooltip: 'Refresh from server',
@@ -134,7 +153,15 @@ class InventoryPage extends HookWidget {
                   controller: tabController,
                   children: [
                     // Store Products Tab
-                    _InventoryGrid(items: storeItems),
+                    _InventoryGrid(
+                      items: storeItems,
+                      products: allProducts,
+                      onStockIn: (product) => _showStockInDialog(
+                        context,
+                        product,
+                        hardRefresh,
+                      ),
+                    ),
                     // Printing Supplies Tab — show print services with ink/paper levels
                     _PrintSuppliesGrid(services: allServices, items: printItems),
                   ],
@@ -150,15 +177,32 @@ class InventoryPage extends HookWidget {
 
 class _InventoryGrid extends StatelessWidget {
   final List<InventoryItem> items;
-  const _InventoryGrid({required this.items});
+  final List<Product> products;
+  final void Function(Product product) onStockIn;
+
+  const _InventoryGrid({
+    required this.items,
+    required this.products,
+    required this.onStockIn,
+  });
 
   @override
   Widget build(BuildContext context) {
     if (items.isEmpty) {
       return Center(
-        child: Text(
-          'No store inventory items',
-          style: GoogleFonts.outfit(color: posTextMuted),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'No store inventory items',
+              style: GoogleFonts.outfit(color: posTextMuted),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'Use "Stock In" on a product to add inventory batches.',
+              style: GoogleFonts.outfit(color: posTextMuted, fontSize: 12),
+            ),
+          ],
         ),
       );
     }
@@ -166,12 +210,456 @@ class _InventoryGrid extends StatelessWidget {
       child: Wrap(
         spacing: 16.0,
         runSpacing: 16.0,
-        children: items
-            .map((item) => InventoryCard(onEdit: () {}, item: item))
-            .toList(),
+        children: items.map((item) {
+          final product = products.where((p) => p.id == item.productId).firstOrNull;
+          return InventoryCard(
+            item: item,
+            onEdit: () {},
+            onStockIn: product != null ? () => onStockIn(product) : null,
+          );
+        }).toList(),
       ),
     );
   }
+}
+
+Future<void> _showStockInDialog(
+  BuildContext context,
+  Product product,
+  VoidCallback onRefresh,
+) async {
+  final stockController = TextEditingController();
+  final priceController = TextEditingController(
+    text: product.purchasePrice.toStringAsFixed(2),
+  );
+  DateTime? selectedExpiry;
+  bool isSaving = false;
+
+  await showDialog(
+    context: context,
+    builder: (ctx) => StatefulBuilder(
+      builder: (ctx, setDialogState) => AlertDialog(
+        backgroundColor: posSurface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text(
+          'Stock In — ${product.name}',
+          style: GoogleFonts.outfit(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        content: SizedBox(
+          width: 380,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Quantity
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: TextField(
+                    controller: stockController,
+                    keyboardType: TextInputType.number,
+                    autofocus: true,
+                    style: GoogleFonts.outfit(color: Colors.white),
+                    decoration: InputDecoration(
+                      labelText: 'Quantity to add',
+                      labelStyle: GoogleFonts.outfit(color: posTextMuted),
+                      filled: true,
+                      fillColor: posSurfaceLight,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        borderSide: BorderSide.none,
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        borderSide: const BorderSide(color: posPrimary, width: 1.5),
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 12),
+                    ),
+                  ),
+                ),
+                // Retail price
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: TextField(
+                    controller: priceController,
+                    keyboardType: TextInputType.number,
+                    style: GoogleFonts.outfit(color: Colors.white),
+                    decoration: InputDecoration(
+                      labelText: 'Retail price (P)',
+                      labelStyle: GoogleFonts.outfit(color: posTextMuted),
+                      filled: true,
+                      fillColor: posSurfaceLight,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        borderSide: BorderSide.none,
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        borderSide: const BorderSide(color: posPrimary, width: 1.5),
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 12),
+                    ),
+                  ),
+                ),
+                // Expiry date picker
+                InkWell(
+                  onTap: () async {
+                    final picked = await showDatePicker(
+                      context: ctx,
+                      initialDate: DateTime.now().add(const Duration(days: 30)),
+                      firstDate: DateTime.now(),
+                      lastDate: DateTime.now().add(const Duration(days: 365 * 10)),
+                    );
+                    if (picked != null) {
+                      setDialogState(() => selectedExpiry = picked);
+                    }
+                  },
+                  borderRadius: BorderRadius.circular(10),
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 14, vertical: 14),
+                    decoration: BoxDecoration(
+                      color: posSurfaceLight,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.calendar_today_outlined,
+                            size: 16,
+                            color: selectedExpiry != null
+                                ? posPrimary
+                                : posTextMuted),
+                        const SizedBox(width: 10),
+                        Text(
+                          selectedExpiry != null
+                              ? DateFormat('MMM d, yyyy').format(selectedExpiry!)
+                              : 'Select expiry date (optional)',
+                          style: GoogleFonts.outfit(
+                            color: selectedExpiry != null
+                                ? Colors.white
+                                : posTextMuted,
+                            fontSize: 14,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child:
+                Text('Cancel', style: GoogleFonts.outfit(color: posTextMuted)),
+          ),
+          FilledButton(
+            onPressed: isSaving
+                ? null
+                : () async {
+                    final qty = double.tryParse(stockController.text) ?? 0;
+                    final price = double.tryParse(priceController.text) ?? 0;
+                    if (qty <= 0) {
+                      ScaffoldMessenger.of(ctx).showSnackBar(
+                        const SnackBar(
+                            content: Text('Quantity must be greater than 0')),
+                      );
+                      return;
+                    }
+                    setDialogState(() => isSaving = true);
+                    try {
+                      final inventoryProvider =
+                          ctx.read<InventoryProvider>();
+                      await inventoryProvider.stockIn(
+                        productId: product.id,
+                        quantity: qty,
+                        retailPrice: price > 0 ? price : product.purchasePrice,
+                        expiryDate: selectedExpiry,
+                      );
+                      if (ctx.mounted) Navigator.pop(ctx);
+                      onRefresh();
+                    } catch (e) {
+                      debugPrint('Stock in error: $e');
+                      if (ctx.mounted) {
+                        setDialogState(() => isSaving = false);
+                        ScaffoldMessenger.of(ctx).showSnackBar(
+                          SnackBar(content: Text('Error: $e')),
+                        );
+                      }
+                    }
+                  },
+            style: FilledButton.styleFrom(
+              backgroundColor: posPrimary,
+              foregroundColor: Colors.white,
+            ),
+            child: isSaving
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(
+                        strokeWidth: 2, color: Colors.white),
+                  )
+                : Text('Stock In', style: GoogleFonts.outfit()),
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+Future<void> _showNewStockInDialog(
+  BuildContext context,
+  List<Product> products,
+  VoidCallback onRefresh,
+) async {
+  final storeProducts = products.where((p) => p.categoryId == 1).toList();
+  if (storeProducts.isEmpty) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+          content: Text('No store products found. Add products first.')),
+    );
+    return;
+  }
+
+  Product? selectedProduct = storeProducts.first;
+  final stockController = TextEditingController();
+  final priceController = TextEditingController(
+    text: storeProducts.first.purchasePrice.toStringAsFixed(2),
+  );
+  DateTime? selectedExpiry;
+  bool isSaving = false;
+
+  await showDialog(
+    context: context,
+    builder: (ctx) => StatefulBuilder(
+      builder: (ctx, setDialogState) => AlertDialog(
+        backgroundColor: posSurface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text(
+          'Stock In',
+          style: GoogleFonts.outfit(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        content: SizedBox(
+          width: 380,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Product selector
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: DropdownButtonFormField<Product>(
+                    value: selectedProduct,
+                    dropdownColor: posSurfaceLight,
+                    style: GoogleFonts.outfit(color: Colors.white),
+                    decoration: InputDecoration(
+                      labelText: 'Product',
+                      labelStyle: GoogleFonts.outfit(color: posTextMuted),
+                      filled: true,
+                      fillColor: posSurfaceLight,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        borderSide: BorderSide.none,
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        borderSide:
+                            const BorderSide(color: posPrimary, width: 1.5),
+                      ),
+                      contentPadding:
+                          const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                    ),
+                    items: storeProducts
+                        .map((p) => DropdownMenuItem(
+                              value: p,
+                              child: Text(p.name),
+                            ))
+                        .toList(),
+                    onChanged: (p) {
+                      if (p != null) {
+                        setDialogState(() {
+                          selectedProduct = p;
+                          priceController.text =
+                              p.purchasePrice.toStringAsFixed(2);
+                        });
+                      }
+                    },
+                  ),
+                ),
+                // Quantity
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: TextField(
+                    controller: stockController,
+                    keyboardType: TextInputType.number,
+                    autofocus: true,
+                    style: GoogleFonts.outfit(color: Colors.white),
+                    decoration: InputDecoration(
+                      labelText: 'Quantity to add',
+                      labelStyle: GoogleFonts.outfit(color: posTextMuted),
+                      filled: true,
+                      fillColor: posSurfaceLight,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        borderSide: BorderSide.none,
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        borderSide:
+                            const BorderSide(color: posPrimary, width: 1.5),
+                      ),
+                      contentPadding:
+                          const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                    ),
+                  ),
+                ),
+                // Retail price
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: TextField(
+                    controller: priceController,
+                    keyboardType: TextInputType.number,
+                    style: GoogleFonts.outfit(color: Colors.white),
+                    decoration: InputDecoration(
+                      labelText: 'Retail price (P)',
+                      labelStyle: GoogleFonts.outfit(color: posTextMuted),
+                      filled: true,
+                      fillColor: posSurfaceLight,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        borderSide: BorderSide.none,
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        borderSide:
+                            const BorderSide(color: posPrimary, width: 1.5),
+                      ),
+                      contentPadding:
+                          const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                    ),
+                  ),
+                ),
+                // Expiry date
+                InkWell(
+                  onTap: () async {
+                    final picked = await showDatePicker(
+                      context: ctx,
+                      initialDate:
+                          DateTime.now().add(const Duration(days: 30)),
+                      firstDate: DateTime.now(),
+                      lastDate:
+                          DateTime.now().add(const Duration(days: 365 * 10)),
+                    );
+                    if (picked != null) {
+                      setDialogState(() => selectedExpiry = picked);
+                    }
+                  },
+                  borderRadius: BorderRadius.circular(10),
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 14, vertical: 14),
+                    decoration: BoxDecoration(
+                      color: posSurfaceLight,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.calendar_today_outlined,
+                            size: 16,
+                            color: selectedExpiry != null
+                                ? posPrimary
+                                : posTextMuted),
+                        const SizedBox(width: 10),
+                        Text(
+                          selectedExpiry != null
+                              ? DateFormat('MMM d, yyyy').format(selectedExpiry!)
+                              : 'Select expiry date (optional)',
+                          style: GoogleFonts.outfit(
+                            color: selectedExpiry != null
+                                ? Colors.white
+                                : posTextMuted,
+                            fontSize: 14,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child:
+                Text('Cancel', style: GoogleFonts.outfit(color: posTextMuted)),
+          ),
+          FilledButton(
+            onPressed: isSaving
+                ? null
+                : () async {
+                    final qty = double.tryParse(stockController.text) ?? 0;
+                    final price = double.tryParse(priceController.text) ?? 0;
+                    if (qty <= 0) {
+                      ScaffoldMessenger.of(ctx).showSnackBar(
+                        const SnackBar(
+                            content:
+                                Text('Quantity must be greater than 0')),
+                      );
+                      return;
+                    }
+                    setDialogState(() => isSaving = true);
+                    try {
+                      final inventoryProvider = ctx.read<InventoryProvider>();
+                      await inventoryProvider.stockIn(
+                        productId: selectedProduct!.id,
+                        quantity: qty,
+                        retailPrice: price > 0
+                            ? price
+                            : selectedProduct!.purchasePrice,
+                        expiryDate: selectedExpiry,
+                      );
+                      if (ctx.mounted) Navigator.pop(ctx);
+                      onRefresh();
+                    } catch (e) {
+                      debugPrint('Stock in error: $e');
+                      if (ctx.mounted) {
+                        setDialogState(() => isSaving = false);
+                        ScaffoldMessenger.of(ctx).showSnackBar(
+                          SnackBar(content: Text('Error: $e')),
+                        );
+                      }
+                    }
+                  },
+            style: FilledButton.styleFrom(
+              backgroundColor: posPrimary,
+              foregroundColor: Colors.white,
+            ),
+            child: isSaving
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(
+                        strokeWidth: 2, color: Colors.white),
+                  )
+                : Text('Stock In', style: GoogleFonts.outfit()),
+          ),
+        ],
+      ),
+    ),
+  );
 }
 
 class _PrintSuppliesGrid extends StatelessWidget {

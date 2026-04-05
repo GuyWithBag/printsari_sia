@@ -1,12 +1,21 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:intl/intl.dart';
+import 'package:printsari_sia/shared/themes/colors.dart';
 import 'package:printsari_sia/shared/types/dtos/inventory_item.dart';
 import 'package:skeletonizer/skeletonizer.dart';
 
 class InventoryCard extends StatelessWidget {
   final InventoryItem item;
   final VoidCallback onEdit;
+  final VoidCallback? onStockIn;
 
-  const InventoryCard({super.key, required this.item, required this.onEdit});
+  const InventoryCard({
+    super.key,
+    required this.item,
+    required this.onEdit,
+    this.onStockIn,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -19,9 +28,12 @@ class InventoryCard extends StatelessWidget {
         final String title = data?.name ?? "";
         final String subtitle = data?.category?.categoryName ?? "";
         final bool isOutOfStock = item.stock <= 0;
-        final String stockLevel = item.stock.toString();
-        final String price = item.retailPrice.toString();
-        final String expiry = data?.expiryDate?.toString() ?? "";
+        final String stockLevel = item.stock.toStringAsFixed(0);
+        final String price = 'P${item.retailPrice.toStringAsFixed(2)}';
+        final expiryDate = item.expiryDate;
+        final String expiry = expiryDate != null
+            ? DateFormat('MMM d, yyyy').format(expiryDate)
+            : 'No expiry';
         return Skeletonizer(
           enabled: asyncSnapshot.data == null,
           child: SizedBox(
@@ -101,9 +113,26 @@ class InventoryCard extends StatelessWidget {
                     _buildDataRow(context, 'Stock Level:', stockLevel),
                     const SizedBox(height: 12),
                     _buildDataRow(context, 'Price:', price),
-                    ...[
-                      const SizedBox(height: 12),
-                      _buildDataRow(context, 'Expiry:', expiry),
+                    const SizedBox(height: 12),
+                    _buildDataRow(context, 'Expiry:', expiry),
+                    if (onStockIn != null) ...[
+                      const SizedBox(height: 16),
+                      SizedBox(
+                        width: double.infinity,
+                        child: OutlinedButton.icon(
+                          onPressed: onStockIn,
+                          icon: const Icon(Icons.add_box_outlined, size: 16),
+                          label: Text('Stock In', style: GoogleFonts.outfit(fontSize: 13)),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: posPrimary,
+                            side: BorderSide(color: posPrimary.withValues(alpha: 0.4)),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            padding: const EdgeInsets.symmetric(vertical: 8),
+                          ),
+                        ),
+                      ),
                     ],
                   ],
                 ),

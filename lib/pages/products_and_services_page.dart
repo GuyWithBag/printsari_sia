@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
+import 'package:printsari_sia/controllers/auth_controller.dart';
 import 'package:printsari_sia/providers/inventory_provider.dart';
 import 'package:printsari_sia/providers/product_provider.dart';
 import 'package:printsari_sia/shared/themes/colors.dart';
@@ -25,6 +26,8 @@ class ProductsAndServicesPage extends HookWidget {
 
     final productProvider = context.read<ProductProvider>();
     final inventoryProvider = context.read<InventoryProvider>();
+    final auth = context.watch<AuthController>();
+    final isReadOnly = auth.isRole(UserRoleType.cashier);
 
     void hardRefresh() {
       productProvider.clearAllCache();
@@ -62,7 +65,9 @@ class ProductsAndServicesPage extends HookWidget {
             child: Align(
               alignment: Alignment.centerLeft,
               child: Text(
-                'Manage store products and print service offerings',
+                isReadOnly
+                    ? 'View store products and print service offerings'
+                    : 'Manage store products and print service offerings',
                 style: GoogleFonts.outfit(color: posTextMuted),
               ),
             ),
@@ -101,10 +106,12 @@ class ProductsAndServicesPage extends HookWidget {
                   _StoreProductsTab(
                     refreshKey: refreshKey.value,
                     onRefresh: () => refreshKey.value++,
+                    isReadOnly: isReadOnly,
                   ),
                   _PrintServicesTab(
                     refreshKey: refreshKey.value,
                     onRefresh: () => refreshKey.value++,
+                    isReadOnly: isReadOnly,
                   ),
                 ],
               ),
@@ -119,10 +126,12 @@ class ProductsAndServicesPage extends HookWidget {
 class _StoreProductsTab extends HookWidget {
   final int refreshKey;
   final VoidCallback onRefresh;
+  final bool isReadOnly;
 
   const _StoreProductsTab({
     required this.refreshKey,
     required this.onRefresh,
+    this.isReadOnly = false,
   });
 
   @override
@@ -166,6 +175,7 @@ class _StoreProductsTab extends HookWidget {
                   ),
                 ),
               ),
+              if (!isReadOnly) ...[
               const SizedBox(width: 12),
               FilledButton.icon(
                 onPressed: () => _showProductDialog(context, null, onRefresh),
@@ -179,6 +189,7 @@ class _StoreProductsTab extends HookWidget {
                   ),
                 ),
               ),
+              ],
             ],
           ),
           const SizedBox(height: 12),
@@ -189,6 +200,7 @@ class _StoreProductsTab extends HookWidget {
                     snapshot.data![0] as List<Product>,
                     snapshot.data![1] as List<InventoryItem>,
                     searchQuery.value,
+                    isReadOnly,
                   )
                 : const Center(
                     child: CircularProgressIndicator(color: posPrimary),
@@ -204,6 +216,7 @@ class _StoreProductsTab extends HookWidget {
     List<Product> products,
     List<InventoryItem> inventory,
     String searchQuery,
+    bool isReadOnly,
   ) {
     if (products.isEmpty) {
       return Center(
@@ -257,14 +270,14 @@ class _StoreProductsTab extends HookWidget {
                 color: Colors.white,
                 fontSize: 13,
               ),
-              columns: const [
-                DataColumn(label: Text('Name')),
-                DataColumn(label: Text('Category')),
-                DataColumn(label: Text('Purchase Price'), numeric: true),
-                DataColumn(label: Text('Stock'), numeric: true),
-                DataColumn(label: Text('SKU')),
-                DataColumn(label: Text('Supplier')),
-                DataColumn(label: Text('Actions')),
+              columns: [
+                const DataColumn(label: Text('Name')),
+                const DataColumn(label: Text('Category')),
+                const DataColumn(label: Text('Purchase Price'), numeric: true),
+                const DataColumn(label: Text('Stock'), numeric: true),
+                const DataColumn(label: Text('SKU')),
+                const DataColumn(label: Text('Supplier')),
+                if (!isReadOnly) const DataColumn(label: Text('Actions')),
               ],
               rows: filteredProducts.map((product) {
                 final stock = inventory
@@ -288,6 +301,7 @@ class _StoreProductsTab extends HookWidget {
                   ),
                   DataCell(Text(product.sku ?? '-')),
                   DataCell(Text(product.supplier ?? '-')),
+                  if (!isReadOnly)
                   DataCell(
                     Row(
                       mainAxisSize: MainAxisSize.min,
@@ -554,10 +568,12 @@ Future<void> _showDeleteProductDialog(
 class _PrintServicesTab extends HookWidget {
   final int refreshKey;
   final VoidCallback onRefresh;
+  final bool isReadOnly;
 
   const _PrintServicesTab({
     required this.refreshKey,
     required this.onRefresh,
+    this.isReadOnly = false,
   });
 
   @override
@@ -597,6 +613,7 @@ class _PrintServicesTab extends HookWidget {
                   ),
                 ),
               ),
+              if (!isReadOnly) ...[
               const SizedBox(width: 12),
               FilledButton.icon(
                 onPressed: () =>
@@ -611,12 +628,13 @@ class _PrintServicesTab extends HookWidget {
                   ),
                 ),
               ),
+              ],
             ],
           ),
           const SizedBox(height: 12),
           Expanded(
             child: snapshot.hasData
-                ? _buildServiceTable(context, snapshot.data!, searchQuery.value)
+                ? _buildServiceTable(context, snapshot.data!, searchQuery.value, isReadOnly)
                 : const Center(
                     child: CircularProgressIndicator(color: posPrimary),
                   ),
@@ -630,6 +648,7 @@ class _PrintServicesTab extends HookWidget {
     BuildContext context,
     List<PrintService> services,
     String searchQuery,
+    bool isReadOnly,
   ) {
     if (services.isEmpty) {
       return Center(
@@ -681,13 +700,13 @@ class _PrintServicesTab extends HookWidget {
                 color: Colors.white,
                 fontSize: 13,
               ),
-              columns: const [
-                DataColumn(label: Text('Name')),
-                DataColumn(label: Text('Paper Size')),
-                DataColumn(label: Text('Color Mode')),
-                DataColumn(label: Text('Base Price'), numeric: true),
-                DataColumn(label: Text('Cost/Page'), numeric: true),
-                DataColumn(label: Text('Actions')),
+              columns: [
+                const DataColumn(label: Text('Name')),
+                const DataColumn(label: Text('Paper Size')),
+                const DataColumn(label: Text('Color Mode')),
+                const DataColumn(label: Text('Base Price'), numeric: true),
+                const DataColumn(label: Text('Cost/Page'), numeric: true),
+                if (!isReadOnly) const DataColumn(label: Text('Actions')),
               ],
               rows: filteredServices.map((svc) {
                 return DataRow(cells: [
@@ -698,6 +717,7 @@ class _PrintServicesTab extends HookWidget {
                   DataCell(
                     Text(currencyFormat.format(svc.totalCostPerPage)),
                   ),
+                  if (!isReadOnly)
                   DataCell(
                     Row(
                       mainAxisSize: MainAxisSize.min,

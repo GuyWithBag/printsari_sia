@@ -31,7 +31,7 @@ class TransactionProvider extends ChangeNotifier {
       id: item.id,
       transactionId: item.transactionId,
       inventoryId: item.inventoryId,
-      productId: item.productId,
+      productId: item.productId, // nullable
       productName: item.productName,
       quantity: quantity,
       unitPrice: item.unitPrice,
@@ -127,10 +127,10 @@ class TransactionProvider extends ChangeNotifier {
 
       // Insert each TransactionItem linked to the new transaction
       for (final item in _cart) {
-        final itemData = {
+        final itemData = <String, dynamic>{
           'transaction_id': transactionId,
           'inventory_id': item.inventoryId,
-          'product_id': item.productId,
+          if (item.productId != null) 'product_id': item.productId,
           'product_name': item.productName,
           'quantity': item.quantity,
           'unit_price': item.unitPrice,

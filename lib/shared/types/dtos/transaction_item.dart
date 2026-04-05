@@ -4,7 +4,7 @@ class TransactionItem {
   final int id;
   final int transactionId;
   final int? inventoryId;
-  final int productId;
+  final int? productId;
   final String productName;
   final double quantity;
   final double unitPrice;
@@ -26,7 +26,7 @@ class TransactionItem {
     required this.id,
     required this.transactionId,
     this.inventoryId,
-    required this.productId,
+    this.productId,
     required this.productName,
     required this.quantity,
     required this.unitPrice,
@@ -48,7 +48,7 @@ class TransactionItem {
       id: (json['id'] as int?) ?? 0,
       transactionId: (json['transaction_id'] as int?) ?? 0,
       inventoryId: json['inventory_id'] as int?,
-      productId: (json['product_id'] as int?) ?? 0,
+      productId: json['product_id'] as int?,
       productName: (json['product_name'] as String?) ?? '',
       quantity: (json['quantity'] as num?)?.toDouble() ?? 0.0,
       unitPrice: (json['unit_price'] as num?)?.toDouble() ?? 0.0,

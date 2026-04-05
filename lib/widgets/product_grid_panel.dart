@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:intl/intl.dart';
 import 'package:printsari_sia/providers/providers.dart';
 import 'package:printsari_sia/shared/themes/colors.dart';
 import 'package:printsari_sia/shared/types/types.dart';
@@ -171,13 +172,17 @@ class ProductGridPanel extends HookWidget {
     final inventory = inventorySnapshot.data ?? [];
     final query = searchQuery.value.toLowerCase();
 
-    final filtered = products.where((p) {
+    // Show one card per inventory batch (per expiry date), filtered by search
+    final batches = inventory.where((inv) {
+      final product = products.where((p) => p.id == inv.productId).firstOrNull;
+      if (product == null) return false;
       if (query.isEmpty) return true;
-      return p.name.toLowerCase().contains(query) ||
-          (p.category?.categoryName.toLowerCase().contains(query) ?? false);
+      return product.name.toLowerCase().contains(query) ||
+          (product.category?.categoryName.toLowerCase().contains(query) ??
+              false);
     }).toList();
 
-    if (filtered.isEmpty) {
+    if (batches.isEmpty) {
       return _emptyState(Icons.inventory_2_outlined, 'No products found');
     }
 
@@ -188,18 +193,20 @@ class ProductGridPanel extends HookWidget {
         crossAxisSpacing: 10,
         mainAxisSpacing: 10,
       ),
-      itemCount: filtered.length,
+      itemCount: batches.length,
       itemBuilder: (context, index) {
-        final product = filtered[index];
-        final inventoryItem = inventory
-            .where((inv) => inv.productId == product.id)
+        final inventoryItem = batches[index];
+        final product = products
+            .where((p) => p.id == inventoryItem.productId)
             .firstOrNull;
 
-        // Calculate how many of this product are already in the cart
+        if (product == null) return const SizedBox.shrink();
+
+        // Calculate cart quantity for this specific inventory batch
         final cartQty = transactionProvider.cart
-            .where((c) => c.productId == product.id)
+            .where((c) => c.inventoryId == inventoryItem.id)
             .fold(0.0, (sum, c) => sum + c.quantity);
-        final effectiveStock = (inventoryItem?.stock ?? 0) - cartQty;
+        final effectiveStock = inventoryItem.stock - cartQty;
 
         return _BounceTapCard(
           child: _StoreProductCard(
@@ -208,7 +215,7 @@ class ProductGridPanel extends HookWidget {
             cartQuantity: cartQty,
           ),
           onTap: () {
-            if (inventoryItem == null || effectiveStock <= 0) {
+            if (effectiveStock <= 0) {
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
                   content: Text('${product.name} is out of stock'),
@@ -217,26 +224,121 @@ class ProductGridPanel extends HookWidget {
               );
               return;
             }
-            final now = DateTime.now();
-            transactionProvider.addToCart(
-              TransactionItem(
-                id: 0,
-                transactionId: 0,
-                inventoryId: inventoryItem.id,
-                productId: product.id,
-                productName: product.name,
-                quantity: 1,
-                unitPrice: inventoryItem.retailPrice,
-                subtotal: inventoryItem.retailPrice,
-                categoryId: 1,
-                itemCost: product.purchasePrice,
-                createdAt: now,
-                updatedAt: now,
-              ),
+            _showQuantityDialog(
+              context,
+              product,
+              inventoryItem,
+              effectiveStock,
             );
           },
         );
       },
+    );
+  }
+
+  // ── Quantity dialog for store products ──
+  Future<void> _showQuantityDialog(
+    BuildContext context,
+    Product product,
+    InventoryItem inventoryItem,
+    double maxQty,
+  ) async {
+    final qtyController = TextEditingController(text: '1');
+    final result = await showDialog<int>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: posSurface,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+          side: BorderSide(color: Colors.white.withValues(alpha: 0.08)),
+        ),
+        title: Text(
+          'Enter Quantity',
+          style: GoogleFonts.outfit(
+            color: Colors.white,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              product.name,
+              style: GoogleFonts.outfit(color: posAccent, fontSize: 14),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Price: P${inventoryItem.retailPrice.toStringAsFixed(2)} · Stock: ${maxQty.toStringAsFixed(0)}',
+              style: GoogleFonts.outfit(color: posTextMuted, fontSize: 13),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: qtyController,
+              keyboardType: TextInputType.number,
+              autofocus: true,
+              style: GoogleFonts.outfit(color: Colors.white),
+              decoration: InputDecoration(
+                labelText: 'Quantity',
+                labelStyle: GoogleFonts.outfit(color: posTextMuted),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(
+                    color: Colors.white.withValues(alpha: 0.1),
+                  ),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: posPrimary),
+                ),
+                filled: true,
+                fillColor: posSurfaceLight,
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(null),
+            child: Text('Cancel', style: GoogleFonts.outfit(color: posTextMuted)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: posPrimary,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            onPressed: () {
+              final qty = int.tryParse(qtyController.text) ?? 0;
+              if (qty > 0 && qty <= maxQty) Navigator.of(ctx).pop(qty);
+            },
+            child: Text('Add to Cart', style: GoogleFonts.outfit()),
+          ),
+        ],
+      ),
+    );
+
+    if (result == null || result <= 0) return;
+    if (!context.mounted) return;
+
+    final now = DateTime.now();
+    transactionProvider.addToCart(
+      TransactionItem(
+        id: 0,
+        transactionId: 0,
+        inventoryId: inventoryItem.id,
+        productId: product.id,
+        productName: product.name,
+        quantity: result.toDouble(),
+        unitPrice: inventoryItem.retailPrice,
+        subtotal: inventoryItem.retailPrice * result,
+        categoryId: 1,
+        itemCost: product.purchasePrice * result,
+        createdAt: now,
+        updatedAt: now,
+      ),
     );
   }
 
@@ -402,7 +504,7 @@ class ProductGridPanel extends HookWidget {
         TransactionItem(
           id: 0,
           transactionId: 0,
-          productId: service.id,
+          productId: null, // print services are not in the products table
           productName: service.name,
           quantity: pageCount.toDouble(),
           unitPrice: service.basePrice,
@@ -532,7 +634,7 @@ class ProductGridPanel extends HookWidget {
       TransactionItem(
         id: 0,
         transactionId: 0,
-        productId: 0,
+        productId: null,
         productName: name,
         quantity: 1,
         unitPrice: price,
@@ -811,6 +913,14 @@ class _StoreProductCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 4),
+          if (inventoryItem?.expiryDate != null)
+            Text(
+              'Exp: ${DateFormat('MMM d, yyyy').format(inventoryItem!.expiryDate!)}',
+              style: GoogleFonts.outfit(
+                color: warmGray.withValues(alpha: 0.6),
+                fontSize: 9,
+              ),
+            ),
           Text(
             'P${price.toStringAsFixed(2)}',
             style: GoogleFonts.outfit(
