@@ -26,6 +26,21 @@ class InventoryPage extends HookWidget {
     final inventory = context.read<InventoryProvider>();
     final productProvider = context.read<ProductProvider>();
 
+    // Start realtime subscriptions once
+    useEffect(() {
+      inventory.subscribeToChanges();
+      productProvider.subscribeToChanges();
+      return () {
+        inventory.unsubscribe();
+        productProvider.unsubscribe();
+      };
+    }, []);
+
+    // Reactive: rebuilds when hasPendingChanges changes
+    final hasPendingChanges =
+        context.select<InventoryProvider, bool>((p) => p.hasPendingChanges) ||
+        context.select<ProductProvider, bool>((p) => p.hasPendingChanges);
+
     void hardRefresh() {
       inventory.clearCache();
       productProvider.clearAllCache();
@@ -64,6 +79,49 @@ class InventoryPage extends HookWidget {
       return product != null && product.categoryId == 2;
     }).toList();
 
+    if (snapshot.hasError) {
+      return AppPage(
+        appBar: AppBar(
+          elevation: 0,
+          scrolledUnderElevation: 0,
+          backgroundColor: Colors.transparent,
+          title: Text(
+            'Inventory Management',
+            style: theme.textTheme.headlineSmall?.copyWith(
+              fontWeight: FontWeight.bold,
+              color: theme.colorScheme.onSurface,
+            ),
+          ),
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.refresh_rounded, color: Colors.white),
+              tooltip: 'Retry',
+              onPressed: hardRefresh,
+            ),
+          ],
+        ),
+        body: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.error_outline, color: Colors.redAccent, size: 48),
+              const SizedBox(height: 12),
+              Text(
+                'Failed to load inventory',
+                style: GoogleFonts.outfit(color: Colors.white, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                '${snapshot.error}',
+                style: GoogleFonts.outfit(color: posTextMuted, fontSize: 12),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     return AppPage(
       appBar: AppBar(
         elevation: 0,
@@ -95,10 +153,33 @@ class InventoryPage extends HookWidget {
               ),
             ),
           const SizedBox(width: 8),
-          IconButton(
-            icon: const Icon(Icons.refresh_rounded, color: Colors.white),
-            tooltip: 'Refresh from server',
-            onPressed: hardRefresh,
+          Stack(
+            clipBehavior: Clip.none,
+            children: [
+              IconButton(
+                icon: Icon(
+                  Icons.refresh_rounded,
+                  color: hasPendingChanges ? Colors.orange : Colors.white,
+                ),
+                tooltip: hasPendingChanges
+                    ? 'Changes detected — tap to sync'
+                    : 'Refresh from server',
+                onPressed: hardRefresh,
+              ),
+              if (hasPendingChanges)
+                Positioned(
+                  right: 8,
+                  top: 8,
+                  child: Container(
+                    width: 8,
+                    height: 8,
+                    decoration: const BoxDecoration(
+                      color: Colors.orange,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                ),
+            ],
           ),
         ],
         bottom: PreferredSize(

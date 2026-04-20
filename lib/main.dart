@@ -10,8 +10,8 @@ void main() async {
   await Hive.initFlutter();
   await Hive.openBox<String>('app_cache');
   await Supabase.initialize(
-    url: "https://ezfbjccvucyqzfxkyssg.supabase.co",
-    anonKey: "sb_publishable_SHGoLCLSjCArcdvngMhOdw_o8FkU05i",
+    url: "http://127.0.0.1:54321",
+    anonKey: "sb_secret_N7UND0UgjKTVK-Uodkm0Hg_xSvEMPvz  ",
   );
   runApp(const App());
 }

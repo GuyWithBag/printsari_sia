@@ -12,8 +12,42 @@ class ProductProvider extends ChangeNotifier {
 
   List<Product>? _products;
   List<PrintService>? _services;
+  bool _hasPendingChanges = false;
+  RealtimeChannel? _channel;
+
+  bool get hasPendingChanges => _hasPendingChanges;
 
   Box<String> get _box => Hive.box<String>('app_cache');
+
+  void subscribeToChanges() {
+    _channel?.unsubscribe();
+    _channel = supabase
+        .channel('products_services_changes')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'products',
+          callback: (_) {
+            _hasPendingChanges = true;
+            notifyListeners();
+          },
+        )
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'print_services',
+          callback: (_) {
+            _hasPendingChanges = true;
+            notifyListeners();
+          },
+        )
+        .subscribe();
+  }
+
+  void unsubscribe() {
+    _channel?.unsubscribe();
+    _channel = null;
+  }
 
   void clearProductsCache() {
     _products = null;
@@ -48,6 +82,7 @@ class ProductProvider extends ChangeNotifier {
     final query = await supabase.from('products').select('*, product_categories(*)');
     _products = query.map((r) => Product.fromJson(r)).toList();
     await _box.put(_productsKey, jsonEncode(query));
+    _hasPendingChanges = false;
     return _products!;
   }
 
@@ -71,6 +106,7 @@ class ProductProvider extends ChangeNotifier {
         .select('*, paper_sizes(*), color_modes(*), print_orientations(*), print_finishes(*)');
     _services = query.map((r) => PrintService.fromJson(r)).toList();
     await _box.put(_servicesKey, jsonEncode(query));
+    _hasPendingChanges = false;
     return _services!;
   }
 

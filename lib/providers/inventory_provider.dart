@@ -10,8 +10,33 @@ class InventoryProvider extends ChangeNotifier {
   static const _itemsKey = 'inventory_items';
 
   List<InventoryItem>? _items;
+  bool _hasPendingChanges = false;
+  RealtimeChannel? _channel;
+
+  bool get hasPendingChanges => _hasPendingChanges;
 
   Box<String> get _box => Hive.box<String>('app_cache');
+
+  void subscribeToChanges() {
+    _channel?.unsubscribe();
+    _channel = supabase
+        .channel('inventory_items_changes')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'inventory_items',
+          callback: (_) {
+            _hasPendingChanges = true;
+            notifyListeners();
+          },
+        )
+        .subscribe();
+  }
+
+  void unsubscribe() {
+    _channel?.unsubscribe();
+    _channel = null;
+  }
 
   void clearCache() {
     _items = null;
@@ -63,6 +88,7 @@ class InventoryProvider extends ChangeNotifier {
     final query = await supabase.from('inventory_items').select();
     _items = query.map((r) => InventoryItem.fromJson(r)).toList();
     await _box.put(_itemsKey, jsonEncode(query));
+    _hasPendingChanges = false;
     return _items!;
   }
 }
