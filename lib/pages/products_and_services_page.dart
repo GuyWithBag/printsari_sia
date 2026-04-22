@@ -10,6 +10,7 @@ import 'package:printsari_sia/shared/types/types.dart';
 import 'package:printsari_sia/widgets/app_page.dart';
 import 'package:printsari_sia/widgets/circular_tab.dart';
 import 'package:printsari_sia/widgets/circular_tab_bar.dart';
+import 'package:printsari_sia/widgets/selection_bar.dart';
 import 'package:printsari_sia/providers/activity_log_provider.dart';
 import 'package:provider/provider.dart';
 import 'package:skeletonizer/skeletonizer.dart';
@@ -20,7 +21,7 @@ class ProductsAndServicesPage extends HookWidget {
 
   @override
   Widget build(BuildContext context) {
-    final tabController = useTabController(initialLength: 2);
+    final tabController = useTabController(initialLength: 4);
     final currentIndex = useState(0);
     final refreshKey = useState(0);
 
@@ -96,6 +97,20 @@ class ProductsAndServicesPage extends HookWidget {
                   icon: Icons.print_outlined,
                   indexState: currentIndex,
                 ),
+                CircularTab(
+                  tabController: tabController,
+                  index: 2,
+                  label: 'Machines',
+                  icon: Icons.computer_outlined,
+                  indexState: currentIndex,
+                ),
+                CircularTab(
+                  tabController: tabController,
+                  index: 3,
+                  label: 'Service Supplies',
+                  icon: Icons.science_outlined,
+                  indexState: currentIndex,
+                ),
               ],
             ),
             const SizedBox(height: 24),
@@ -109,6 +124,16 @@ class ProductsAndServicesPage extends HookWidget {
                     isReadOnly: isReadOnly,
                   ),
                   _PrintServicesTab(
+                    refreshKey: refreshKey.value,
+                    onRefresh: () => refreshKey.value++,
+                    isReadOnly: isReadOnly,
+                  ),
+                  _MachinesTab(
+                    refreshKey: refreshKey.value,
+                    onRefresh: () => refreshKey.value++,
+                    isReadOnly: isReadOnly,
+                  ),
+                  _ServiceSuppliesTab(
                     refreshKey: refreshKey.value,
                     onRefresh: () => refreshKey.value++,
                     isReadOnly: isReadOnly,
@@ -140,6 +165,7 @@ class _StoreProductsTab extends HookWidget {
     final inventoryProvider = context.watch<InventoryProvider>();
     final searchController = useTextEditingController();
     final searchQuery = useState('');
+    final selectedProductIds = useState(<int>{});
 
     final dataFuture = useMemoized(
       () => Future.wait([
@@ -177,6 +203,17 @@ class _StoreProductsTab extends HookWidget {
               ),
               if (!isReadOnly) ...[
               const SizedBox(width: 12),
+              OutlinedButton.icon(
+                onPressed: () => _showBulkAddProductsDialog(context, onRefresh),
+                icon: const Icon(Icons.playlist_add_rounded, size: 18),
+                label: Text('Bulk Add', style: GoogleFonts.outfit()),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: Colors.white,
+                  side: BorderSide(color: Colors.white.withValues(alpha: 0.2)),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+              ),
+              const SizedBox(width: 8),
               FilledButton.icon(
                 onPressed: () => _showProductDialog(context, null, onRefresh),
                 icon: const Icon(Icons.add, size: 18),
@@ -193,6 +230,28 @@ class _StoreProductsTab extends HookWidget {
             ],
           ),
           const SizedBox(height: 12),
+          if (selectedProductIds.value.isNotEmpty && !isReadOnly)
+            SelectionBar(
+              count: selectedProductIds.value.length,
+              itemLabel: 'product',
+              onClear: () => selectedProductIds.value = {},
+              onDelete: () async {
+                final ok = await confirmBulkDelete(
+                  context,
+                  selectedProductIds.value.length,
+                  'product',
+                );
+                if (!ok || !context.mounted) return;
+                final provider = context.read<ProductProvider>();
+                for (final id in selectedProductIds.value.toList()) {
+                  try {
+                    await provider.deleteProduct(id);
+                  } catch (_) {}
+                }
+                selectedProductIds.value = {};
+                onRefresh();
+              },
+            ),
           Expanded(
             child: snapshot.hasData
                 ? _buildProductTable(
@@ -201,6 +260,8 @@ class _StoreProductsTab extends HookWidget {
                     snapshot.data![1] as List<InventoryItem>,
                     searchQuery.value,
                     isReadOnly,
+                    selectedProductIds.value,
+                    (ids) => selectedProductIds.value = ids,
                   )
                 : const Center(
                     child: CircularProgressIndicator(color: posPrimary),
@@ -217,6 +278,8 @@ class _StoreProductsTab extends HookWidget {
     List<InventoryItem> inventory,
     String searchQuery,
     bool isReadOnly,
+    Set<int> selectedIds,
+    void Function(Set<int>) onSelectionChanged,
   ) {
     if (products.isEmpty) {
       return Center(
@@ -270,10 +333,18 @@ class _StoreProductsTab extends HookWidget {
                 color: Colors.white,
                 fontSize: 13,
               ),
+              onSelectAll: isReadOnly
+                  ? null
+                  : (v) => onSelectionChanged(
+                        v == true
+                            ? filteredProducts.map((p) => p.id).toSet()
+                            : {},
+                      ),
               columns: [
                 const DataColumn(label: Text('Name')),
                 const DataColumn(label: Text('Category')),
                 const DataColumn(label: Text('Purchase Price'), numeric: true),
+                const DataColumn(label: Text('Selling Price'), numeric: true),
                 const DataColumn(label: Text('Stock'), numeric: true),
                 const DataColumn(label: Text('SKU')),
                 const DataColumn(label: Text('Supplier')),
@@ -283,11 +354,25 @@ class _StoreProductsTab extends HookWidget {
                 final stock = inventory
                     .where((i) => i.productId == product.id)
                     .fold(0.0, (sum, i) => sum + i.stock);
-                return DataRow(cells: [
+                return DataRow(
+                  selected: selectedIds.contains(product.id),
+                  onSelectChanged: isReadOnly
+                      ? null
+                      : (v) {
+                          final s = Set<int>.from(selectedIds);
+                          v == true ? s.add(product.id) : s.remove(product.id);
+                          onSelectionChanged(s);
+                        },
+                  cells: [
                   DataCell(Text(product.name)),
                   DataCell(Text(product.category?.categoryName ?? 'N/A')),
                   DataCell(
                     Text(currencyFormat.format(product.purchasePrice)),
+                  ),
+                  DataCell(
+                    Text(product.sellingPrice != null
+                        ? currencyFormat.format(product.sellingPrice)
+                        : '-'),
                   ),
                   DataCell(
                     Text(
@@ -355,12 +440,18 @@ Future<void> _showProductDialog(
   final priceController = TextEditingController(
     text: isEditing ? product.purchasePrice.toString() : '',
   );
+  final sellingPriceController = TextEditingController(
+    text: isEditing && product.sellingPrice != null
+        ? product.sellingPrice.toString()
+        : '',
+  );
   final skuController = TextEditingController(text: product?.sku ?? '');
   final supplierController =
       TextEditingController(text: product?.supplier ?? '');
 
   // Category dropdown: 1 = store, 2 = printing
   int selectedCategoryId = product?.categoryId ?? 1;
+  bool isPerishable = product?.perishable ?? true;
 
   // Capture providers from the page context (which has access to the provider tree)
   final productProviderRef = Provider.of<ProductProvider>(context, listen: false);
@@ -385,6 +476,8 @@ Future<void> _showProductDialog(
                 _dialogField('Name', nameController),
                 _dialogField('Description', descController),
                 _dialogField('Purchase Price', priceController,
+                    keyboardType: TextInputType.number),
+                _dialogField('Selling Price (optional)', sellingPriceController,
                     keyboardType: TextInputType.number),
                 // Category dropdown
                 Padding(
@@ -422,6 +515,40 @@ Future<void> _showProductDialog(
                 ),
                 _dialogField('SKU (optional)', skuController),
                 _dialogField('Supplier (optional)', supplierController),
+                // Perishable toggle
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Perishable',
+                            style: GoogleFonts.outfit(
+                              color: Colors.white,
+                              fontSize: 14,
+                            ),
+                          ),
+                          Text(
+                            'Has expiry date',
+                            style: GoogleFonts.outfit(
+                              color: posTextMuted,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      ),
+                      Switch(
+                        value: isPerishable,
+                        activeColor: posPrimary,
+                        onChanged: (v) =>
+                            setDialogState(() => isPerishable = v),
+                      ),
+                    ],
+                  ),
+                ),
               ],
             ),
           ),
@@ -447,7 +574,11 @@ Future<void> _showProductDialog(
                     'description': descController.text,
                     'purchase_price':
                         double.tryParse(priceController.text) ?? 0,
+                    'selling_price': sellingPriceController.text.isEmpty
+                        ? null
+                        : double.tryParse(sellingPriceController.text),
                     'category_id': selectedCategoryId,
+                    'perishable': isPerishable,
                     'sku': skuController.text.isEmpty
                         ? null
                         : skuController.text,
@@ -470,6 +601,10 @@ Future<void> _showProductDialog(
                     categoryId: selectedCategoryId,
                     purchasePrice:
                         double.tryParse(priceController.text) ?? 0,
+                    sellingPrice: sellingPriceController.text.isEmpty
+                        ? null
+                        : double.tryParse(sellingPriceController.text),
+                    perishable: isPerishable,
                     sku: skuController.text.isEmpty
                         ? null
                         : skuController.text,
@@ -581,6 +716,7 @@ class _PrintServicesTab extends HookWidget {
     final productProvider = context.watch<ProductProvider>();
     final searchController = useTextEditingController();
     final searchQuery = useState('');
+    final selectedServiceIds = useState(<int>{});
 
     final servicesFuture = useMemoized(
       () => productProvider.getPrintServices(),
@@ -632,9 +768,38 @@ class _PrintServicesTab extends HookWidget {
             ],
           ),
           const SizedBox(height: 12),
+          if (selectedServiceIds.value.isNotEmpty && !isReadOnly)
+            SelectionBar(
+              count: selectedServiceIds.value.length,
+              itemLabel: 'print service',
+              onClear: () => selectedServiceIds.value = {},
+              onDelete: () async {
+                final ok = await confirmBulkDelete(
+                  context,
+                  selectedServiceIds.value.length,
+                  'print service',
+                );
+                if (!ok || !context.mounted) return;
+                final provider = context.read<ProductProvider>();
+                for (final id in selectedServiceIds.value.toList()) {
+                  try {
+                    await provider.deletePrintService(id);
+                  } catch (_) {}
+                }
+                selectedServiceIds.value = {};
+                onRefresh();
+              },
+            ),
           Expanded(
             child: snapshot.hasData
-                ? _buildServiceTable(context, snapshot.data!, searchQuery.value, isReadOnly)
+                ? _buildServiceTable(
+                    context,
+                    snapshot.data!,
+                    searchQuery.value,
+                    isReadOnly,
+                    selectedServiceIds.value,
+                    (ids) => selectedServiceIds.value = ids,
+                  )
                 : const Center(
                     child: CircularProgressIndicator(color: posPrimary),
                   ),
@@ -649,6 +814,8 @@ class _PrintServicesTab extends HookWidget {
     List<PrintService> services,
     String searchQuery,
     bool isReadOnly,
+    Set<int> selectedIds,
+    void Function(Set<int>) onSelectionChanged,
   ) {
     if (services.isEmpty) {
       return Center(
@@ -700,8 +867,16 @@ class _PrintServicesTab extends HookWidget {
                 color: Colors.white,
                 fontSize: 13,
               ),
+              onSelectAll: isReadOnly
+                  ? null
+                  : (v) => onSelectionChanged(
+                        v == true
+                            ? filteredServices.map((s) => s.id).toSet()
+                            : {},
+                      ),
               columns: [
                 const DataColumn(label: Text('Name')),
+                const DataColumn(label: Text('Machine')),
                 const DataColumn(label: Text('Paper Size')),
                 const DataColumn(label: Text('Color Mode')),
                 const DataColumn(label: Text('Base Price'), numeric: true),
@@ -709,8 +884,18 @@ class _PrintServicesTab extends HookWidget {
                 if (!isReadOnly) const DataColumn(label: Text('Actions')),
               ],
               rows: filteredServices.map((svc) {
-                return DataRow(cells: [
+                return DataRow(
+                  selected: selectedIds.contains(svc.id),
+                  onSelectChanged: isReadOnly
+                      ? null
+                      : (v) {
+                          final s = Set<int>.from(selectedIds);
+                          v == true ? s.add(svc.id) : s.remove(svc.id);
+                          onSelectionChanged(s);
+                        },
+                  cells: [
                   DataCell(Text(svc.name)),
+                  DataCell(Text(svc.machine?.name ?? '—')),
                   DataCell(Text(svc.paperSize?.sizeName ?? 'N/A')),
                   DataCell(Text(svc.colorMode?.modeName ?? 'N/A')),
                   DataCell(Text(currencyFormat.format(svc.basePrice))),
@@ -786,13 +971,21 @@ Future<void> _showPrintServiceDialog(
 
   // Fetch lookup data for dropdowns
   final supabase = Supabase.instance.client;
-  final paperSizesRaw = await supabase.from('paper_sizes').select().order('id');
-  final colorModesRaw = await supabase.from('color_modes').select().order('id');
-  final paperSizes = paperSizesRaw.map((r) => PaperSize.fromJson(r)).toList();
-  final colorModes = colorModesRaw.map((r) => ColorMode.fromJson(r)).toList();
+  final results = await Future.wait([
+    supabase.from('paper_sizes').select().order('id'),
+    supabase.from('color_modes').select().order('id'),
+    supabase.from('machines').select().order('name'),
+    supabase.from('service_supplies').select().order('name'),
+  ]);
+  final paperSizes = (results[0] as List).map((r) => PaperSize.fromJson(r as Map<String, dynamic>)).toList();
+  final colorModes = (results[1] as List).map((r) => ColorMode.fromJson(r as Map<String, dynamic>)).toList();
+  final machines = (results[2] as List).map((r) => Machine.fromJson(r as Map<String, dynamic>)).toList();
+  final serviceSupplies = (results[3] as List).map((r) => ServiceSupply.fromJson(r as Map<String, dynamic>)).toList();
 
   int selectedPaperSizeId = service?.paperSizeId ?? (paperSizes.isNotEmpty ? paperSizes.first.id : 1);
   int selectedColorModeId = service?.colorModeId ?? (colorModes.isNotEmpty ? colorModes.first.id : 1);
+  int? selectedMachineId = service?.machineId;
+  int? selectedServiceSupplyId = service?.serviceSupplyId;
 
   // Capture providers from the page context
   final productProviderRef = Provider.of<ProductProvider>(context, listen: false);
@@ -820,6 +1013,82 @@ Future<void> _showPrintServiceDialog(
                 _dialogField('Description', descController),
                 _dialogField('Base Price', basePriceController,
                     keyboardType: TextInputType.number),
+                // Machine dropdown (optional)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: DropdownButtonFormField<int?>(
+                    value: selectedMachineId,
+                    dropdownColor: posSurfaceLight,
+                    style: GoogleFonts.outfit(color: Colors.white),
+                    decoration: InputDecoration(
+                      labelText: 'Machine (optional)',
+                      labelStyle: GoogleFonts.outfit(color: posTextMuted),
+                      filled: true,
+                      fillColor: posSurfaceLight,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        borderSide: BorderSide.none,
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        borderSide: const BorderSide(color: posPrimary, width: 1.5),
+                      ),
+                      contentPadding:
+                          const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                    ),
+                    items: [
+                      DropdownMenuItem<int?>(
+                        value: null,
+                        child: Text('None', style: GoogleFonts.outfit(color: posTextMuted)),
+                      ),
+                      ...machines.map((m) => DropdownMenuItem<int?>(
+                            value: m.id,
+                            child: Text(m.name),
+                          )),
+                    ],
+                    onChanged: (value) {
+                      setDialogState(() => selectedMachineId = value);
+                    },
+                  ),
+                ),
+                // Service Supply dropdown (optional)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: DropdownButtonFormField<int?>(
+                    value: selectedServiceSupplyId,
+                    dropdownColor: posSurfaceLight,
+                    style: GoogleFonts.outfit(color: Colors.white),
+                    decoration: InputDecoration(
+                      labelText: 'Service Supply (optional)',
+                      labelStyle: GoogleFonts.outfit(color: posTextMuted),
+                      filled: true,
+                      fillColor: posSurfaceLight,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        borderSide: BorderSide.none,
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        borderSide: const BorderSide(color: posPrimary, width: 1.5),
+                      ),
+                      contentPadding:
+                          const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                    ),
+                    items: [
+                      DropdownMenuItem<int?>(
+                        value: null,
+                        child: Text('None', style: GoogleFonts.outfit(color: posTextMuted)),
+                      ),
+                      ...serviceSupplies.map((s) => DropdownMenuItem<int?>(
+                            value: s.id,
+                            child: Text('${s.name} (${s.supplyType})'),
+                          )),
+                    ],
+                    onChanged: (value) {
+                      setDialogState(() => selectedServiceSupplyId = value);
+                    },
+                  ),
+                ),
                 // Paper Size dropdown
                 Padding(
                   padding: const EdgeInsets.only(bottom: 12),
@@ -938,6 +1207,8 @@ Future<void> _showPrintServiceDialog(
                         double.tryParse(basePriceController.text) ?? 0,
                     'paper_size_id': selectedPaperSizeId,
                     'color_mode_id': selectedColorModeId,
+                    'machine_id': selectedMachineId,
+                    'service_supply_id': selectedServiceSupplyId,
                     'ink_cost_per_page': inkCost,
                     'paper_cost_per_page': paperCost,
                     'electricity_cost_per_page': elecCost,
@@ -958,6 +1229,8 @@ Future<void> _showPrintServiceDialog(
                         : descController.text,
                     paperSizeId: selectedPaperSizeId,
                     colorModeId: selectedColorModeId,
+                    machineId: selectedMachineId,
+                    serviceSupplyId: selectedServiceSupplyId,
                     basePrice:
                         double.tryParse(basePriceController.text) ?? 0,
                     inkCostPerPage: inkCost,
@@ -1081,6 +1354,979 @@ Widget _dialogField(
         contentPadding:
             const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       ),
+    ),
+  );
+}
+
+// ── Machines Tab ─────────────────────────────────────────────────────────────
+
+class _MachinesTab extends HookWidget {
+  final int refreshKey;
+  final VoidCallback onRefresh;
+  final bool isReadOnly;
+
+  const _MachinesTab({
+    required this.refreshKey,
+    required this.onRefresh,
+    this.isReadOnly = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final productProvider = context.watch<ProductProvider>();
+    final searchController = useTextEditingController();
+    final searchQuery = useState('');
+
+    final machinesFuture = useMemoized(
+      () => productProvider.getMachines(),
+      [refreshKey],
+    );
+    final snapshot = useFuture(machinesFuture);
+
+    return Skeletonizer(
+      enabled: !snapshot.hasData,
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: searchController,
+                  onChanged: (value) => searchQuery.value = value,
+                  style: GoogleFonts.outfit(color: Colors.white),
+                  decoration: InputDecoration(
+                    hintText: 'Search machines...',
+                    hintStyle: GoogleFonts.outfit(color: posTextMuted),
+                    prefixIcon: const Icon(Icons.search, color: posTextMuted),
+                    filled: true,
+                    fillColor: posSurfaceLight,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: BorderSide.none,
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  ),
+                ),
+              ),
+              if (!isReadOnly) ...[
+                const SizedBox(width: 12),
+                FilledButton.icon(
+                  onPressed: () => _showMachineDialog(context, null, onRefresh),
+                  icon: const Icon(Icons.add, size: 18),
+                  label: Text('Add Machine', style: GoogleFonts.outfit()),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: posPrimary,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
+          const SizedBox(height: 12),
+          Expanded(
+            child: snapshot.hasData
+                ? _buildMachineTable(context, snapshot.data!, searchQuery.value, isReadOnly)
+                : const Center(child: CircularProgressIndicator(color: posPrimary)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMachineTable(
+    BuildContext context,
+    List<Machine> machines,
+    String searchQuery,
+    bool isReadOnly,
+  ) {
+    if (machines.isEmpty) {
+      return Center(
+        child: Text('No machines yet', style: GoogleFonts.outfit(color: posTextMuted)),
+      );
+    }
+
+    final filtered = searchQuery.isEmpty
+        ? machines
+        : machines.where((m) => m.name.toLowerCase().contains(searchQuery.toLowerCase())).toList();
+
+    if (filtered.isEmpty) {
+      return Center(
+        child: Text('No machines match your search', style: GoogleFonts.outfit(color: posTextMuted)),
+      );
+    }
+
+    return Container(
+      decoration: BoxDecoration(color: posSurface, borderRadius: BorderRadius.circular(12)),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(12),
+        child: SingleChildScrollView(
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: DataTable(
+              headingRowColor: WidgetStateProperty.all(posSurfaceLight),
+              dataRowColor: WidgetStateProperty.all(posSurface),
+              headingTextStyle: GoogleFonts.outfit(color: posTextMuted, fontWeight: FontWeight.w600, fontSize: 13),
+              dataTextStyle: GoogleFonts.outfit(color: Colors.white, fontSize: 13),
+              columns: [
+                const DataColumn(label: Text('Name')),
+                const DataColumn(label: Text('Status')),
+                if (!isReadOnly) const DataColumn(label: Text('Actions')),
+              ],
+              rows: filtered.map((machine) {
+                return DataRow(cells: [
+                  DataCell(Text(machine.name)),
+                  DataCell(
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: machine.isActive
+                            ? const Color(0xFF22C55E).withOpacity(0.15)
+                            : const Color(0xFFEF4444).withOpacity(0.15),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Text(
+                        machine.isActive ? 'Active' : 'Inactive',
+                        style: GoogleFonts.outfit(
+                          color: machine.isActive ? const Color(0xFF22C55E) : const Color(0xFFEF4444),
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ),
+                  if (!isReadOnly)
+                    DataCell(
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          IconButton(
+                            icon: const Icon(Icons.edit_outlined, size: 18, color: posAccent),
+                            onPressed: () => _showMachineDialog(context, machine, onRefresh),
+                          ),
+                          IconButton(
+                            icon: Icon(
+                              machine.isActive ? Icons.toggle_on_outlined : Icons.toggle_off_outlined,
+                              size: 18,
+                              color: machine.isActive ? const Color(0xFF22C55E) : posTextMuted,
+                            ),
+                            tooltip: machine.isActive ? 'Deactivate' : 'Activate',
+                            onPressed: () async {
+                              final provider = context.read<ProductProvider>();
+                              await provider.updateMachine(machine.id, {'is_active': !machine.isActive});
+                              onRefresh();
+                            },
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.delete_outline, size: 18, color: Color(0xFFEF4444)),
+                            onPressed: () => _showDeleteMachineDialog(context, machine, onRefresh),
+                          ),
+                        ],
+                      ),
+                    ),
+                ]);
+              }).toList(),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+Future<void> _showMachineDialog(
+  BuildContext context,
+  Machine? machine,
+  VoidCallback onRefresh,
+) async {
+  final isEditing = machine != null;
+  final nameController = TextEditingController(text: machine?.name ?? '');
+  bool isActive = machine?.isActive ?? true;
+
+  final productProviderRef = Provider.of<ProductProvider>(context, listen: false);
+  final activityLogRef = Provider.of<ActivityLogProvider>(context, listen: false);
+
+  await showDialog(
+    context: context,
+    builder: (ctx) => StatefulBuilder(
+      builder: (ctx, setDialogState) => AlertDialog(
+        backgroundColor: posSurface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text(
+          isEditing ? 'Edit Machine' : 'Add Machine',
+          style: GoogleFonts.outfit(color: Colors.white, fontWeight: FontWeight.bold),
+        ),
+        content: SizedBox(
+          width: 360,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _dialogField('Machine Name', nameController),
+              Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text('Active', style: GoogleFonts.outfit(color: Colors.white, fontSize: 14)),
+                    Switch(
+                      value: isActive,
+                      activeColor: posPrimary,
+                      onChanged: (v) => setDialogState(() => isActive = v),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text('Cancel', style: GoogleFonts.outfit(color: posTextMuted)),
+          ),
+          FilledButton(
+            onPressed: () async {
+              if (nameController.text.isEmpty) {
+                ScaffoldMessenger.of(ctx).showSnackBar(
+                  const SnackBar(content: Text('Name is required')),
+                );
+                return;
+              }
+              try {
+                final machineName = nameController.text;
+                if (isEditing) {
+                  await productProviderRef.updateMachine(machine.id, {
+                    'name': machineName,
+                    'is_active': isActive,
+                  });
+                  activityLogRef.log(
+                    actionName: 'Machine Updated',
+                    description: 'Updated machine: $machineName',
+                  );
+                } else {
+                  final now = DateTime.now();
+                  await productProviderRef.createMachine(Machine(
+                    id: 0,
+                    name: machineName,
+                    isActive: isActive,
+                    createdAt: now,
+                    updatedAt: now,
+                  ));
+                  activityLogRef.log(
+                    actionName: 'Machine Added',
+                    description: 'Added new machine: $machineName',
+                  );
+                }
+                if (ctx.mounted) Navigator.pop(ctx);
+                onRefresh();
+              } catch (e) {
+                debugPrint('Error: $e');
+                if (ctx.mounted) {
+                  ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text('Error: $e')));
+                }
+              }
+            },
+            style: FilledButton.styleFrom(backgroundColor: posPrimary, foregroundColor: Colors.white),
+            child: Text(isEditing ? 'Update' : 'Create', style: GoogleFonts.outfit()),
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+Future<void> _showDeleteMachineDialog(
+  BuildContext context,
+  Machine machine,
+  VoidCallback onRefresh,
+) async {
+  final productProviderRef = Provider.of<ProductProvider>(context, listen: false);
+  final activityLogRef = Provider.of<ActivityLogProvider>(context, listen: false);
+  await showDialog(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      backgroundColor: posSurface,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      title: Text('Delete Machine',
+          style: GoogleFonts.outfit(color: Colors.white, fontWeight: FontWeight.bold)),
+      content: Text(
+        'Are you sure you want to delete "${machine.name}"? Print services assigned to this machine will be unlinked.',
+        style: GoogleFonts.outfit(color: posTextMuted),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(ctx),
+          child: Text('Cancel', style: GoogleFonts.outfit(color: posTextMuted)),
+        ),
+        FilledButton(
+          onPressed: () async {
+            try {
+              await productProviderRef.deleteMachine(machine.id);
+              activityLogRef.log(
+                actionName: 'Machine Deleted',
+                description: 'Deleted machine: ${machine.name}',
+              );
+              if (ctx.mounted) Navigator.pop(ctx);
+              onRefresh();
+            } catch (e) {
+              debugPrint('Delete machine error: $e');
+              if (ctx.mounted) {
+                ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text('Error: $e')));
+              }
+            }
+          },
+          style: FilledButton.styleFrom(
+              backgroundColor: const Color(0xFFEF4444), foregroundColor: Colors.white),
+          child: Text('Delete', style: GoogleFonts.outfit()),
+        ),
+      ],
+    ),
+  );
+}
+
+// ── Service Supplies Tab ──────────────────────────────────────────────────────
+
+class _ServiceSuppliesTab extends HookWidget {
+  final int refreshKey;
+  final VoidCallback onRefresh;
+  final bool isReadOnly;
+
+  const _ServiceSuppliesTab({
+    required this.refreshKey,
+    required this.onRefresh,
+    this.isReadOnly = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final inventoryProvider = context.watch<InventoryProvider>();
+    final searchController = useTextEditingController();
+    final searchQuery = useState('');
+    final selectedSupplyIds = useState(<int>{});
+
+    final suppliesFuture = useMemoized(
+      () => inventoryProvider.getServiceSupplies(),
+      [refreshKey],
+    );
+    final snapshot = useFuture(suppliesFuture);
+
+    return Skeletonizer(
+      enabled: !snapshot.hasData,
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: searchController,
+                  onChanged: (value) => searchQuery.value = value,
+                  style: GoogleFonts.outfit(color: Colors.white),
+                  decoration: InputDecoration(
+                    hintText: 'Search supplies...',
+                    hintStyle: GoogleFonts.outfit(color: posTextMuted),
+                    prefixIcon: const Icon(Icons.search, color: posTextMuted),
+                    filled: true,
+                    fillColor: posSurfaceLight,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: BorderSide.none,
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  ),
+                ),
+              ),
+              if (!isReadOnly) ...[
+                const SizedBox(width: 12),
+                FilledButton.icon(
+                  onPressed: () => _showServiceSupplyDialog(context, null, onRefresh),
+                  icon: const Icon(Icons.add, size: 18),
+                  label: Text('Add Supply', style: GoogleFonts.outfit()),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: posPrimary,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                ),
+              ],
+            ],
+          ),
+          const SizedBox(height: 12),
+          if (selectedSupplyIds.value.isNotEmpty && !isReadOnly)
+            SelectionBar(
+              count: selectedSupplyIds.value.length,
+              itemLabel: 'supply',
+              onClear: () => selectedSupplyIds.value = {},
+              onDelete: () async {
+                final ok = await confirmBulkDelete(
+                  context,
+                  selectedSupplyIds.value.length,
+                  'supply',
+                );
+                if (!ok || !context.mounted) return;
+                final provider = context.read<InventoryProvider>();
+                for (final id in selectedSupplyIds.value.toList()) {
+                  try {
+                    await provider.deleteServiceSupply(id);
+                  } catch (_) {}
+                }
+                selectedSupplyIds.value = {};
+                onRefresh();
+              },
+            ),
+          Expanded(
+            child: snapshot.hasData
+                ? _buildSupplyTable(
+                    context,
+                    snapshot.data!,
+                    searchQuery.value,
+                    isReadOnly,
+                    selectedSupplyIds.value,
+                    (ids) => selectedSupplyIds.value = ids,
+                  )
+                : const Center(child: CircularProgressIndicator(color: posPrimary)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSupplyTable(
+    BuildContext context,
+    List<ServiceSupply> supplies,
+    String searchQuery,
+    bool isReadOnly,
+    Set<int> selectedIds,
+    void Function(Set<int>) onSelectionChanged,
+  ) {
+    if (supplies.isEmpty) {
+      return Center(
+        child: Text('No service supplies yet', style: GoogleFonts.outfit(color: posTextMuted)),
+      );
+    }
+
+    final filtered = searchQuery.isEmpty
+        ? supplies
+        : supplies
+            .where((s) =>
+                s.name.toLowerCase().contains(searchQuery.toLowerCase()) ||
+                s.supplyType.toLowerCase().contains(searchQuery.toLowerCase()))
+            .toList();
+
+    if (filtered.isEmpty) {
+      return Center(
+        child: Text('No supplies match your search', style: GoogleFonts.outfit(color: posTextMuted)),
+      );
+    }
+
+    return Container(
+      decoration: BoxDecoration(color: posSurface, borderRadius: BorderRadius.circular(12)),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(12),
+        child: SingleChildScrollView(
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: DataTable(
+              headingRowColor: WidgetStateProperty.all(posSurfaceLight),
+              dataRowColor: WidgetStateProperty.all(posSurface),
+              headingTextStyle: GoogleFonts.outfit(color: posTextMuted, fontWeight: FontWeight.w600, fontSize: 13),
+              dataTextStyle: GoogleFonts.outfit(color: Colors.white, fontSize: 13),
+              onSelectAll: isReadOnly
+                  ? null
+                  : (v) => onSelectionChanged(
+                        v == true
+                            ? filtered.map((s) => s.id).toSet()
+                            : {},
+                      ),
+              columns: [
+                const DataColumn(label: Text('Name')),
+                const DataColumn(label: Text('Type')),
+                const DataColumn(label: Text('Paper Size')),
+                const DataColumn(label: Text('Purchase Price')),
+                if (!isReadOnly) const DataColumn(label: Text('Actions')),
+              ],
+              rows: filtered.map((supply) {
+                return DataRow(
+                  selected: selectedIds.contains(supply.id),
+                  onSelectChanged: isReadOnly
+                      ? null
+                      : (v) {
+                          final s = Set<int>.from(selectedIds);
+                          v == true ? s.add(supply.id) : s.remove(supply.id);
+                          onSelectionChanged(s);
+                        },
+                  cells: [
+                  DataCell(Text(supply.name)),
+                  DataCell(
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: posPrimary.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Text(
+                        supply.supplyType,
+                        style: GoogleFonts.outfit(color: posPrimary, fontSize: 12, fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                  ),
+                  DataCell(Text(supply.paperSize ?? '—')),
+                  DataCell(Text('₱${supply.purchasePrice.toStringAsFixed(2)}')),
+                  if (!isReadOnly)
+                    DataCell(
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          IconButton(
+                            icon: const Icon(Icons.edit_outlined, size: 18, color: posAccent),
+                            onPressed: () => _showServiceSupplyDialog(context, supply, onRefresh),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.delete_outline, size: 18, color: Color(0xFFEF4444)),
+                            onPressed: () => _showDeleteServiceSupplyDialog(context, supply, onRefresh),
+                          ),
+                        ],
+                      ),
+                    ),
+                ]);
+              }).toList(),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+Future<void> _showServiceSupplyDialog(
+  BuildContext context,
+  ServiceSupply? supply,
+  VoidCallback onRefresh,
+) async {
+  final isEditing = supply != null;
+  final nameController = TextEditingController(text: supply?.name ?? '');
+  final paperSizeController = TextEditingController(text: supply?.paperSize ?? '');
+  final priceController = TextEditingController(
+    text: isEditing ? supply.purchasePrice.toStringAsFixed(2) : '',
+  );
+  String selectedType = supply?.supplyType ?? 'paper';
+
+  final inventoryProviderRef = Provider.of<InventoryProvider>(context, listen: false);
+  final activityLogRef = Provider.of<ActivityLogProvider>(context, listen: false);
+
+  await showDialog(
+    context: context,
+    builder: (ctx) => StatefulBuilder(
+      builder: (ctx, setDialogState) => AlertDialog(
+        backgroundColor: posSurface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text(
+          isEditing ? 'Edit Service Supply' : 'Add Service Supply',
+          style: GoogleFonts.outfit(color: Colors.white, fontWeight: FontWeight.bold),
+        ),
+        content: SizedBox(
+          width: 360,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _dialogField('Name', nameController),
+                // Supply type dropdown
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: DropdownButtonFormField<String>(
+                    value: selectedType,
+                    dropdownColor: posSurfaceLight,
+                    style: GoogleFonts.outfit(color: Colors.white),
+                    decoration: InputDecoration(
+                      labelText: 'Supply Type',
+                      labelStyle: GoogleFonts.outfit(color: posTextMuted),
+                      filled: true,
+                      fillColor: posSurfaceLight,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        borderSide: BorderSide.none,
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        borderSide: const BorderSide(color: posPrimary, width: 1.5),
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                    ),
+                    items: ['paper', 'ink', 'toner', 'other']
+                        .map((t) => DropdownMenuItem(value: t, child: Text(t)))
+                        .toList(),
+                    onChanged: (v) {
+                      if (v != null) setDialogState(() => selectedType = v);
+                    },
+                  ),
+                ),
+                // Paper size — only relevant for paper type
+                if (selectedType == 'paper')
+                  _dialogField('Paper Size (e.g. short, long, a4)', paperSizeController),
+                _dialogField('Purchase Price (₱)', priceController,
+                    keyboardType: TextInputType.number),
+              ],
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text('Cancel', style: GoogleFonts.outfit(color: posTextMuted)),
+          ),
+          FilledButton(
+            onPressed: () async {
+              if (nameController.text.isEmpty) {
+                ScaffoldMessenger.of(ctx).showSnackBar(
+                  const SnackBar(content: Text('Name is required')),
+                );
+                return;
+              }
+              final price = double.tryParse(priceController.text) ?? 0;
+              final paperSize = selectedType == 'paper' && paperSizeController.text.isNotEmpty
+                  ? paperSizeController.text.trim()
+                  : null;
+              try {
+                final supplyName = nameController.text.trim();
+                if (isEditing) {
+                  await inventoryProviderRef.updateServiceSupply(supply.id, {
+                    'name': supplyName,
+                    'supply_type': selectedType,
+                    'paper_size': paperSize,
+                    'purchase_price': price,
+                  });
+                  activityLogRef.log(
+                    actionName: 'Service Supply Updated',
+                    description: 'Updated service supply: $supplyName',
+                  );
+                } else {
+                  final now = DateTime.now();
+                  await inventoryProviderRef.createServiceSupply(ServiceSupply(
+                    id: 0,
+                    name: supplyName,
+                    supplyType: selectedType,
+                    paperSize: paperSize,
+                    purchasePrice: price,
+                    createdAt: now,
+                    updatedAt: now,
+                  ));
+                  activityLogRef.log(
+                    actionName: 'Service Supply Added',
+                    description: 'Added new service supply: $supplyName',
+                  );
+                }
+                if (ctx.mounted) Navigator.pop(ctx);
+                onRefresh();
+              } catch (e) {
+                debugPrint('Error: $e');
+                if (ctx.mounted) {
+                  ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text('Error: $e')));
+                }
+              }
+            },
+            style: FilledButton.styleFrom(backgroundColor: posPrimary, foregroundColor: Colors.white),
+            child: Text(isEditing ? 'Update' : 'Create', style: GoogleFonts.outfit()),
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+Future<void> _showDeleteServiceSupplyDialog(
+  BuildContext context,
+  ServiceSupply supply,
+  VoidCallback onRefresh,
+) async {
+  final inventoryProviderRef = Provider.of<InventoryProvider>(context, listen: false);
+  final activityLogRef = Provider.of<ActivityLogProvider>(context, listen: false);
+  await showDialog(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      backgroundColor: posSurface,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      title: Text('Delete Service Supply',
+          style: GoogleFonts.outfit(color: Colors.white, fontWeight: FontWeight.bold)),
+      content: Text(
+        'Are you sure you want to delete "${supply.name}"? This will also delete its inventory record and unlink it from any print services.',
+        style: GoogleFonts.outfit(color: posTextMuted),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(ctx),
+          child: Text('Cancel', style: GoogleFonts.outfit(color: posTextMuted)),
+        ),
+        FilledButton(
+          onPressed: () async {
+            try {
+              await inventoryProviderRef.deleteServiceSupply(supply.id);
+              activityLogRef.log(
+                actionName: 'Service Supply Deleted',
+                description: 'Deleted service supply: ${supply.name}',
+              );
+              if (ctx.mounted) Navigator.pop(ctx);
+              onRefresh();
+            } catch (e) {
+              debugPrint('Delete supply error: $e');
+              if (ctx.mounted) {
+                ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text('Error: $e')));
+              }
+            }
+          },
+          style: FilledButton.styleFrom(
+              backgroundColor: const Color(0xFFEF4444), foregroundColor: Colors.white),
+          child: Text('Delete', style: GoogleFonts.outfit()),
+        ),
+      ],
+    ),
+  );
+}
+
+// ── Bulk Add Products Dialog ────────────────────────────────────────────────────
+
+Future<void> _showBulkAddProductsDialog(
+  BuildContext context,
+  VoidCallback onRefresh,
+) async {
+  final productProviderRef = Provider.of<ProductProvider>(context, listen: false);
+  final activityLogRef = Provider.of<ActivityLogProvider>(context, listen: false);
+
+  // Each row: {name, purchasePrice, sellingPrice, categoryId, perishable}
+  final rows = <Map<String, dynamic>>[
+    {'name': '', 'purchasePrice': '', 'sellingPrice': '', 'categoryId': 1, 'perishable': true},
+  ];
+
+  await showDialog(
+    context: context,
+    builder: (ctx) => StatefulBuilder(
+      builder: (ctx, setDialogState) {
+        bool isSaving = false;
+
+        void addRow() => setDialogState(() => rows.add(
+            {'name': '', 'purchasePrice': '', 'sellingPrice': '', 'categoryId': 1, 'perishable': true}));
+        void removeRow(int i) => setDialogState(() => rows.removeAt(i));
+
+        return AlertDialog(
+          backgroundColor: posSurface,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Row(
+            children: [
+              Text('Bulk Add Products',
+                  style: GoogleFonts.outfit(color: Colors.white, fontWeight: FontWeight.bold)),
+              const Spacer(),
+              TextButton.icon(
+                onPressed: addRow,
+                icon: const Icon(Icons.add, size: 16),
+                label: Text('Add Row', style: GoogleFonts.outfit()),
+                style: TextButton.styleFrom(foregroundColor: posPrimary),
+              ),
+            ],
+          ),
+          content: SizedBox(
+            width: 700,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Header
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Row(
+                      children: [
+                        Expanded(flex: 3, child: Text('Name *', style: GoogleFonts.outfit(color: posTextMuted, fontSize: 12))),
+                        const SizedBox(width: 8),
+                        Expanded(flex: 2, child: Text('Purchase Price *', style: GoogleFonts.outfit(color: posTextMuted, fontSize: 12))),
+                        const SizedBox(width: 8),
+                        Expanded(flex: 2, child: Text('Selling Price', style: GoogleFonts.outfit(color: posTextMuted, fontSize: 12))),
+                        const SizedBox(width: 8),
+                        Expanded(flex: 2, child: Text('Category', style: GoogleFonts.outfit(color: posTextMuted, fontSize: 12))),
+                        const SizedBox(width: 8),
+                        SizedBox(width: 80, child: Text('Perishable', style: GoogleFonts.outfit(color: posTextMuted, fontSize: 12))),
+                        const SizedBox(width: 36),
+                      ],
+                    ),
+                  ),
+                  ...rows.asMap().entries.map((entry) {
+                    final i = entry.key;
+                    final row = entry.value;
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            flex: 3,
+                            child: _bulkTextField(
+                              hint: 'Product name',
+                              initialValue: row['name'] as String,
+                              onChanged: (v) => row['name'] = v,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            flex: 2,
+                            child: _bulkTextField(
+                              hint: '0.00',
+                              initialValue: row['purchasePrice'] as String,
+                              numeric: true,
+                              onChanged: (v) => row['purchasePrice'] = v,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            flex: 2,
+                            child: _bulkTextField(
+                              hint: '0.00 (opt)',
+                              initialValue: row['sellingPrice'] as String,
+                              numeric: true,
+                              onChanged: (v) => row['sellingPrice'] = v,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            flex: 2,
+                            child: Container(
+                              height: 44,
+                              padding: const EdgeInsets.symmetric(horizontal: 10),
+                              decoration: BoxDecoration(
+                                color: posSurfaceLight,
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: DropdownButtonHideUnderline(
+                                child: DropdownButton<int>(
+                                  value: row['categoryId'] as int,
+                                  dropdownColor: posSurfaceLight,
+                                  style: GoogleFonts.outfit(color: Colors.white, fontSize: 13),
+                                  isExpanded: true,
+                                  items: const [
+                                    DropdownMenuItem(value: 1, child: Text('Store')),
+                                    DropdownMenuItem(value: 2, child: Text('Printing')),
+                                  ],
+                                  onChanged: (v) => setDialogState(() => row['categoryId'] = v ?? 1),
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          SizedBox(
+                            width: 80,
+                            child: Checkbox(
+                              value: row['perishable'] as bool,
+                              activeColor: posPrimary,
+                              checkColor: Colors.white,
+                              onChanged: (v) => setDialogState(() => row['perishable'] = v ?? true),
+                            ),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.remove_circle_outline, color: Color(0xFFEF4444), size: 18),
+                            onPressed: rows.length > 1 ? () => removeRow(i) : null,
+                          ),
+                        ],
+                      ),
+                    );
+                  }),
+                ],
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: Text('Cancel', style: GoogleFonts.outfit(color: posTextMuted)),
+            ),
+            FilledButton(
+              onPressed: isSaving
+                  ? null
+                  : () async {
+                      final validRows = rows.where((r) => (r['name'] as String).isNotEmpty).toList();
+                      if (validRows.isEmpty) {
+                        ScaffoldMessenger.of(ctx).showSnackBar(
+                          const SnackBar(content: Text('Enter at least one product name')),
+                        );
+                        return;
+                      }
+                      setDialogState(() => isSaving = true);
+                      int saved = 0;
+                      try {
+                        final now = DateTime.now();
+                        for (final row in validRows) {
+                          final name = row['name'] as String;
+                          final purchasePrice = double.tryParse(row['purchasePrice'] as String) ?? 0;
+                          final sellingPrice = (row['sellingPrice'] as String).isEmpty
+                              ? null
+                              : double.tryParse(row['sellingPrice'] as String);
+                          await productProviderRef.createProduct(Product(
+                            id: 0,
+                            name: name,
+                            description: name,
+                            categoryId: row['categoryId'] as int,
+                            purchasePrice: purchasePrice,
+                            sellingPrice: sellingPrice,
+                            perishable: row['perishable'] as bool,
+                            createdAt: now,
+                            updatedAt: now,
+                          ));
+                          saved++;
+                        }
+                        activityLogRef.log(
+                          actionName: 'Product Added',
+                          description: 'Bulk added $saved products',
+                        );
+                        if (ctx.mounted) Navigator.pop(ctx);
+                        onRefresh();
+                      } catch (e) {
+                        debugPrint('Bulk add error: $e');
+                        if (ctx.mounted) {
+                          setDialogState(() => isSaving = false);
+                          ScaffoldMessenger.of(ctx).showSnackBar(
+                            SnackBar(content: Text('Error after $saved saved: $e')),
+                          );
+                        }
+                      }
+                    },
+              style: FilledButton.styleFrom(
+                backgroundColor: posPrimary,
+                foregroundColor: Colors.white,
+              ),
+              child: isSaving
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                    )
+                  : Text('Save All', style: GoogleFonts.outfit()),
+            ),
+          ],
+        );
+      },
+    ),
+  );
+}
+
+Widget _bulkTextField({
+  required String hint,
+  required String initialValue,
+  required ValueChanged<String> onChanged,
+  bool numeric = false,
+}) {
+  return TextFormField(
+    initialValue: initialValue,
+    keyboardType: numeric ? TextInputType.number : TextInputType.text,
+    style: GoogleFonts.outfit(color: Colors.white, fontSize: 13),
+    onChanged: onChanged,
+    decoration: InputDecoration(
+      hintText: hint,
+      hintStyle: GoogleFonts.outfit(color: posTextMuted, fontSize: 12),
+      filled: true,
+      fillColor: posSurfaceLight,
+      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(8),
+        borderSide: const BorderSide(color: posPrimary, width: 1.5),
+      ),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+      isDense: true,
     ),
   );
 }

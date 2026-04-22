@@ -91,6 +91,10 @@ final router = GoRouter(
                   path: '/users',
                   builder: (context, state) => const UserManagementPage(),
                 ),
+                GoRoute(
+                  path: '/transactions',
+                  builder: (context, state) => const TransactionsPage(),
+                ),
               ],
             ),
           ],

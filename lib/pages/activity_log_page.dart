@@ -72,12 +72,9 @@ class ActivityLogPage extends HookWidget {
           .toList();
     }
 
-    // Apply action filter
+    // Apply action filter (category-based + partial name match)
     if (selectedAction.value != 'All Actions') {
-      logs = logs
-          .where(
-              (l) => l.action?.actionName == selectedAction.value)
-          .toList();
+      logs = logs.where((l) => _matchesActionFilter(l, selectedAction.value)).toList();
     }
 
     // Apply time filter
@@ -885,5 +882,44 @@ Color _dialogCategoryColor(String category) {
       return const Color(0xFFFBBF24);
     default:
       return posTextMuted;
+  }
+}
+
+bool _matchesActionFilter(ActivityLog l, String filter) {
+  final cat = l.action?.category ?? '';
+  final name = (l.action?.actionName ?? '').toLowerCase();
+  switch (filter) {
+    case 'Transactions':
+      return cat == 'transaction';
+    case 'Inventory Restock':
+      return cat == 'inventory' && name.contains('stock');
+    case 'Inventory Adjustment':
+      return cat == 'inventory' && name.contains('adjust');
+    case 'Inventory Deduction':
+      return cat == 'inventory' && name.contains('deduct');
+    case 'Product Added':
+      return cat == 'product' && name.contains('add');
+    case 'Product Edited':
+      return cat == 'product' && name.contains('edit');
+    case 'Product Deleted':
+      return cat == 'product' && name.contains('delete');
+    case 'User Added':
+      return cat == 'user' && name.contains('add');
+    case 'User Edited':
+      return cat == 'user' && name.contains('edit');
+    case 'User Deleted':
+      return cat == 'user' && name.contains('delete');
+    case 'Expense Added':
+      return cat == 'expense' && name.contains('add');
+    case 'Expense Edited':
+      return cat == 'expense' && name.contains('edit');
+    case 'Expense Deleted':
+      return cat == 'expense' && name.contains('delete');
+    case 'Login':
+      return name.contains('login');
+    case 'Logout':
+      return name.contains('logout');
+    default:
+      return l.action?.actionName == filter;
   }
 }

@@ -398,6 +398,29 @@ class _UserGroupPanel extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(width: 8),
+                    // Activate / Deactivate button
+                    if (!isCurrentUser)
+                      IconButton(
+                        icon: Icon(
+                          u.profile.isActive
+                              ? Icons.block_outlined
+                              : Icons.check_circle_outline,
+                          size: 18,
+                          color: u.profile.isActive
+                              ? const Color(0xFFEF4444)
+                              : const Color(0xFF4ADE80),
+                        ),
+                        tooltip: u.profile.isActive
+                            ? 'Deactivate account'
+                            : 'Activate account',
+                        onPressed: () async {
+                          final supabase = Supabase.instance.client;
+                          await supabase.from('profiles').update({
+                            'is_active': !u.profile.isActive,
+                          }).eq('id', u.profile.id);
+                          onRefresh();
+                        },
+                      ),
                     // Edit button
                     IconButton(
                       icon: const Icon(Icons.edit_outlined,
@@ -423,6 +446,11 @@ Future<void> _showAddUserDialog(
   BuildContext context,
   VoidCallback onRefresh,
 ) async {
+  // Capture authController and supabase BEFORE showDialog so we can restore
+  // the owner's session after signUp switches to the new user's session.
+  final authController = context.read<AuthController>();
+  final supabase = Supabase.instance.client;
+
   final passwordController = TextEditingController();
   final nameController = TextEditingController();
   final usernameController = TextEditingController();
@@ -553,8 +581,13 @@ Future<void> _showAddUserDialog(
                     final username = usernameController.text.trim();
                     final generatedEmail = '$username@printsari.internal';
 
-                    final supabase = Supabase.instance.client;
                     try {
+                      // Save owner's session BEFORE signUp.
+                      // supabase.auth.signUp() auto-logs in the new user,
+                      // replacing the current session. We restore it afterwards.
+                      final ownerAccessToken =
+                          supabase.auth.currentSession?.accessToken;
+
                       // Sign up the new user via Supabase Auth
                       final authResponse = await supabase.auth.signUp(
                         email: generatedEmail,
@@ -566,7 +599,8 @@ Future<void> _showAddUserDialog(
                         throw Exception('Failed to create auth user');
                       }
 
-                      // Create the profile
+                      // Create the profile (new user's session is active here,
+                      // which is fine — RLS allows users to insert their own profile)
                       await supabase.from('profiles').insert({
                         'user_id': newUserId,
                         'username': username,
@@ -576,6 +610,12 @@ Future<void> _showAddUserDialog(
                             ? null
                             : phoneController.text,
                       });
+
+                      // Restore owner's session so subsequent operations work
+                      if (ownerAccessToken != null) {
+                        await supabase.auth.setSession(ownerAccessToken);
+                        await authController.restoreSession();
+                      }
 
                       if (ctx.mounted) Navigator.pop(ctx);
                       onRefresh();

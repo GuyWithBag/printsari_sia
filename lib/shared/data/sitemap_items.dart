@@ -20,6 +20,12 @@ const siteMapItems = <SiteMapItem>[
     roles: [UserRoleType.cashier, UserRoleType.owner],
   ),
   SiteMapItem(
+    title: 'Transactions',
+    iconPath: 'assets/clipboard-list.svg',
+    path: '/transactions',
+    roles: [UserRoleType.owner],
+  ),
+  SiteMapItem(
     title: 'Activity Log',
     iconPath: 'assets/clipboard-list.svg',
     path: '/activity-log',

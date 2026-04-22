@@ -1,9 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:intl/intl.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart';
 import 'package:printsari_sia/controllers/controllers.dart';
 import 'package:printsari_sia/providers/providers.dart';
 import 'package:printsari_sia/shared/themes/colors.dart';
+import 'package:printsari_sia/shared/types/types.dart';
 import 'package:printsari_sia/widgets/cart_item_row.dart';
 import 'package:provider/provider.dart';
 
@@ -21,6 +26,16 @@ class CartPanel extends HookWidget {
     final cart = transactionProvider.cart;
     final isCheckingOut = useState(false);
     final checkoutSuccess = useState(false);
+    final cashTenderedController = useTextEditingController();
+
+    // Keep cash tendered in sync with the total whenever payment is Cash
+    final total = transactionProvider.cartSubtotal;
+    useEffect(() {
+      if (selectedPaymentMethod.value == 1) {
+        cashTenderedController.text = total > 0 ? total.toStringAsFixed(2) : '';
+      }
+      return null;
+    }, [total, selectedPaymentMethod.value]);
 
     // Animated list key for smooth insert/remove
     final listKey = useMemoized(() => GlobalKey<AnimatedListState>());
@@ -296,14 +311,45 @@ class CartPanel extends HookWidget {
               ),
             ),
 
+            // ── Cash tendered field (Cash only) ──
+            if (selectedPaymentMethod.value == 1)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+                child: TextField(
+                  controller: cashTenderedController,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  style: GoogleFonts.outfit(color: posTextMain, fontSize: 14),
+                  decoration: InputDecoration(
+                    labelText: 'Cash Tendered (₱)',
+                    labelStyle: GoogleFonts.outfit(color: posTextMuted, fontSize: 13),
+                    prefixIcon: const Icon(Icons.money_rounded, color: posTextMuted, size: 18),
+                    filled: true,
+                    fillColor: Colors.black.withValues(alpha: 0.05),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide.none,
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: posPrimary, width: 1.5),
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  ),
+                ),
+              ),
+
             // ── Order Now button with morph ──
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
               child: _CheckoutButton(
                 isCheckingOut: isCheckingOut,
                 checkoutSuccess: checkoutSuccess,
-                onCheckout: () =>
-                    _handleCheckout(context, isCheckingOut, checkoutSuccess),
+                onCheckout: () => _handleCheckout(
+                  context,
+                  isCheckingOut,
+                  checkoutSuccess,
+                  cashTenderedController,
+                ),
               ),
             ),
           ],
@@ -316,9 +362,19 @@ class CartPanel extends HookWidget {
     BuildContext context,
     ValueNotifier<bool> isCheckingOut,
     ValueNotifier<bool> checkoutSuccess,
+    TextEditingController cashTenderedController,
   ) async {
     isCheckingOut.value = true;
     checkoutSuccess.value = false;
+
+    // Snapshot cart BEFORE checkout clears it
+    final cartSnapshot = List<TransactionItem>.from(transactionProvider.cart);
+    final total = transactionProvider.cartSubtotal;
+    final storeRevenue = transactionProvider.cartStoreRevenue;
+    final printingRevenue = transactionProvider.cartPrintingRevenue;
+    final isCash = selectedPaymentMethod.value == 1;
+    final cashTendered = double.tryParse(cashTenderedController.text) ?? 0.0;
+
     try {
       final cashierId = context.read<AuthController>().userProfile!.id;
       final result = await transactionProvider.checkout(
@@ -330,27 +386,23 @@ class CartPanel extends HookWidget {
 
       if (result != null) {
         checkoutSuccess.value = true;
-        await Future.delayed(const Duration(milliseconds: 1200));
+        cashTenderedController.clear();
+        await Future.delayed(const Duration(milliseconds: 800));
         checkoutSuccess.value = false;
 
         if (!context.mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Row(
-              children: [
-                const Icon(Icons.check_circle, color: Colors.white),
-                const SizedBox(width: 8),
-                Text(
-                  'Transaction ${result.transactionNumber} completed!',
-                  style: GoogleFonts.outfit(color: Colors.white),
-                ),
-              ],
-            ),
-            backgroundColor: Colors.green.shade700,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
+
+        await showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (ctx) => _ReceiptDialog(
+            transaction: result,
+            cartItems: cartSnapshot,
+            total: total,
+            storeRevenue: storeRevenue,
+            printingRevenue: printingRevenue,
+            isCash: isCash,
+            cashTendered: cashTendered,
           ),
         );
       } else {
@@ -362,9 +414,7 @@ class CartPanel extends HookWidget {
             ),
             backgroundColor: Colors.red.shade700,
             behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           ),
         );
       }
@@ -380,6 +430,327 @@ class CartPanel extends HookWidget {
     } finally {
       isCheckingOut.value = false;
     }
+  }
+}
+
+// ── Receipt Dialog ─────────────────────────────────────────────────────────────
+
+class _ReceiptDialog extends StatelessWidget {
+  final Transaction transaction;
+  final List<TransactionItem> cartItems;
+  final double total;
+  final double storeRevenue;
+  final double printingRevenue;
+  final bool isCash;
+  final double cashTendered;
+
+  const _ReceiptDialog({
+    required this.transaction,
+    required this.cartItems,
+    required this.total,
+    required this.storeRevenue,
+    required this.printingRevenue,
+    required this.isCash,
+    required this.cashTendered,
+  });
+
+  double get change => isCash ? (cashTendered - total).clamp(0, double.infinity) : 0;
+
+  @override
+  Widget build(BuildContext context) {
+    final dateStr = DateFormat('MMM d, yyyy  h:mm a').format(transaction.date);
+
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      child: Container(
+        constraints: const BoxConstraints(maxWidth: 420),
+        decoration: BoxDecoration(
+          color: posSurface,
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Header
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 20),
+              decoration: BoxDecoration(
+                color: posPrimary,
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+              ),
+              child: Column(
+                children: [
+                  const Icon(Icons.check_circle_rounded, color: Colors.white, size: 36),
+                  const SizedBox(height: 6),
+                  Text(
+                    'Order Complete',
+                    style: GoogleFonts.outfit(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w700),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    transaction.transactionNumber,
+                    style: GoogleFonts.outfit(color: Colors.white70, fontSize: 13),
+                  ),
+                ],
+              ),
+            ),
+
+            // Receipt body
+            Flexible(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Store info
+                    Center(
+                      child: Column(
+                        children: [
+                          Text('PrintSari Corner',
+                              style: GoogleFonts.outfit(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 15)),
+                          Text('Magpet, North Cotabato',
+                              style: GoogleFonts.outfit(color: posTextMuted, fontSize: 12)),
+                          Text(dateStr, style: GoogleFonts.outfit(color: posTextMuted, fontSize: 12)),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    const Divider(color: Color(0xFF334155)),
+
+                    // Items
+                    ...cartItems.map((item) => Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 5),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(item.productName,
+                                    style: GoogleFonts.outfit(color: Colors.white, fontSize: 13)),
+                                Text('×${item.quantity.toStringAsFixed(item.quantity % 1 == 0 ? 0 : 1)}  @  ₱${item.unitPrice.toStringAsFixed(2)}',
+                                    style: GoogleFonts.outfit(color: posTextMuted, fontSize: 11)),
+                              ],
+                            ),
+                          ),
+                          Text('₱${item.subtotal.toStringAsFixed(2)}',
+                              style: GoogleFonts.outfit(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600)),
+                        ],
+                      ),
+                    )),
+
+                    const Divider(color: Color(0xFF334155)),
+
+                    // Subtotals
+                    if (storeRevenue > 0) _receiptRow('Store', storeRevenue, muted: true),
+                    if (printingRevenue > 0) _receiptRow('Printing', printingRevenue, muted: true),
+                    const SizedBox(height: 4),
+                    _receiptRow('TOTAL', total, bold: true, large: true),
+
+                    if (isCash) ...[
+                      const SizedBox(height: 4),
+                      _receiptRow('Cash Tendered', cashTendered, muted: true),
+                      _receiptRow('Change', change, muted: true),
+                    ],
+
+                    const SizedBox(height: 16),
+                    Center(
+                      child: Text(
+                        'Thank you for your purchase!',
+                        style: GoogleFonts.outfit(color: posTextMuted, fontSize: 12),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
+            // Actions
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => Navigator.pop(context),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: posTextMuted,
+                        side: const BorderSide(color: Color(0xFF334155)),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                      ),
+                      child: Text('Close', style: GoogleFonts.outfit()),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: FilledButton.icon(
+                      onPressed: () => _printReceipt(context),
+                      icon: const Icon(Icons.print_rounded, size: 18),
+                      label: Text('Print', style: GoogleFonts.outfit()),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: posPrimary,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _receiptRow(String label, double value, {bool muted = false, bool bold = false, bool large = false}) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            label,
+            style: GoogleFonts.outfit(
+              color: muted ? posTextMuted : Colors.white,
+              fontSize: large ? 15 : 13,
+              fontWeight: bold ? FontWeight.w700 : FontWeight.normal,
+            ),
+          ),
+          Text(
+            '₱${value.toStringAsFixed(2)}',
+            style: GoogleFonts.outfit(
+              color: muted ? posTextMuted : Colors.white,
+              fontSize: large ? 16 : 13,
+              fontWeight: bold ? FontWeight.w700 : FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _printReceipt(BuildContext context) async {
+    final dateStr = DateFormat('MMM d, yyyy  h:mm a').format(transaction.date);
+
+    Future<pw.Document> buildDoc() async {
+      final regular = await PdfGoogleFonts.notoSansRegular();
+      final bold = await PdfGoogleFonts.notoSansBold();
+
+      pw.TextStyle style(double size, {bool isBold = false}) =>
+          pw.TextStyle(font: isBold ? bold : regular, fontSize: size);
+
+      final doc = pw.Document();
+      doc.addPage(pw.Page(
+        pageFormat: const PdfPageFormat(
+            80 * PdfPageFormat.mm, double.infinity,
+            marginAll: 8 * PdfPageFormat.mm),
+        build: (pw.Context ctx) {
+          return pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
+            children: [
+              pw.Center(child: pw.Text('PrintSari Corner', style: style(14, isBold: true))),
+              pw.Center(child: pw.Text('Magpet, North Cotabato', style: style(10))),
+              pw.Center(child: pw.Text(dateStr, style: style(10))),
+              pw.SizedBox(height: 6),
+              pw.Center(child: pw.Text(transaction.transactionNumber, style: style(11, isBold: true))),
+              pw.Divider(),
+              ...cartItems.map((item) => pw.Row(
+                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                children: [
+                  pw.Expanded(child: pw.Text(
+                    '${item.productName}\n  \u00d7${item.quantity.toStringAsFixed(item.quantity % 1 == 0 ? 0 : 1)} @ \u20b1${item.unitPrice.toStringAsFixed(2)}',
+                    style: style(10),
+                  )),
+                  pw.Text('\u20b1${item.subtotal.toStringAsFixed(2)}', style: style(10)),
+                ],
+              )),
+              pw.Divider(),
+              if (storeRevenue > 0) _pdfRow('Store Subtotal', storeRevenue, regular: regular, bold: bold),
+              if (printingRevenue > 0) _pdfRow('Printing Subtotal', printingRevenue, regular: regular, bold: bold),
+              pw.SizedBox(height: 4),
+              _pdfRow('TOTAL', total, isBold: true, regular: regular, bold: bold),
+              if (isCash) ...[
+                _pdfRow('Cash Tendered', cashTendered, regular: regular, bold: bold),
+                _pdfRow('Change', change, regular: regular, bold: bold),
+              ],
+              pw.SizedBox(height: 8),
+              pw.Center(child: pw.Text('Thank you!', style: style(11))),
+            ],
+          );
+        },
+      ));
+      return doc;
+    }
+
+    if (!context.mounted) return;
+
+    await showDialog(
+      context: context,
+      builder: (ctx) => Dialog(
+        backgroundColor: posSurface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        child: SizedBox(
+          width: 480,
+          height: 680,
+          child: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 16, 8, 8),
+                child: Row(
+                  children: [
+                    Text('Print Preview',
+                        style: GoogleFonts.outfit(
+                            color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+                    const Spacer(),
+                    IconButton(
+                      icon: const Icon(Icons.close, color: posTextMuted),
+                      onPressed: () => Navigator.pop(ctx),
+                    ),
+                  ],
+                ),
+              ),
+              Expanded(
+                child: PdfPreview(
+                  build: (_) async {
+                    final doc = await buildDoc();
+                    return doc.save();
+                  },
+                  canChangePageFormat: false,
+                  canChangeOrientation: false,
+                  allowPrinting: true,
+                  allowSharing: true,
+                  initialPageFormat: const PdfPageFormat(
+                      80 * PdfPageFormat.mm, double.infinity,
+                      marginAll: 8 * PdfPageFormat.mm),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  pw.Widget _pdfRow(
+    String label,
+    double value, {
+    bool isBold = false,
+    required pw.Font regular,
+    required pw.Font bold,
+  }) {
+    final style = pw.TextStyle(font: isBold ? bold : regular, fontSize: isBold ? 11 : 10);
+    return pw.Row(
+      mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+      children: [
+        pw.Text(label, style: style),
+        pw.Text('\u20b1${value.toStringAsFixed(2)}', style: style),
+      ],
+    );
   }
 }
 

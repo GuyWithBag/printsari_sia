@@ -6,6 +6,8 @@ class Product {
   final String description;
   final int categoryId;
   final double purchasePrice;
+  final double? sellingPrice;
+  final bool perishable;
   final String? sku;
   final String? barcode;
   final String? supplier;
@@ -22,6 +24,8 @@ class Product {
     required this.description,
     required this.categoryId,
     required this.purchasePrice,
+    this.sellingPrice,
+    this.perishable = true,
     this.sku,
     this.barcode,
     this.supplier,
@@ -38,6 +42,10 @@ class Product {
       description: json['description'] as String,
       categoryId: json['category_id'] as int,
       purchasePrice: (json['purchase_price'] as num).toDouble(),
+      sellingPrice: json['selling_price'] != null
+          ? (json['selling_price'] as num).toDouble()
+          : null,
+      perishable: json['perishable'] == true || json['perishable'] == null,
       sku: json['sku'] as String?,
       barcode: json['barcode'] as String?,
       supplier: json['supplier'] as String?,
@@ -61,6 +69,8 @@ class Product {
       'description': description,
       'category_id': categoryId,
       'purchase_price': purchasePrice,
+      'selling_price': sellingPrice,
+      'perishable': perishable,
       'sku': sku,
       'barcode': barcode,
       'supplier': supplier,
@@ -76,10 +86,12 @@ class Product {
       'description': description,
       'category_id': categoryId,
       'purchase_price': purchasePrice,
+      'selling_price': sellingPrice,
+      'perishable': perishable,
       'sku': sku,
       'barcode': barcode,
       'supplier': supplier,
-      'expiry_date': expiryDate?.toIso8601String(),
+      'expiry_date': perishable ? expiryDate?.toIso8601String() : null,
     };
   }
 }

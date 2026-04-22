@@ -35,3 +35,8 @@ export 'dtos/product_category.dart';
 export 'dtos/report_period.dart';
 export 'dtos/payment_method_type.dart';
 export 'dtos/report_period_type.dart';
+export 'dtos/login_history.dart';
+export 'dtos/stock_in.dart';
+export 'dtos/stock_out.dart';
+export 'dtos/service_supply.dart';
+export 'dtos/machine.dart';

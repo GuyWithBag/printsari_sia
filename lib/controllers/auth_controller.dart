@@ -12,6 +12,7 @@ class AuthController extends ChangeNotifier {
   User? user;
   Profile? userProfile;
   UserRoleType? userRoleType;
+  int? _currentLoginHistoryId;
 
   Future<bool> restoreSession() async {
     final currentSession = supabase.auth.currentSession;
@@ -26,7 +27,32 @@ class AuthController extends ChangeNotifier {
             .eq('user_id', currentUser.id)
             .single();
         userProfile = Profile.fromJson(query);
+
+        if (!userProfile!.isActive) {
+          await supabase.auth.signOut();
+          session = null;
+          user = null;
+          userProfile = null;
+          userRoleType = null;
+          return false;
+        }
+
         userRoleType = await userProfile!.getRoleType(userProfile!);
+
+        // Record session restore as a login event if no current history exists
+        if (_currentLoginHistoryId == null) {
+          try {
+            final loginRecord = await supabase.from('login_history').insert({
+              'profile_id': userProfile!.id,
+              'username': userProfile!.username,
+              'login_time': DateTime.now().toIso8601String(),
+            }).select().single();
+            _currentLoginHistoryId = loginRecord['id'] as int;
+          } catch (e) {
+            log('Could not record login history: $e');
+          }
+        }
+
         notifyListeners();
         return true;
       } catch (e) {
@@ -67,12 +93,47 @@ class AuthController extends ChangeNotifier {
         .eq('user_id', user!.id)
         .single();
     userProfile = Profile.fromJson(query);
+
+    if (!userProfile!.isActive) {
+      await supabase.auth.signOut();
+      session = null;
+      user = null;
+      userProfile = null;
+      throw Exception('This account has been deactivated. Please contact the owner.');
+    }
+
     userRoleType = await userProfile!.getRoleType(userProfile!);
+
+    // Record login in login_history
+    try {
+      final loginRecord = await supabase.from('login_history').insert({
+        'profile_id': userProfile!.id,
+        'username': userProfile!.username,
+        'login_time': DateTime.now().toIso8601String(),
+      }).select().single();
+      _currentLoginHistoryId = loginRecord['id'] as int;
+    } catch (e) {
+      log('Could not record login history: $e');
+    }
+
     notifyListeners();
   }
 
   void signOut(BuildContext context) async {
     GoRouter router = GoRouter.of(context);
+
+    // Record logout time in login_history
+    if (_currentLoginHistoryId != null) {
+      try {
+        await supabase.from('login_history').update({
+          'logout_time': DateTime.now().toIso8601String(),
+        }).eq('id', _currentLoginHistoryId!);
+      } catch (e) {
+        log('Could not record logout time: $e');
+      }
+      _currentLoginHistoryId = null;
+    }
+
     await supabase.auth.signOut();
     session = null;
     user = null;

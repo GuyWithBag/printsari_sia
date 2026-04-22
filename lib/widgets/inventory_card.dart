@@ -7,12 +7,16 @@ import 'package:skeletonizer/skeletonizer.dart';
 
 class InventoryCard extends StatelessWidget {
   final InventoryItem item;
+  final String title;
+  final String subtitle;
   final VoidCallback onEdit;
   final VoidCallback? onStockIn;
 
   const InventoryCard({
     super.key,
     required this.item,
+    required this.title,
+    required this.subtitle,
     required this.onEdit,
     this.onStockIn,
   });
@@ -20,127 +24,119 @@ class InventoryCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final bool isOutOfStock = item.stock <= 0;
+    final String stockLevel = item.stock.toStringAsFixed(0);
+    final String price = '₱${item.retailPrice.toStringAsFixed(2)}';
+    final expiryDate = item.expiryDate;
+    final String expiry = expiryDate != null
+        ? DateFormat('MMM d, yyyy').format(expiryDate)
+        : 'No expiry';
 
-    return FutureBuilder(
-      future: InventoryItem.getProduct(item),
-      builder: (context, asyncSnapshot) {
-        final data = asyncSnapshot.data;
-        final String title = data?.name ?? "";
-        final String subtitle = data?.category?.categoryName ?? "";
-        final bool isOutOfStock = item.stock <= 0;
-        final String stockLevel = item.stock.toStringAsFixed(0);
-        final String price = 'P${item.retailPrice.toStringAsFixed(2)}';
-        final expiryDate = item.expiryDate;
-        final String expiry = expiryDate != null
-            ? DateFormat('MMM d, yyyy').format(expiryDate)
-            : 'No expiry';
-        return Skeletonizer(
-          enabled: asyncSnapshot.data == null,
-          child: SizedBox(
-            width: 320,
-            child: Card(
-              child: Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
+    return Skeletonizer(
+      enabled: false,
+      child: SizedBox(
+        width: 320,
+        child: Card(
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Header Row: Titles + Edit IconButton
+                Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    // Header Row: Titles + Edit IconButton
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                title,
-                                style: theme.textTheme.titleMedium?.copyWith(
-                                  color: theme.colorScheme.onSurface,
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                subtitle,
-                                style: theme.textTheme.bodyMedium?.copyWith(
-                                  color: theme.colorScheme.onSurfaceVariant,
-                                ),
-                              ),
-                            ],
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            title,
+                            style: theme.textTheme.titleMedium?.copyWith(
+                              color: theme.colorScheme.onSurface,
+                            ),
                           ),
-                        ),
-                        IconButton(
-                          onPressed: onEdit,
-                          icon: const Icon(Icons.edit_square),
-                          iconSize: 20,
-                          color: theme.colorScheme.onSurfaceVariant,
-                          padding: EdgeInsets.zero,
-                          constraints: const BoxConstraints(),
-                          style: const ButtonStyle(
-                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          const SizedBox(height: 4),
+                          Text(
+                            subtitle,
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              color: theme.colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    IconButton(
+                      onPressed: onEdit,
+                      icon: const Icon(Icons.edit_square),
+                      iconSize: 20,
+                      color: theme.colorScheme.onSurfaceVariant,
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                      style: const ButtonStyle(
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 24),
+
+                // Out of stock badge
+                if (isOutOfStock)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.red.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.error_outline, size: 14, color: Colors.red.shade400),
+                        const SizedBox(width: 4),
+                        Text(
+                          'Out of Stock',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: Colors.red.shade400,
+                            fontWeight: FontWeight.w600,
                           ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 24),
+                  ),
+                if (isOutOfStock) const SizedBox(height: 12),
 
-                    // Out of stock badge
-                    if (isOutOfStock)
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: Colors.red.withValues(alpha: 0.15),
-                          borderRadius: BorderRadius.circular(8),
+                // Data Rows
+                _buildDataRow(context, 'Stock Level:', stockLevel),
+                const SizedBox(height: 12),
+                _buildDataRow(context, 'Price:', price),
+                const SizedBox(height: 12),
+                _buildDataRow(context, 'Expiry:', expiry),
+                if (onStockIn != null) ...[
+                  const SizedBox(height: 16),
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      onPressed: onStockIn,
+                      icon: const Icon(Icons.add_box_outlined, size: 16),
+                      label: Text('Stock In', style: GoogleFonts.outfit(fontSize: 13)),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: posPrimary,
+                        side: BorderSide(color: posPrimary.withValues(alpha: 0.4)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
                         ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.error_outline, size: 14, color: Colors.red.shade400),
-                            const SizedBox(width: 4),
-                            Text(
-                              'Out of Stock',
-                              style: theme.textTheme.bodySmall?.copyWith(
-                                color: Colors.red.shade400,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ],
-                        ),
+                        padding: const EdgeInsets.symmetric(vertical: 8),
                       ),
-                    if (isOutOfStock) const SizedBox(height: 12),
-
-                    // Data Rows
-                    _buildDataRow(context, 'Stock Level:', stockLevel),
-                    const SizedBox(height: 12),
-                    _buildDataRow(context, 'Price:', price),
-                    const SizedBox(height: 12),
-                    _buildDataRow(context, 'Expiry:', expiry),
-                    if (onStockIn != null) ...[
-                      const SizedBox(height: 16),
-                      SizedBox(
-                        width: double.infinity,
-                        child: OutlinedButton.icon(
-                          onPressed: onStockIn,
-                          icon: const Icon(Icons.add_box_outlined, size: 16),
-                          label: Text('Stock In', style: GoogleFonts.outfit(fontSize: 13)),
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: posPrimary,
-                            side: BorderSide(color: posPrimary.withValues(alpha: 0.4)),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            padding: const EdgeInsets.symmetric(vertical: 8),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
+                    ),
+                  ),
+                ],
+              ],
             ),
           ),
-        );
-      },
+        ),
+      ),
     );
   }
 

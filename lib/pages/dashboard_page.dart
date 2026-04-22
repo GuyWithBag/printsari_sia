@@ -28,8 +28,6 @@ class DashboardPage extends HookWidget {
     final productProvider = context.read<ProductProvider>();
 
     void hardRefresh() {
-      transactionProvider.clearTransactionsCache();
-      expenseProvider.clearCache();
       inventoryProvider.clearCache();
       productProvider.clearAllCache();
       refreshKey.value++;
@@ -101,7 +99,9 @@ class DashboardPage extends HookWidget {
     // Map productId -> InventoryItem for stock lookup
     final inventoryByProduct = <int, InventoryItem>{};
     for (final item in inventoryItems) {
-      inventoryByProduct[item.productId] = item;
+      if (item.productId != null) {
+        inventoryByProduct[item.productId!] = item;
+      }
     }
 
     return AppPage(

@@ -1,21 +1,17 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:hive_ce/hive.dart';
 import 'package:printsari_sia/shared/types/dtos/inventory_item.dart';
+import 'package:printsari_sia/shared/types/dtos/service_supply.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class InventoryProvider extends ChangeNotifier {
   final supabase = Supabase.instance.client;
 
-  static const _itemsKey = 'inventory_items';
-
   List<InventoryItem>? _items;
+  List<ServiceSupply>? _serviceSupplies;
   bool _hasPendingChanges = false;
   RealtimeChannel? _channel;
 
   bool get hasPendingChanges => _hasPendingChanges;
-
-  Box<String> get _box => Hive.box<String>('app_cache');
 
   void subscribeToChanges() {
     _channel?.unsubscribe();
@@ -40,7 +36,7 @@ class InventoryProvider extends ChangeNotifier {
 
   void clearCache() {
     _items = null;
-    _box.delete(_itemsKey);
+    _serviceSupplies = null;
   }
 
   Future<InventoryItem> stockIn({
@@ -50,45 +46,232 @@ class InventoryProvider extends ChangeNotifier {
     DateTime? expiryDate,
   }) async {
     final now = DateTime.now();
-    final inserted = await supabase
-        .from('inventory_items')
-        .insert({
-          'product_id': productId,
-          'stock': quantity,
-          'retail_price': retailPrice,
-          if (expiryDate != null)
-            'expiry_date': expiryDate.toIso8601String().substring(0, 10),
-          'last_restocked': now.toIso8601String(),
-        })
-        .select()
+
+    // 1. Get current user's profile id
+    final currentUser = supabase.auth.currentUser;
+    if (currentUser == null) throw Exception('Not authenticated');
+    final profileQuery = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('user_id', currentUser.id)
         .single();
-    final newItem = InventoryItem.fromJson(inserted);
-    _items ??= [];
-    _items!.add(newItem);
-    _box.delete(_itemsKey);
+    final profileId = profileQuery['id'] as int;
+
+    // 2. Insert into stock_in table and get its id
+    final stockInRecord = await supabase.from('stock_in').insert({
+      'product_id': productId,
+      'user_id': profileId,
+      'purchase_price': retailPrice,
+      'quantity_added': quantity,
+      if (expiryDate != null)
+        'expiry_date': expiryDate.toIso8601String().substring(0, 10),
+      'stock_in_date': now.toIso8601String(),
+    }).select().single();
+    final stockInId = stockInRecord['id'] as int;
+
+    // 3. Check if an inventory_items row already exists for this product
+    final existing = await supabase
+        .from('inventory_items')
+        .select()
+        .eq('product_id', productId)
+        .maybeSingle();
+
+    InventoryItem newItem;
+    if (existing != null) {
+      // 4. Update: add stock, refresh retail price and stock_in_id
+      final currentStock = (existing['stock'] as num).toDouble();
+      final updated = await supabase
+          .from('inventory_items')
+          .update({
+            'stock': currentStock + quantity,
+            'retail_price': retailPrice,
+            'last_restocked': now.toIso8601String(),
+            'stock_in_id': stockInId,
+            if (expiryDate != null)
+              'expiry_date': expiryDate.toIso8601String().substring(0, 10),
+          })
+          .eq('product_id', productId)
+          .select()
+          .single();
+      newItem = InventoryItem.fromJson(updated);
+
+      // Update local cache
+      _items = _items?.map((i) => i.productId == productId ? newItem : i).toList();
+    } else {
+      // 5. Insert new inventory row
+      final inserted = await supabase
+          .from('inventory_items')
+          .insert({
+            'product_id': productId,
+            'stock': quantity,
+            'retail_price': retailPrice,
+            if (expiryDate != null)
+              'expiry_date': expiryDate.toIso8601String().substring(0, 10),
+            'last_restocked': now.toIso8601String(),
+            'stock_in_id': stockInId,
+          })
+          .select()
+          .single();
+      newItem = InventoryItem.fromJson(inserted);
+      _items ??= [];
+      _items!.add(newItem);
+    }
+
     notifyListeners();
     return newItem;
+  }
+
+  Future<List<Map<String, dynamic>>> getStockHistory() async {
+    final rows = await supabase
+        .from('stock_in')
+        .select('*, products(name), profiles(name, username)')
+        .order('stock_in_date', ascending: false);
+    return List<Map<String, dynamic>>.from(rows);
+  }
+
+  Future<void> recordStockOut({
+    required int userId,
+    required double quantityRemoved,
+    int? transactionId,
+    int? transactionItemId,
+    int? productId,
+    int? serviceSupplyId,
+    int? inventoryItemId,
+    String stockOutType = 'sale',
+  }) async {
+    await supabase.from('stock_out').insert({
+      'user_id': userId,
+      'quantity_removed': quantityRemoved,
+      if (transactionId != null) 'transaction_id': transactionId,
+      if (transactionItemId != null) 'transaction_item_id': transactionItemId,
+      if (productId != null) 'product_id': productId,
+      if (serviceSupplyId != null) 'service_supply_id': serviceSupplyId,
+      if (inventoryItemId != null) 'inventory_item_id': inventoryItemId,
+      'stock_out_type': stockOutType,
+      'stock_out_date': DateTime.now().toIso8601String(),
+    });
   }
 
   Future<List<InventoryItem>> getItems() async {
     if (_items != null) return _items!;
 
-    final cached = _box.get(_itemsKey);
-    if (cached != null) {
-      try {
-        final raw = jsonDecode(cached) as List;
-        _items = raw.map((r) => InventoryItem.fromJson(r as Map<String, dynamic>)).toList();
-        return _items!;
-      } catch (e) {
-        debugPrint('Inventory cache parse error: $e');
-        _box.delete(_itemsKey);
-      }
-    }
-
-    final query = await supabase.from('inventory_items').select();
+    final query = await supabase
+        .from('inventory_items')
+        .select('*, service_supplies(*)');
     _items = query.map((r) => InventoryItem.fromJson(r)).toList();
-    await _box.put(_itemsKey, jsonEncode(query));
     _hasPendingChanges = false;
     return _items!;
+  }
+
+  Future<List<ServiceSupply>> getServiceSupplies() async {
+    if (_serviceSupplies != null) return _serviceSupplies!;
+
+    final query = await supabase.from('service_supplies').select().order('name');
+    _serviceSupplies = query.map((r) => ServiceSupply.fromJson(r)).toList();
+    return _serviceSupplies!;
+  }
+
+  Future<ServiceSupply> createServiceSupply(ServiceSupply supply) async {
+    final inserted = await supabase
+        .from('service_supplies')
+        .insert(supply.toInsertJson())
+        .select()
+        .single();
+    final newSupply = ServiceSupply.fromJson(inserted);
+    _serviceSupplies ??= [];
+    _serviceSupplies!.add(newSupply);
+    notifyListeners();
+    return newSupply;
+  }
+
+  Future<ServiceSupply> updateServiceSupply(int id, Map<String, dynamic> updates) async {
+    final updated = await supabase
+        .from('service_supplies')
+        .update(updates)
+        .eq('id', id)
+        .select()
+        .single();
+    final updatedSupply = ServiceSupply.fromJson(updated);
+    if (_serviceSupplies != null) {
+      final idx = _serviceSupplies!.indexWhere((s) => s.id == id);
+      if (idx != -1) _serviceSupplies![idx] = updatedSupply;
+    }
+    notifyListeners();
+    return updatedSupply;
+  }
+
+  Future<void> deleteServiceSupply(int id) async {
+    await supabase.from('service_supplies').delete().eq('id', id);
+    _serviceSupplies?.removeWhere((s) => s.id == id);
+    notifyListeners();
+  }
+
+  Future<InventoryItem> stockInSupply({
+    required int serviceSupplyId,
+    required double quantity,
+    required double purchasePrice,
+  }) async {
+    final now = DateTime.now();
+
+    final currentUser = supabase.auth.currentUser;
+    if (currentUser == null) throw Exception('Not authenticated');
+    final profileQuery = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('user_id', currentUser.id)
+        .single();
+    final profileId = profileQuery['id'] as int;
+
+    // Insert stock_in record
+    await supabase.from('stock_in').insert({
+      'service_supply_id': serviceSupplyId,
+      'user_id': profileId,
+      'purchase_price': purchasePrice,
+      'quantity_added': quantity,
+      'stock_in_date': now.toIso8601String(),
+    });
+
+    // Check if inventory row already exists for this supply
+    final existing = await supabase
+        .from('inventory_items')
+        .select('*, service_supplies(*)')
+        .eq('service_supply_id', serviceSupplyId)
+        .maybeSingle();
+
+    InventoryItem newItem;
+    if (existing != null) {
+      final currentStock = (existing['stock'] as num).toDouble();
+      final updated = await supabase
+          .from('inventory_items')
+          .update({
+            'stock': currentStock + quantity,
+            'retail_price': purchasePrice,
+            'last_restocked': now.toIso8601String(),
+          })
+          .eq('service_supply_id', serviceSupplyId)
+          .select('*, service_supplies(*)')
+          .single();
+      newItem = InventoryItem.fromJson(updated);
+      _items = _items
+          ?.map((i) => i.serviceSupplyId == serviceSupplyId ? newItem : i)
+          .toList();
+    } else {
+      final inserted = await supabase
+          .from('inventory_items')
+          .insert({
+            'service_supply_id': serviceSupplyId,
+            'stock': quantity,
+            'retail_price': purchasePrice,
+            'last_restocked': now.toIso8601String(),
+          })
+          .select('*, service_supplies(*)')
+          .single();
+      newItem = InventoryItem.fromJson(inserted);
+      _items ??= [];
+      _items!.add(newItem);
+    }
+
+    notifyListeners();
+    return newItem;
   }
 }

@@ -19,6 +19,7 @@ class Profile {
   final String? addressRegion;
   final String? addressPostalCode;
   final String? addressCountry;
+  final bool isActive;
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -37,6 +38,7 @@ class Profile {
     this.addressRegion,
     this.addressPostalCode,
     this.addressCountry,
+    this.isActive = true,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -78,6 +80,7 @@ class Profile {
       addressRegion: json['address_region'] as String?,
       addressPostalCode: json['address_postal_code'] as String?,
       addressCountry: json['address_country'] as String?,
+      isActive: json['is_active'] as bool? ?? true,
       createdAt: DateTime.parse(json['created_at'] as String),
       updatedAt: DateTime.parse(json['updated_at'] as String),
     );
@@ -99,6 +102,7 @@ class Profile {
       'address_region': addressRegion,
       'address_postal_code': addressPostalCode,
       'address_country': addressCountry,
+      'is_active': isActive,
       'created_at': createdAt.toIso8601String(),
       'updated_at': updatedAt.toIso8601String(),
     };

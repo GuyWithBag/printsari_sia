@@ -6,3 +6,4 @@ export 'user_management_page.dart';
 export 'financial_reports_page.dart';
 export 'business_expenses_page.dart';
 export 'activity_log_page.dart';
+export 'transactions_page.dart';

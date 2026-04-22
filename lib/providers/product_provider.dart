@@ -1,23 +1,17 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:hive_ce/hive.dart';
 import 'package:printsari_sia/shared/types/types.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class ProductProvider extends ChangeNotifier {
   final supabase = Supabase.instance.client;
 
-  static const _productsKey = 'products';
-  static const _servicesKey = 'print_services';
-
   List<Product>? _products;
   List<PrintService>? _services;
+  List<Machine>? _machines;
   bool _hasPendingChanges = false;
   RealtimeChannel? _channel;
 
   bool get hasPendingChanges => _hasPendingChanges;
-
-  Box<String> get _box => Hive.box<String>('app_cache');
 
   void subscribeToChanges() {
     _channel?.unsubscribe();
@@ -51,37 +45,27 @@ class ProductProvider extends ChangeNotifier {
 
   void clearProductsCache() {
     _products = null;
-    _box.delete(_productsKey);
   }
 
   void clearServicesCache() {
     _services = null;
-    _box.delete(_servicesKey);
+  }
+
+  void clearMachinesCache() {
+    _machines = null;
   }
 
   void clearAllCache() {
     clearProductsCache();
     clearServicesCache();
+    clearMachinesCache();
   }
 
   Future<List<Product>> getProducts() async {
     if (_products != null) return _products!;
 
-    final cached = _box.get(_productsKey);
-    if (cached != null) {
-      try {
-        final raw = jsonDecode(cached) as List;
-        _products = raw.map((r) => Product.fromJson(r as Map<String, dynamic>)).toList();
-        return _products!;
-      } catch (e) {
-        debugPrint('Products cache parse error: $e');
-        _box.delete(_productsKey);
-      }
-    }
-
     final query = await supabase.from('products').select('*, product_categories(*)');
     _products = query.map((r) => Product.fromJson(r)).toList();
-    await _box.put(_productsKey, jsonEncode(query));
     _hasPendingChanges = false;
     return _products!;
   }
@@ -89,25 +73,55 @@ class ProductProvider extends ChangeNotifier {
   Future<List<PrintService>> getPrintServices() async {
     if (_services != null) return _services!;
 
-    final cached = _box.get(_servicesKey);
-    if (cached != null) {
-      try {
-        final raw = jsonDecode(cached) as List;
-        _services = raw.map((r) => PrintService.fromJson(r as Map<String, dynamic>)).toList();
-        return _services!;
-      } catch (e) {
-        debugPrint('PrintServices cache parse error: $e');
-        _box.delete(_servicesKey);
-      }
-    }
-
     final query = await supabase
         .from('print_services')
-        .select('*, paper_sizes(*), color_modes(*), print_orientations(*), print_finishes(*)');
+        .select('*, paper_sizes(*), color_modes(*), print_orientations(*), print_finishes(*), machines(*), service_supplies(*)');
     _services = query.map((r) => PrintService.fromJson(r)).toList();
-    await _box.put(_servicesKey, jsonEncode(query));
     _hasPendingChanges = false;
     return _services!;
+  }
+
+  Future<List<Machine>> getMachines() async {
+    if (_machines != null) return _machines!;
+
+    final query = await supabase.from('machines').select().order('name');
+    _machines = query.map((r) => Machine.fromJson(r)).toList();
+    return _machines!;
+  }
+
+  Future<Machine> createMachine(Machine machine) async {
+    final inserted = await supabase
+        .from('machines')
+        .insert(machine.toInsertJson())
+        .select()
+        .single();
+    final newMachine = Machine.fromJson(inserted);
+    _machines ??= [];
+    _machines!.add(newMachine);
+    notifyListeners();
+    return newMachine;
+  }
+
+  Future<Machine> updateMachine(int id, Map<String, dynamic> updates) async {
+    final updated = await supabase
+        .from('machines')
+        .update(updates)
+        .eq('id', id)
+        .select()
+        .single();
+    final updatedMachine = Machine.fromJson(updated);
+    if (_machines != null) {
+      final idx = _machines!.indexWhere((m) => m.id == id);
+      if (idx != -1) _machines![idx] = updatedMachine;
+    }
+    notifyListeners();
+    return updatedMachine;
+  }
+
+  Future<void> deleteMachine(int id) async {
+    await supabase.from('machines').delete().eq('id', id);
+    _machines?.removeWhere((m) => m.id == id);
+    notifyListeners();
   }
 
   Future<Product> createProduct(Product product) async {
@@ -119,7 +133,6 @@ class ProductProvider extends ChangeNotifier {
     final newProduct = Product.fromJson(inserted);
     _products ??= [];
     _products!.add(newProduct);
-    _box.delete(_productsKey);
     notifyListeners();
     return newProduct;
   }
@@ -136,7 +149,6 @@ class ProductProvider extends ChangeNotifier {
       final idx = _products!.indexWhere((p) => p.id == id);
       if (idx != -1) _products![idx] = updatedProduct;
     }
-    _box.delete(_productsKey);
     notifyListeners();
     return updatedProduct;
   }
@@ -144,7 +156,6 @@ class ProductProvider extends ChangeNotifier {
   Future<void> deleteProduct(int id) async {
     await supabase.from('products').delete().eq('id', id);
     _products?.removeWhere((p) => p.id == id);
-    _box.delete(_productsKey);
     notifyListeners();
   }
 
@@ -152,12 +163,11 @@ class ProductProvider extends ChangeNotifier {
     final inserted = await supabase
         .from('print_services')
         .insert(service.toInsertJson())
-        .select('*, paper_sizes(*), color_modes(*), print_orientations(*), print_finishes(*)')
+        .select('*, paper_sizes(*), color_modes(*), print_orientations(*), print_finishes(*), machines(*), service_supplies(*)')
         .single();
     final newService = PrintService.fromJson(inserted);
     _services ??= [];
     _services!.add(newService);
-    _box.delete(_servicesKey);
     notifyListeners();
     return newService;
   }
@@ -167,14 +177,13 @@ class ProductProvider extends ChangeNotifier {
         .from('print_services')
         .update(updates)
         .eq('id', id)
-        .select('*, paper_sizes(*), color_modes(*), print_orientations(*), print_finishes(*)')
+        .select('*, paper_sizes(*), color_modes(*), print_orientations(*), print_finishes(*), machines(*), service_supplies(*)')
         .single();
     final updatedService = PrintService.fromJson(updated);
     if (_services != null) {
       final idx = _services!.indexWhere((s) => s.id == id);
       if (idx != -1) _services![idx] = updatedService;
     }
-    _box.delete(_servicesKey);
     notifyListeners();
     return updatedService;
   }
@@ -182,7 +191,6 @@ class ProductProvider extends ChangeNotifier {
   Future<void> deletePrintService(int id) async {
     await supabase.from('print_services').delete().eq('id', id);
     _services?.removeWhere((s) => s.id == id);
-    _box.delete(_servicesKey);
     notifyListeners();
   }
 }

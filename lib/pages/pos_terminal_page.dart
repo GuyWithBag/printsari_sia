@@ -22,6 +22,9 @@ class POSTerminalPage extends HookWidget {
     final inventoryProvider = context.read<InventoryProvider>();
     final transactionProvider = context.watch<TransactionProvider>();
 
+    // Re-fetch inventory after each completed checkout so stock levels update.
+    final completedTxCount = transactionProvider.completedTransactionCount;
+
     final productsFuture = useMemoized(() => productProvider.getProducts(), [
       productProvider,
     ]);
@@ -29,9 +32,13 @@ class POSTerminalPage extends HookWidget {
       () => productProvider.getPrintServices(),
       [productProvider],
     );
-    final inventoryFuture = useMemoized(() => inventoryProvider.getItems(), [
-      inventoryProvider,
-    ]);
+    final inventoryFuture = useMemoized(
+      () {
+        inventoryProvider.clearCache();
+        return inventoryProvider.getItems();
+      },
+      [completedTxCount],
+    );
 
     final productsSnapshot = useFuture(productsFuture);
     final servicesSnapshot = useFuture(servicesFuture);

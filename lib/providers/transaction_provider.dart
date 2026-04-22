@@ -1,19 +1,19 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:hive_ce/hive.dart';
 import 'package:printsari_sia/shared/types/types.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class TransactionProvider extends ChangeNotifier {
   final supabase = Supabase.instance.client;
 
-  static const _transactionsKey = 'transactions';
   List<Transaction>? _transactions;
-  Box<String> get _box => Hive.box<String>('app_cache');
+
+  // Incremented each time checkout() succeeds.
+  // Used by BusinessExpensesPage to auto-refresh its list.
+  int _completedTransactionCount = 0;
+  int get completedTransactionCount => _completedTransactionCount;
 
   void clearTransactionsCache() {
     _transactions = null;
-    _box.delete(_transactionsKey);
   }
 
   List<TransactionItem> _cart = [];
@@ -31,7 +31,7 @@ class TransactionProvider extends ChangeNotifier {
       id: item.id,
       transactionId: item.transactionId,
       inventoryId: item.inventoryId,
-      productId: item.productId, // nullable
+      productId: item.productId,
       productName: item.productName,
       quantity: quantity,
       unitPrice: item.unitPrice,
@@ -79,7 +79,6 @@ class TransactionProvider extends ChangeNotifier {
       final printingRevenue = cartPrintingRevenue;
       final subtotal = cartSubtotal;
 
-      // Calculate total cost from cart items that have itemCost
       double totalCost = 0.0;
       for (final item in _cart) {
         if (item.itemCost != null) {
@@ -125,7 +124,7 @@ class TransactionProvider extends ChangeNotifier {
 
       final transactionId = insertedTransaction['id'] as int;
 
-      // Insert each TransactionItem linked to the new transaction
+      // Insert each TransactionItem and deduct inventory
       for (final item in _cart) {
         final itemData = <String, dynamic>{
           'transaction_id': transactionId,
@@ -142,7 +141,7 @@ class TransactionProvider extends ChangeNotifier {
         };
         await supabase.from('transaction_items').insert(itemData);
 
-        // Deduct inventory for items with inventoryId
+        // Deduct inventory for store items with inventoryId
         if (item.inventoryId != null) {
           final inventoryRow = await supabase
               .from('inventory_items')
@@ -156,7 +155,7 @@ class TransactionProvider extends ChangeNotifier {
               .eq('id', item.inventoryId!);
         }
 
-        // Auto-generate expenses for print items
+        // Auto-generate expenses and deduct supply stock for print items
         if (item.printOrderId != null) {
           final printOrderRow = await supabase
               .from('print_orders')
@@ -172,48 +171,86 @@ class TransactionProvider extends ChangeNotifier {
               'description':
                   'Ink cost - ${item.productName} (${printOrder.quantity} pages)',
               'amount': service.inkCostPerPage * printOrder.quantity,
-              'category_id': 1, // printing_ink
+              'category_id': 1,
               'date': expenseDate,
               'linked_transaction_id': transactionId,
-              'source_id': 2, // auto_print
+              'source_id': 2,
             },
             {
               'description':
                   'Paper cost - ${item.productName} (${printOrder.quantity} pages)',
               'amount': service.paperCostPerPage * printOrder.quantity,
-              'category_id': 2, // printing_paper
+              'category_id': 2,
               'date': expenseDate,
               'linked_transaction_id': transactionId,
-              'source_id': 2, // auto_print
+              'source_id': 2,
             },
             {
               'description':
                   'Electricity cost - ${item.productName} (${printOrder.quantity} pages)',
               'amount': service.electricityCostPerPage * printOrder.quantity,
-              'category_id': 3, // printing_electricity
+              'category_id': 3,
               'date': expenseDate,
               'linked_transaction_id': transactionId,
-              'source_id': 2, // auto_print
+              'source_id': 2,
             },
             {
               'description':
                   'Maintenance cost - ${item.productName} (${printOrder.quantity} pages)',
               'amount': service.maintenanceCostPerPage * printOrder.quantity,
-              'category_id': 4, // printing_maintenance
+              'category_id': 4,
               'date': expenseDate,
               'linked_transaction_id': transactionId,
-              'source_id': 2, // auto_print
+              'source_id': 2,
             },
           ];
 
           await supabase.from('expenses').insert(expenses);
+
+          // Deduct supply stock if this service links to a service supply
+          if (service.serviceSupplyId != null) {
+            final supplyRow = await supabase
+                .from('inventory_items')
+                .select('id, stock')
+                .eq('service_supply_id', service.serviceSupplyId!)
+                .maybeSingle();
+            if (supplyRow != null) {
+              final currentStock = (supplyRow['stock'] as num).toDouble();
+              final deduction = printOrder.quantity.toDouble();
+              final supplyInventoryId = supplyRow['id'] as int;
+              await supabase
+                  .from('inventory_items')
+                  .update({'stock': (currentStock - deduction).clamp(0.0, double.infinity)})
+                  .eq('id', supplyInventoryId);
+
+              // Get cashier profile id for stock_out record
+              final currentUser = supabase.auth.currentUser;
+              if (currentUser != null) {
+                final profileRow = await supabase
+                    .from('profiles')
+                    .select('id')
+                    .eq('user_id', currentUser.id)
+                    .maybeSingle();
+                if (profileRow != null) {
+                  await supabase.from('stock_out').insert({
+                    'user_id': profileRow['id'] as int,
+                    'quantity_removed': deduction,
+                    'transaction_id': transactionId,
+                    'service_supply_id': service.serviceSupplyId,
+                    'inventory_item_id': supplyInventoryId,
+                    'stock_out_type': 'sale',
+                    'stock_out_date': now.toIso8601String(),
+                  });
+                }
+              }
+            }
+          }
         }
       }
 
-      // Clear cart and invalidate transactions cache (new transaction added)
       _cart = [];
       _transactions = null;
-      _box.delete(_transactionsKey);
+      _completedTransactionCount++;
       notifyListeners();
 
       return Transaction.fromJson(insertedTransaction);
@@ -226,18 +263,6 @@ class TransactionProvider extends ChangeNotifier {
   Future<List<Transaction>> getTransactions() async {
     if (_transactions != null) return _transactions!;
 
-    final cached = _box.get(_transactionsKey);
-    if (cached != null) {
-      try {
-        final raw = jsonDecode(cached) as List;
-        _transactions = raw.map((r) => Transaction.fromJson(r as Map<String, dynamic>)).toList();
-        return _transactions!;
-      } catch (e) {
-        debugPrint('Transactions cache parse error: $e');
-        _box.delete(_transactionsKey);
-      }
-    }
-
     final query = await supabase
         .from('transactions')
         .select(
@@ -245,7 +270,6 @@ class TransactionProvider extends ChangeNotifier {
         )
         .order('created_at', ascending: false);
     _transactions = query.map((r) => Transaction.fromJson(r)).toList();
-    await _box.put(_transactionsKey, jsonEncode(query));
     return _transactions!;
   }
 

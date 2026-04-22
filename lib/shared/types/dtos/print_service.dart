@@ -16,6 +16,8 @@ class PrintService {
   final int? finishId;
   final double? paperStock;
   final double? inkLevel;
+  final int? machineId;
+  final int? serviceSupplyId;
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -24,6 +26,8 @@ class PrintService {
   final ColorMode? colorMode;
   final PrintOrientation? orientation;
   final PrintFinish? finish;
+  final Machine? machine;
+  final ServiceSupply? serviceSupply;
 
   PrintService({
     required this.id,
@@ -41,12 +45,16 @@ class PrintService {
     this.finishId,
     this.paperStock,
     this.inkLevel,
+    this.machineId,
+    this.serviceSupplyId,
     required this.createdAt,
     required this.updatedAt,
     this.paperSize,
     this.colorMode,
     this.orientation,
     this.finish,
+    this.machine,
+    this.serviceSupply,
   });
 
   factory PrintService.fromJson(Map<String, dynamic> json) {
@@ -72,6 +80,8 @@ class PrintService {
       inkLevel: json['ink_level'] != null
           ? (json['ink_level'] as num).toDouble()
           : null,
+      machineId: json['machine_id'] as int?,
+      serviceSupplyId: json['service_supply_id'] as int?,
       createdAt: DateTime.parse(json['created_at'] as String),
       updatedAt: DateTime.parse(json['updated_at'] as String),
       paperSize: json['paper_sizes'] != null
@@ -87,6 +97,14 @@ class PrintService {
           : null,
       finish: json['print_finishes'] != null
           ? PrintFinish.fromJson(json['print_finishes'] as Map<String, dynamic>)
+          : null,
+      machine: json['machines'] != null
+          ? Machine.fromJson(json['machines'] as Map<String, dynamic>)
+          : null,
+      serviceSupply: json['service_supplies'] != null
+          ? ServiceSupply.fromJson(
+              json['service_supplies'] as Map<String, dynamic>,
+            )
           : null,
     );
   }
@@ -108,6 +126,8 @@ class PrintService {
       'finish_id': finishId,
       'paper_stock': paperStock,
       'ink_level': inkLevel,
+      'machine_id': machineId,
+      'service_supply_id': serviceSupplyId,
       'created_at': createdAt.toIso8601String(),
       'updated_at': updatedAt.toIso8601String(),
     };
@@ -129,6 +149,8 @@ class PrintService {
       'finish_id': finishId,
       'paper_stock': paperStock,
       'ink_level': inkLevel,
+      'machine_id': machineId,
+      'service_supply_id': serviceSupplyId,
     };
   }
 }

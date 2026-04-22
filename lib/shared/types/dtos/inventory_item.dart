@@ -1,46 +1,45 @@
 import 'package:printsari_sia/shared/types/types.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
 class InventoryItem {
   final int id;
-  final int productId;
+  final int? productId;
+  final int? serviceSupplyId;
   final double stock;
   final double retailPrice;
   final double? reorderLevel;
   final String? location;
   final DateTime? lastRestocked;
   final DateTime? expiryDate;
+  final int? stockInId;
   final DateTime createdAt;
   final DateTime updatedAt;
 
+  // Optional joined data
+  final ServiceSupply? serviceSupply;
+
+  bool get isSupplyItem => serviceSupplyId != null;
+
   InventoryItem({
     required this.id,
-    required this.productId,
+    this.productId,
+    this.serviceSupplyId,
     required this.stock,
     required this.retailPrice,
     this.reorderLevel,
     this.location,
     this.lastRestocked,
     this.expiryDate,
+    this.stockInId,
     required this.createdAt,
     required this.updatedAt,
+    this.serviceSupply,
   });
-
-  static Future<Product> getProduct(InventoryItem item) async {
-    final supabase = Supabase.instance.client;
-    final query = await supabase
-        .from('products')
-        .select()
-        .eq('id', item.productId)
-        .single();
-    final result = Product.fromJson(query);
-    return result;
-  }
 
   factory InventoryItem.fromJson(Map<String, dynamic> json) {
     return InventoryItem(
       id: json['id'] as int,
-      productId: json['product_id'] as int,
+      productId: json['product_id'] as int?,
+      serviceSupplyId: json['service_supply_id'] as int?,
       stock: (json['stock'] as num).toDouble(),
       retailPrice: (json['retail_price'] as num).toDouble(),
       reorderLevel: json['reorder_level'] != null
@@ -53,8 +52,14 @@ class InventoryItem {
       expiryDate: json['expiry_date'] != null
           ? DateTime.parse(json['expiry_date'] as String)
           : null,
+      stockInId: json['stock_in_id'] as int?,
       createdAt: DateTime.parse(json['created_at'] as String),
       updatedAt: DateTime.parse(json['updated_at'] as String),
+      serviceSupply: json['service_supplies'] != null
+          ? ServiceSupply.fromJson(
+              json['service_supplies'] as Map<String, dynamic>,
+            )
+          : null,
     );
   }
 
@@ -62,6 +67,7 @@ class InventoryItem {
     return {
       'id': id,
       'product_id': productId,
+      'service_supply_id': serviceSupplyId,
       'stock': stock,
       'retail_price': retailPrice,
       'reorder_level': reorderLevel,
@@ -75,7 +81,8 @@ class InventoryItem {
 
   Map<String, dynamic> toInsertJson() {
     return {
-      'product_id': productId,
+      if (productId != null) 'product_id': productId,
+      if (serviceSupplyId != null) 'service_supply_id': serviceSupplyId,
       'stock': stock,
       'retail_price': retailPrice,
       'reorder_level': reorderLevel,

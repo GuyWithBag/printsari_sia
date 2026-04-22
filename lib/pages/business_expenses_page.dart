@@ -3,9 +3,11 @@ import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:printsari_sia/providers/expense_provider.dart';
+import 'package:printsari_sia/providers/transaction_provider.dart';
 import 'package:printsari_sia/shared/themes/colors.dart';
 import 'package:printsari_sia/shared/types/types.dart';
 import 'package:printsari_sia/widgets/app_page.dart';
+import 'package:printsari_sia/widgets/selection_bar.dart';
 import 'package:provider/provider.dart';
 import 'package:skeletonizer/skeletonizer.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -16,19 +18,22 @@ class BusinessExpensesPage extends HookWidget {
   @override
   Widget build(BuildContext context) {
     final expenseProvider = context.read<ExpenseProvider>();
+    // Watch TransactionProvider so that completing a sale auto-refreshes expenses.
+    final completedTxCount = context
+        .watch<TransactionProvider>()
+        .completedTransactionCount;
     final refreshKey = useState(0);
+    final selectionMode = useState(false);
+    final selectedExpenseIds = useState(<int>{});
 
     final expensesFuture = useMemoized(
       () => expenseProvider.getExpenses(),
-      [refreshKey.value],
+      [refreshKey.value, completedTxCount],
     );
     final snapshot = useFuture(expensesFuture);
 
     void refresh() => refreshKey.value++;
-    void hardRefresh() {
-      expenseProvider.clearCache();
-      refreshKey.value++;
-    }
+    void hardRefresh() => refreshKey.value++;
 
     final expenses = snapshot.data ?? [];
     final now = DateTime.now();
@@ -101,21 +106,39 @@ class BusinessExpensesPage extends HookWidget {
                       ],
                     ),
                   ),
-                  FilledButton.icon(
-                    onPressed: () =>
-                        _showExpenseDialog(context, null, refresh),
-                    icon: const Icon(Icons.add, size: 18),
-                    label: Text('Record Expense',
-                        style: GoogleFonts.outfit(fontWeight: FontWeight.w500)),
-                    style: FilledButton.styleFrom(
-                      backgroundColor: posPrimary,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 20, vertical: 14),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
+                  Row(
+                    children: [
+                      IconButton(
+                        icon: Icon(
+                          Icons.checklist_rounded,
+                          color: selectionMode.value ? posPrimary : Colors.white,
+                        ),
+                        tooltip: selectionMode.value ? 'Exit selection mode' : 'Select expenses to delete',
+                        onPressed: () {
+                          selectionMode.value = !selectionMode.value;
+                          if (!selectionMode.value) {
+                            selectedExpenseIds.value = {};
+                          }
+                        },
                       ),
-                    ),
+                      const SizedBox(width: 8),
+                      FilledButton.icon(
+                        onPressed: () =>
+                            _showExpenseDialog(context, null, refresh),
+                        icon: const Icon(Icons.add, size: 18),
+                        label: Text('Record Expense',
+                            style: GoogleFonts.outfit(fontWeight: FontWeight.w500)),
+                        style: FilledButton.styleFrom(
+                          backgroundColor: posPrimary,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 20, vertical: 14),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -228,6 +251,29 @@ class BusinessExpensesPage extends HookWidget {
                 ),
               ),
               const SizedBox(height: 12),
+              if (selectedExpenseIds.value.isNotEmpty)
+                SelectionBar(
+                  count: selectedExpenseIds.value.length,
+                  itemLabel: 'expense',
+                  onClear: () => selectedExpenseIds.value = {},
+                  onDelete: () async {
+                    final ok = await confirmBulkDelete(
+                      context,
+                      selectedExpenseIds.value.length,
+                      'expense',
+                    );
+                    if (!ok || !context.mounted) return;
+                    final provider = context.read<ExpenseProvider>();
+                    for (final id in selectedExpenseIds.value.toList()) {
+                      try {
+                        await provider.deleteExpense(id);
+                      } catch (_) {}
+                    }
+                    selectedExpenseIds.value = {};
+                    selectionMode.value = false;
+                    refresh();
+                  },
+                ),
               if (expenses.isEmpty)
                 _GlassPanel(
                   child: Padding(
@@ -243,6 +289,7 @@ class BusinessExpensesPage extends HookWidget {
               else
                 ...expenses.map((expense) {
                   final isManual = expense.sourceId == 1;
+                  final isSelected = selectedExpenseIds.value.contains(expense.id);
                   return Padding(
                     padding: const EdgeInsets.only(bottom: 10),
                     child: _GlassPanel(
@@ -251,6 +298,22 @@ class BusinessExpensesPage extends HookWidget {
                             horizontal: 16, vertical: 14),
                         child: Row(
                           children: [
+                            // Checkbox in selection mode (manual expenses only)
+                            if (selectionMode.value && isManual) ...[
+                              Checkbox(
+                                value: isSelected,
+                                activeColor: posPrimary,
+                                checkColor: Colors.white,
+                                onChanged: (v) {
+                                  final s = Set<int>.from(selectedExpenseIds.value);
+                                  v == true ? s.add(expense.id) : s.remove(expense.id);
+                                  selectedExpenseIds.value = s;
+                                },
+                              ),
+                              const SizedBox(width: 4),
+                            ] else if (selectionMode.value) ...[
+                              const SizedBox(width: 48),
+                            ],
                             // Left side: description, category badge, date
                             Expanded(
                               child: Column(

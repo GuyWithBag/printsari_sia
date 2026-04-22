@@ -9,6 +9,8 @@ import 'package:printsari_sia/widgets/print_service_card.dart';
 import 'package:skeletonizer/skeletonizer.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+const _pageSize = 9;
+
 class ProductGridPanel extends HookWidget {
   final TextEditingController searchController;
   final ValueNotifier<String> searchQuery;
@@ -30,6 +32,51 @@ class ProductGridPanel extends HookWidget {
 
   @override
   Widget build(BuildContext context) {
+    final currentPage = useState(0);
+    final pageInputController = useTextEditingController(text: '1');
+
+    // Reset page when tab or search changes
+    useEffect(() {
+      currentPage.value = 0;
+      pageInputController.text = '1';
+      return null;
+    }, [tabIndex.value, searchQuery.value]);
+
+    // Compute filtered items for pagination totals
+    final allProducts = productsSnapshot.data ?? [];
+    final allInventory = inventorySnapshot.data ?? [];
+    final allServices = servicesSnapshot.data ?? [];
+    final query = searchQuery.value.toLowerCase();
+
+    final filteredBatches = allInventory.where((inv) {
+      final product =
+          allProducts.where((p) => p.id == inv.productId).firstOrNull;
+      if (product == null) return false;
+      if (query.isEmpty) return true;
+      return product.name.toLowerCase().contains(query) ||
+          (product.category?.categoryName.toLowerCase().contains(query) ??
+              false);
+    }).toList();
+
+    final filteredServices = allServices.where((s) {
+      if (query.isEmpty) return true;
+      return s.name.toLowerCase().contains(query) ||
+          (s.paperSize?.sizeName.toLowerCase().contains(query) ?? false) ||
+          (s.colorMode?.modeName.toLowerCase().contains(query) ?? false);
+    }).toList();
+
+    final isProductTab = tabIndex.value == 0;
+    final filteredCount =
+        isProductTab ? filteredBatches.length : filteredServices.length;
+    final totalPages = (filteredCount / _pageSize).ceil().clamp(1, 99999);
+    final safePage = currentPage.value.clamp(0, totalPages - 1);
+
+    void goToPage(int page) {
+      final p = page.clamp(0, totalPages - 1);
+      currentPage.value = p;
+      pageInputController.text = (p + 1).toString();
+    }
+
     return Container(
       decoration: BoxDecoration(
         color: posCream,
@@ -78,7 +125,6 @@ class ProductGridPanel extends HookWidget {
                 // Search bar
                 TextField(
                   controller: searchController,
-                  
                   onChanged: (v) => searchQuery.value = v,
                   style: GoogleFonts.outfit(color: posTextMain, fontSize: 14),
                   decoration: InputDecoration(
@@ -119,37 +165,25 @@ class ProductGridPanel extends HookWidget {
               child: AnimatedSwitcher(
                 duration: const Duration(milliseconds: 200),
                 child: tabIndex.value == 0
-                    ? _buildProductGrid(context)
-                    : _buildServiceGrid(context),
+                    ? _buildProductGrid(
+                        context, filteredBatches, allProducts, safePage)
+                    : _buildServiceGrid(context, filteredServices, safePage),
               ),
             ),
           ),
 
-          // ── Bottom: Fast Add ──
-          Container(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 14),
-            child: SizedBox(
-              width: double.infinity,
-              child: OutlinedButton.icon(
-                onPressed: () => _showFastAddDialog(context),
-                icon: const Icon(Icons.add_rounded, size: 18),
-                label: Text(
-                  'Fast Add',
-                  style: GoogleFonts.outfit(fontWeight: FontWeight.w600),
-                ),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: warmGray,
-                  side: BorderSide(
-                    color: Colors.black.withValues(alpha: 0.12),
-                    strokeAlign: BorderSide.strokeAlignInside,
-                  ),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                ),
-              ),
-            ),
+          // ── Bottom: Pagination ──
+          _PaginationBar(
+            currentPage: safePage,
+            totalPages: totalPages,
+            pageInputController: pageInputController,
+            onPrev: safePage > 0 ? () => goToPage(safePage - 1) : null,
+            onNext:
+                safePage < totalPages - 1 ? () => goToPage(safePage + 1) : null,
+            onPageSubmit: (raw) {
+              final p = int.tryParse(raw);
+              if (p != null) goToPage(p - 1);
+            },
           ),
         ],
       ),
@@ -157,7 +191,12 @@ class ProductGridPanel extends HookWidget {
   }
 
   // ── Product Grid ──
-  Widget _buildProductGrid(BuildContext context) {
+  Widget _buildProductGrid(
+    BuildContext context,
+    List<InventoryItem> filteredBatches,
+    List<Product> allProducts,
+    int page,
+  ) {
     final isLoading =
         productsSnapshot.connectionState == ConnectionState.waiting ||
         inventorySnapshot.connectionState == ConnectionState.waiting;
@@ -168,41 +207,30 @@ class ProductGridPanel extends HookWidget {
       return _emptyState(Icons.error_outline, 'Failed to load products');
     }
 
-    final products = productsSnapshot.data ?? [];
-    final inventory = inventorySnapshot.data ?? [];
-    final query = searchQuery.value.toLowerCase();
-
-    // Show one card per inventory batch (per expiry date), filtered by search
-    final batches = inventory.where((inv) {
-      final product = products.where((p) => p.id == inv.productId).firstOrNull;
-      if (product == null) return false;
-      if (query.isEmpty) return true;
-      return product.name.toLowerCase().contains(query) ||
-          (product.category?.categoryName.toLowerCase().contains(query) ??
-              false);
-    }).toList();
-
-    if (batches.isEmpty) {
+    if (filteredBatches.isEmpty) {
       return _emptyState(Icons.inventory_2_outlined, 'No products found');
     }
 
+    final start = page * _pageSize;
+    final end = (start + _pageSize).clamp(0, filteredBatches.length);
+    final pageItems = filteredBatches.sublist(start, end);
+
     return GridView.builder(
+      key: ValueKey('products-$page'),
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 3,
         childAspectRatio: 1.05,
         crossAxisSpacing: 10,
         mainAxisSpacing: 10,
       ),
-      itemCount: batches.length,
+      itemCount: pageItems.length,
       itemBuilder: (context, index) {
-        final inventoryItem = batches[index];
-        final product = products
-            .where((p) => p.id == inventoryItem.productId)
-            .firstOrNull;
+        final inventoryItem = pageItems[index];
+        final product =
+            allProducts.where((p) => p.id == inventoryItem.productId).firstOrNull;
 
         if (product == null) return const SizedBox.shrink();
 
-        // Calculate cart quantity for this specific inventory batch
         final cartQty = transactionProvider.cart
             .where((c) => c.inventoryId == inventoryItem.id)
             .fold(0.0, (sum, c) => sum + c.quantity);
@@ -224,12 +252,7 @@ class ProductGridPanel extends HookWidget {
               );
               return;
             }
-            _showQuantityDialog(
-              context,
-              product,
-              inventoryItem,
-              effectiveStock,
-            );
+            _showQuantityDialog(context, product, inventoryItem, effectiveStock);
           },
         );
       },
@@ -343,7 +366,11 @@ class ProductGridPanel extends HookWidget {
   }
 
   // ── Service Grid ──
-  Widget _buildServiceGrid(BuildContext context) {
+  Widget _buildServiceGrid(
+    BuildContext context,
+    List<PrintService> filteredServices,
+    int page,
+  ) {
     final isLoading =
         servicesSnapshot.connectionState == ConnectionState.waiting;
 
@@ -353,30 +380,25 @@ class ProductGridPanel extends HookWidget {
       return _emptyState(Icons.error_outline, 'Failed to load print services');
     }
 
-    final services = servicesSnapshot.data ?? [];
-    final query = searchQuery.value.toLowerCase();
-
-    final filtered = services.where((s) {
-      if (query.isEmpty) return true;
-      return s.name.toLowerCase().contains(query) ||
-          (s.paperSize?.sizeName.toLowerCase().contains(query) ?? false) ||
-          (s.colorMode?.modeName.toLowerCase().contains(query) ?? false);
-    }).toList();
-
-    if (filtered.isEmpty) {
+    if (filteredServices.isEmpty) {
       return _emptyState(Icons.print_disabled, 'No print services found');
     }
 
+    final start = page * _pageSize;
+    final end = (start + _pageSize).clamp(0, filteredServices.length);
+    final pageItems = filteredServices.sublist(start, end);
+
     return GridView.builder(
+      key: ValueKey('services-$page'),
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 3,
         childAspectRatio: 1.05,
         crossAxisSpacing: 10,
         mainAxisSpacing: 10,
       ),
-      itemCount: filtered.length,
+      itemCount: pageItems.length,
       itemBuilder: (context, index) {
-        final service = filtered[index];
+        final service = pageItems[index];
         return _BounceTapCard(
           child: PrintServiceCard(service: service),
           onTap: () => _showPageCountDialog(context, service),
@@ -504,7 +526,7 @@ class ProductGridPanel extends HookWidget {
         TransactionItem(
           id: 0,
           transactionId: 0,
-          productId: null, // print services are not in the products table
+          productId: null,
           productName: service.name,
           quantity: pageCount.toDouble(),
           unitPrice: service.basePrice,
@@ -526,124 +548,6 @@ class ProductGridPanel extends HookWidget {
         ),
       );
     }
-  }
-
-  // ── Fast Add dialog ──
-  Future<void> _showFastAddDialog(BuildContext context) async {
-    final nameController = TextEditingController();
-    final priceController = TextEditingController();
-
-    final result = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: posSurface,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
-          side: BorderSide(color: Colors.white.withValues(alpha: 0.08)),
-        ),
-        title: Text(
-          'Quick Sale',
-          style: GoogleFonts.outfit(
-            color: Colors.white,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: nameController,
-              autofocus: true,
-              style: GoogleFonts.outfit(color: Colors.white),
-              decoration: InputDecoration(
-                labelText: 'Item name',
-                labelStyle: GoogleFonts.outfit(color: posTextMuted),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(
-                    color: Colors.white.withValues(alpha: 0.1),
-                  ),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(color: posPrimary),
-                ),
-                filled: true,
-                fillColor: posSurfaceLight,
-              ),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: priceController,
-              keyboardType: TextInputType.number,
-              style: GoogleFonts.outfit(color: Colors.white),
-              decoration: InputDecoration(
-                labelText: 'Price (P)',
-                labelStyle: GoogleFonts.outfit(color: posTextMuted),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(
-                    color: Colors.white.withValues(alpha: 0.1),
-                  ),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(color: posPrimary),
-                ),
-                filled: true,
-                fillColor: posSurfaceLight,
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(null),
-            child: Text(
-              'Cancel',
-              style: GoogleFonts.outfit(color: posTextMuted),
-            ),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: posPrimary,
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-            onPressed: () {
-              final name = nameController.text.trim();
-              final price = double.tryParse(priceController.text) ?? 0;
-              if (name.isNotEmpty && price > 0) Navigator.of(ctx).pop(true);
-            },
-            child: Text('Add', style: GoogleFonts.outfit()),
-          ),
-        ],
-      ),
-    );
-
-    if (result != true) return;
-
-    final name = nameController.text.trim();
-    final price = double.tryParse(priceController.text) ?? 0;
-    if (name.isEmpty || price <= 0) return;
-
-    final now = DateTime.now();
-    transactionProvider.addToCart(
-      TransactionItem(
-        id: 0,
-        transactionId: 0,
-        productId: null,
-        productName: name,
-        quantity: 1,
-        unitPrice: price,
-        subtotal: price,
-        categoryId: 1,
-        createdAt: now,
-        updatedAt: now,
-      ),
-    );
   }
 
   Widget _buildSkeletonGrid() {
@@ -714,6 +618,123 @@ class ProductGridPanel extends HookWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Pagination Bar
+// ─────────────────────────────────────────────────────────────────────────────
+class _PaginationBar extends StatelessWidget {
+  final int currentPage;
+  final int totalPages;
+  final TextEditingController pageInputController;
+  final VoidCallback? onPrev;
+  final VoidCallback? onNext;
+  final ValueChanged<String> onPageSubmit;
+
+  const _PaginationBar({
+    required this.currentPage,
+    required this.totalPages,
+    required this.pageInputController,
+    required this.onPrev,
+    required this.onNext,
+    required this.onPageSubmit,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 14),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          // Previous button
+          _NavButton(
+            icon: Icons.chevron_left_rounded,
+            onTap: onPrev,
+          ),
+          const SizedBox(width: 10),
+          // Page input
+          SizedBox(
+            width: 44,
+            height: 36,
+            child: TextField(
+              controller: pageInputController,
+              keyboardType: TextInputType.number,
+              textAlign: TextAlign.center,
+              style: GoogleFonts.outfit(
+                color: posTextMain,
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+              ),
+              decoration: InputDecoration(
+                contentPadding: EdgeInsets.zero,
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: BorderSide(
+                    color: Colors.black.withValues(alpha: 0.12),
+                  ),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: const BorderSide(color: posPrimary),
+                ),
+                filled: true,
+                fillColor: Colors.white,
+              ),
+              onSubmitted: onPageSubmit,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            'of $totalPages',
+            style: GoogleFonts.outfit(
+              color: warmGray.withValues(alpha: 0.7),
+              fontSize: 13,
+            ),
+          ),
+          const SizedBox(width: 10),
+          // Next button
+          _NavButton(
+            icon: Icons.chevron_right_rounded,
+            onTap: onNext,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _NavButton extends StatelessWidget {
+  final IconData icon;
+  final VoidCallback? onTap;
+
+  const _NavButton({required this.icon, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final enabled = onTap != null;
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 36,
+        height: 36,
+        decoration: BoxDecoration(
+          color: enabled ? Colors.white : Colors.black.withValues(alpha: 0.04),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: Colors.black.withValues(alpha: enabled ? 0.12 : 0.06),
+          ),
+        ),
+        child: Icon(
+          icon,
+          size: 20,
+          color: enabled
+              ? posTextMain
+              : warmGray.withValues(alpha: 0.3),
+        ),
       ),
     );
   }
@@ -913,7 +934,7 @@ class _StoreProductCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 4),
-          if (inventoryItem?.expiryDate != null)
+          if (product.perishable && inventoryItem?.expiryDate != null)
             Text(
               'Exp: ${DateFormat('MMM d, yyyy').format(inventoryItem!.expiryDate!)}',
               style: GoogleFonts.outfit(
