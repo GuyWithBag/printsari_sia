@@ -231,13 +231,14 @@ class InventoryProvider extends ChangeNotifier {
     final profileId = profileQuery['id'] as int;
 
     // Insert stock_in record
-    await supabase.from('stock_in').insert({
+    final stockInRecord = await supabase.from('stock_in').insert({
       'service_supply_id': serviceSupplyId,
       'user_id': profileId,
       'purchase_price': purchasePrice,
       'quantity_added': quantity,
       'stock_in_date': now.toIso8601String(),
-    });
+    }).select().single();
+    final stockInId = stockInRecord['id'] as int;
 
     // Check if inventory row already exists for this supply
     final existing = await supabase
@@ -255,6 +256,7 @@ class InventoryProvider extends ChangeNotifier {
             'stock': currentStock + quantity,
             'retail_price': purchasePrice,
             'last_restocked': now.toIso8601String(),
+            'stock_in_id': stockInId,
           })
           .eq('service_supply_id', serviceSupplyId)
           .select('*, service_supplies(*)')
@@ -271,6 +273,7 @@ class InventoryProvider extends ChangeNotifier {
             'stock': quantity,
             'retail_price': purchasePrice,
             'last_restocked': now.toIso8601String(),
+            'stock_in_id': stockInId,
           })
           .select('*, service_supplies(*)')
           .single();
