@@ -17,7 +17,7 @@ class FinancialReportsPage extends HookWidget {
 
   @override
   Widget build(BuildContext context) {
-    final tabController = useTabController(initialLength: 3);
+    final tabController = useTabController(initialLength: 4);
     final currentIndex = useState(0);
     final transactionProvider = context.read<TransactionProvider>();
     final expenseProvider = context.read<ExpenseProvider>();
@@ -121,6 +121,13 @@ class FinancialReportsPage extends HookWidget {
                           icon: Icons.calendar_month_outlined,
                           indexState: currentIndex,
                         ),
+                        CircularTab(
+                          tabController: tabController,
+                          index: 3,
+                          label: 'Yearly',
+                          icon: Icons.calendar_today_outlined,
+                          indexState: currentIndex,
+                        ),
                       ],
                     ),
                     const SizedBox(height: 24),
@@ -152,6 +159,14 @@ class FinancialReportsPage extends HookWidget {
                                       snapshot.data![1] as List<Expense>,
                                   periodDays: 30,
                                   periodLabel: 'Last 30 Days',
+                                ),
+                                _ReportView(
+                                  transactions:
+                                      snapshot.data![0] as List<Transaction>,
+                                  expenses:
+                                      snapshot.data![1] as List<Expense>,
+                                  periodDays: 365,
+                                  periodLabel: 'Last 12 Months',
                                 ),
                               ],
                             )
