@@ -58,15 +58,19 @@ class InventoryProvider extends ChangeNotifier {
     final profileId = profileQuery['id'] as int;
 
     // 2. Insert into stock_in table and get its id
-    final stockInRecord = await supabase.from('stock_in').insert({
-      'product_id': productId,
-      'user_id': profileId,
-      'purchase_price': retailPrice,
-      'quantity_added': quantity,
-      if (expiryDate != null)
-        'expiry_date': expiryDate.toIso8601String().substring(0, 10),
-      'stock_in_date': now.toIso8601String(),
-    }).select().single();
+    final stockInRecord = await supabase
+        .from('stock_in')
+        .insert({
+          'product_id': productId,
+          'user_id': profileId,
+          'purchase_price': retailPrice,
+          'quantity_added': quantity,
+          if (expiryDate != null)
+            'expiry_date': expiryDate.toIso8601String().substring(0, 10),
+          'stock_in_date': now.toIso8601String(),
+        })
+        .select()
+        .single();
     final stockInId = stockInRecord['id'] as int;
 
     // 3. Check if an inventory_items row already exists for this product
@@ -87,8 +91,6 @@ class InventoryProvider extends ChangeNotifier {
             'retail_price': retailPrice,
             'last_restocked': now.toIso8601String(),
             'stock_in_id': stockInId,
-            if (expiryDate != null)
-              'expiry_date': expiryDate.toIso8601String().substring(0, 10),
           })
           .eq('product_id', productId)
           .select()
@@ -96,7 +98,9 @@ class InventoryProvider extends ChangeNotifier {
       newItem = InventoryItem.fromJson(updated);
 
       // Update local cache
-      _items = _items?.map((i) => i.productId == productId ? newItem : i).toList();
+      _items = _items
+          ?.map((i) => i.productId == productId ? newItem : i)
+          .toList();
     } else {
       // 5. Insert new inventory row
       final inserted = await supabase
@@ -105,8 +109,6 @@ class InventoryProvider extends ChangeNotifier {
             'product_id': productId,
             'stock': quantity,
             'retail_price': retailPrice,
-            if (expiryDate != null)
-              'expiry_date': expiryDate.toIso8601String().substring(0, 10),
             'last_restocked': now.toIso8601String(),
             'stock_in_id': stockInId,
           })
@@ -166,7 +168,10 @@ class InventoryProvider extends ChangeNotifier {
   Future<List<ServiceSupply>> getServiceSupplies() async {
     if (_serviceSupplies != null) return _serviceSupplies!;
 
-    final query = await supabase.from('service_supplies').select().order('name');
+    final query = await supabase
+        .from('service_supplies')
+        .select()
+        .order('name');
     _serviceSupplies = query.map((r) => ServiceSupply.fromJson(r)).toList();
     return _serviceSupplies!;
   }
@@ -184,7 +189,10 @@ class InventoryProvider extends ChangeNotifier {
     return newSupply;
   }
 
-  Future<ServiceSupply> updateServiceSupply(int id, Map<String, dynamic> updates) async {
+  Future<ServiceSupply> updateServiceSupply(
+    int id,
+    Map<String, dynamic> updates,
+  ) async {
     final updated = await supabase
         .from('service_supplies')
         .update(updates)
