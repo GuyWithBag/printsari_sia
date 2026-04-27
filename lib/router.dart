@@ -29,6 +29,7 @@ final router = GoRouter(
           ChangeNotifierProvider(create: (_) => ProductProvider()),
           ChangeNotifierProvider(create: (_) => ExpenseProvider()),
           ChangeNotifierProvider(create: (_) => ActivityLogProvider()),
+          ChangeNotifierProvider(create: (_) => VendorProvider()),
         ],
         child: child,
       ),

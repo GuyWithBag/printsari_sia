@@ -16,6 +16,7 @@ import 'package:printsari_sia/widgets/circular_tab.dart';
 import 'package:printsari_sia/widgets/circular_tab_bar.dart';
 import 'package:printsari_sia/widgets/selection_bar.dart';
 import 'package:printsari_sia/providers/activity_log_provider.dart';
+import 'package:printsari_sia/providers/vendor_provider.dart';
 import 'package:provider/provider.dart';
 import 'package:skeletonizer/skeletonizer.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -25,7 +26,7 @@ class ProductsAndServicesPage extends HookWidget {
 
   @override
   Widget build(BuildContext context) {
-    final tabController = useTabController(initialLength: 4);
+    final tabController = useTabController(initialLength: 5);
     final currentIndex = useState(0);
     final refreshKey = useState(0);
 
@@ -115,6 +116,13 @@ class ProductsAndServicesPage extends HookWidget {
                   icon: Icons.science_outlined,
                   indexState: currentIndex,
                 ),
+                CircularTab(
+                  tabController: tabController,
+                  index: 4,
+                  label: 'Vendors',
+                  icon: Icons.store_outlined,
+                  indexState: currentIndex,
+                ),
               ],
             ),
             const SizedBox(height: 24),
@@ -138,6 +146,11 @@ class ProductsAndServicesPage extends HookWidget {
                     isReadOnly: isReadOnly,
                   ),
                   _ServiceSuppliesTab(
+                    refreshKey: refreshKey.value,
+                    onRefresh: () => refreshKey.value++,
+                    isReadOnly: isReadOnly,
+                  ),
+                  _VendorsTab(
                     refreshKey: refreshKey.value,
                     onRefresh: () => refreshKey.value++,
                     isReadOnly: isReadOnly,
@@ -1836,6 +1849,7 @@ class _ServiceSuppliesTab extends HookWidget {
                 const DataColumn(label: Text('Name')),
                 const DataColumn(label: Text('Type')),
                 const DataColumn(label: Text('Paper Size')),
+                const DataColumn(label: Text('Unit')),
                 const DataColumn(label: Text('Purchase Price')),
                 if (!isReadOnly) const DataColumn(label: Text('Actions')),
               ],
@@ -1865,6 +1879,7 @@ class _ServiceSuppliesTab extends HookWidget {
                     ),
                   ),
                   DataCell(Text(supply.paperSize ?? '—')),
+                  DataCell(Text(supply.unit ?? '—')),
                   DataCell(Text('₱${supply.purchasePrice.toStringAsFixed(2)}')),
                   if (!isReadOnly)
                     DataCell(
@@ -1900,6 +1915,7 @@ Future<void> _showServiceSupplyDialog(
   final isEditing = supply != null;
   final nameController = TextEditingController(text: supply?.name ?? '');
   final paperSizeController = TextEditingController(text: supply?.paperSize ?? '');
+  final unitController = TextEditingController(text: supply?.unit ?? '');
   final priceController = TextEditingController(
     text: isEditing ? supply.purchasePrice.toStringAsFixed(2) : '',
   );
@@ -1958,6 +1974,7 @@ Future<void> _showServiceSupplyDialog(
                 // Paper size — only relevant for paper type
                 if (selectedType == 'paper')
                   _dialogField('Paper Size (e.g. short, long, a4)', paperSizeController),
+                _dialogField('Unit (e.g. ream, bottle, cartridge)', unitController),
                 _dialogField('Purchase Price (₱)', priceController,
                     keyboardType: TextInputType.number),
               ],
@@ -1981,6 +1998,7 @@ Future<void> _showServiceSupplyDialog(
               final paperSize = selectedType == 'paper' && paperSizeController.text.isNotEmpty
                   ? paperSizeController.text.trim()
                   : null;
+              final unit = unitController.text.isNotEmpty ? unitController.text.trim() : null;
               try {
                 final supplyName = nameController.text.trim();
                 if (isEditing) {
@@ -1988,6 +2006,7 @@ Future<void> _showServiceSupplyDialog(
                     'name': supplyName,
                     'supply_type': selectedType,
                     'paper_size': paperSize,
+                    'unit': unit,
                     'purchase_price': price,
                   });
                   activityLogRef.log(
@@ -2001,6 +2020,7 @@ Future<void> _showServiceSupplyDialog(
                     name: supplyName,
                     supplyType: selectedType,
                     paperSize: paperSize,
+                    unit: unit,
                     purchasePrice: price,
                     createdAt: now,
                     updatedAt: now,
@@ -2063,6 +2083,288 @@ Future<void> _showDeleteServiceSupplyDialog(
               onRefresh();
             } catch (e) {
               debugPrint('Delete supply error: $e');
+              if (ctx.mounted) {
+                ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text('Error: $e')));
+              }
+            }
+          },
+          style: FilledButton.styleFrom(
+              backgroundColor: const Color(0xFFEF4444), foregroundColor: Colors.white),
+          child: Text('Delete', style: GoogleFonts.outfit()),
+        ),
+      ],
+    ),
+  );
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Vendors Tab
+// ────────────────────────────────────────────────────────────────────────────
+
+class _VendorsTab extends HookWidget {
+  final int refreshKey;
+  final VoidCallback onRefresh;
+  final bool isReadOnly;
+
+  const _VendorsTab({
+    required this.refreshKey,
+    required this.onRefresh,
+    required this.isReadOnly,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final vendorProvider = context.read<VendorProvider>();
+    final searchQuery = useState('');
+
+    final vendorsFuture = useMemoized(
+      () {
+        vendorProvider.clearCache();
+        return vendorProvider.getVendors();
+      },
+      [refreshKey],
+    );
+    final snapshot = useFuture(vendorsFuture);
+
+    final vendors = snapshot.data ?? <Vendor>[];
+    final filtered = searchQuery.value.isEmpty
+        ? vendors
+        : vendors
+            .where((v) =>
+                v.name.toLowerCase().contains(searchQuery.value.toLowerCase()) ||
+                (v.contactNumber ?? '').toLowerCase().contains(searchQuery.value.toLowerCase()) ||
+                (v.email ?? '').toLowerCase().contains(searchQuery.value.toLowerCase()))
+            .toList();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (!isReadOnly)
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  onChanged: (v) => searchQuery.value = v,
+                  style: GoogleFonts.outfit(color: Colors.white),
+                  decoration: InputDecoration(
+                    hintText: 'Search vendors...',
+                    hintStyle: GoogleFonts.outfit(color: posTextMuted),
+                    prefixIcon: const Icon(Icons.search, color: posTextMuted, size: 20),
+                    filled: true,
+                    fillColor: posSurface,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: BorderSide.none,
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              FilledButton.icon(
+                onPressed: () => _showVendorDialog(context, null, onRefresh),
+                icon: const Icon(Icons.add, size: 18),
+                label: Text('Add Vendor', style: GoogleFonts.outfit()),
+                style: FilledButton.styleFrom(
+                  backgroundColor: posPrimary,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+              ),
+            ],
+          ),
+        const SizedBox(height: 16),
+        Expanded(
+          child: Skeletonizer(
+            enabled: !snapshot.hasData && !snapshot.hasError,
+            child: filtered.isEmpty
+                ? Center(
+                    child: Text(
+                      snapshot.hasData ? 'No vendors found' : 'Loading...',
+                      style: GoogleFonts.outfit(color: posTextMuted),
+                    ),
+                  )
+                : Container(
+                    decoration: BoxDecoration(
+                      color: posSurface,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: SingleChildScrollView(
+                        child: SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          child: DataTable(
+                            headingRowColor: WidgetStateProperty.all(posSurfaceLight),
+                            dataRowColor: WidgetStateProperty.all(posSurface),
+                            headingTextStyle: GoogleFonts.outfit(
+                                color: posTextMuted, fontWeight: FontWeight.w600, fontSize: 13),
+                            dataTextStyle: GoogleFonts.outfit(color: Colors.white, fontSize: 13),
+                            columns: [
+                              const DataColumn(label: Text('Name')),
+                              const DataColumn(label: Text('Contact')),
+                              const DataColumn(label: Text('Email')),
+                              const DataColumn(label: Text('Address')),
+                              if (!isReadOnly) const DataColumn(label: Text('Actions')),
+                            ],
+                            rows: filtered.map((vendor) {
+                              return DataRow(cells: [
+                                DataCell(Text(vendor.name)),
+                                DataCell(Text(vendor.contactNumber ?? '—')),
+                                DataCell(Text(vendor.email ?? '—')),
+                                DataCell(Text(vendor.address ?? '—')),
+                                if (!isReadOnly)
+                                  DataCell(Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      IconButton(
+                                        icon: const Icon(Icons.edit_outlined,
+                                            size: 18, color: posAccent),
+                                        tooltip: 'Edit',
+                                        onPressed: () =>
+                                            _showVendorDialog(context, vendor, onRefresh),
+                                      ),
+                                      IconButton(
+                                        icon: const Icon(Icons.delete_outline,
+                                            size: 18, color: Color(0xFFEF4444)),
+                                        tooltip: 'Delete',
+                                        onPressed: () =>
+                                            _showDeleteVendorDialog(context, vendor, onRefresh),
+                                      ),
+                                    ],
+                                  )),
+                              ]);
+                            }).toList(),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+Future<void> _showVendorDialog(
+  BuildContext context,
+  Vendor? vendor,
+  VoidCallback onRefresh,
+) async {
+  final isEditing = vendor != null;
+  final nameController = TextEditingController(text: vendor?.name ?? '');
+  final contactController = TextEditingController(text: vendor?.contactNumber ?? '');
+  final emailController = TextEditingController(text: vendor?.email ?? '');
+  final addressController = TextEditingController(text: vendor?.address ?? '');
+
+  final vendorProvider = context.read<VendorProvider>();
+
+  await showDialog(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      backgroundColor: posSurface,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      title: Text(
+        isEditing ? 'Edit Vendor' : 'Add Vendor',
+        style: GoogleFonts.outfit(color: Colors.white, fontWeight: FontWeight.bold),
+      ),
+      content: SizedBox(
+        width: 360,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _dialogField('Name', nameController),
+              _dialogField('Contact Number (optional)', contactController,
+                  keyboardType: TextInputType.phone),
+              _dialogField('Email (optional)', emailController,
+                  keyboardType: TextInputType.emailAddress),
+              _dialogField('Address (optional)', addressController),
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(ctx),
+          child: Text('Cancel', style: GoogleFonts.outfit(color: posTextMuted)),
+        ),
+        FilledButton(
+          onPressed: () async {
+            if (nameController.text.trim().isEmpty) {
+              ScaffoldMessenger.of(ctx).showSnackBar(
+                const SnackBar(content: Text('Name is required')),
+              );
+              return;
+            }
+            try {
+              if (isEditing) {
+                await vendorProvider.updateVendor(vendor.id, {
+                  'name': nameController.text.trim(),
+                  'contact_number': contactController.text.isEmpty ? null : contactController.text.trim(),
+                  'email': emailController.text.isEmpty ? null : emailController.text.trim(),
+                  'address': addressController.text.isEmpty ? null : addressController.text.trim(),
+                });
+              } else {
+                final now = DateTime.now();
+                await vendorProvider.createVendor(Vendor(
+                  id: 0,
+                  name: nameController.text.trim(),
+                  contactNumber: contactController.text.isEmpty ? null : contactController.text.trim(),
+                  email: emailController.text.isEmpty ? null : emailController.text.trim(),
+                  address: addressController.text.isEmpty ? null : addressController.text.trim(),
+                  createdAt: now,
+                  updatedAt: now,
+                ));
+              }
+              if (ctx.mounted) Navigator.pop(ctx);
+              onRefresh();
+            } catch (e) {
+              debugPrint('Vendor dialog error: $e');
+              if (ctx.mounted) {
+                ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text('Error: $e')));
+              }
+            }
+          },
+          style: FilledButton.styleFrom(backgroundColor: posPrimary, foregroundColor: Colors.white),
+          child: Text(isEditing ? 'Update' : 'Create', style: GoogleFonts.outfit()),
+        ),
+      ],
+    ),
+  );
+}
+
+Future<void> _showDeleteVendorDialog(
+  BuildContext context,
+  Vendor vendor,
+  VoidCallback onRefresh,
+) async {
+  final vendorProvider = context.read<VendorProvider>();
+  await showDialog(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      backgroundColor: posSurface,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      title: Text('Delete Vendor',
+          style: GoogleFonts.outfit(color: Colors.white, fontWeight: FontWeight.bold)),
+      content: Text(
+        'Are you sure you want to delete "${vendor.name}"?',
+        style: GoogleFonts.outfit(color: posTextMuted),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(ctx),
+          child: Text('Cancel', style: GoogleFonts.outfit(color: posTextMuted)),
+        ),
+        FilledButton(
+          onPressed: () async {
+            try {
+              await vendorProvider.deleteVendor(vendor.id);
+              if (ctx.mounted) Navigator.pop(ctx);
+              onRefresh();
+            } catch (e) {
+              debugPrint('Delete vendor error: $e');
               if (ctx.mounted) {
                 ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text('Error: $e')));
               }

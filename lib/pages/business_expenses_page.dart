@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:printsari_sia/providers/expense_provider.dart';
 import 'package:printsari_sia/providers/transaction_provider.dart';
+import 'package:printsari_sia/providers/vendor_provider.dart';
 import 'package:printsari_sia/shared/themes/colors.dart';
 import 'package:printsari_sia/shared/types/types.dart';
 import 'package:printsari_sia/widgets/app_page.dart';
@@ -523,12 +524,15 @@ Future<void> _showExpenseDialog(
   final amountController =
       TextEditingController(text: expense?.amount.toString() ?? '');
   int selectedCategoryId = expense?.categoryId ?? 1;
-  final vendorController =
-      TextEditingController(text: expense?.vendor ?? '');
   final receiptController =
       TextEditingController(text: expense?.receiptNumber ?? '');
   final notesController =
       TextEditingController(text: expense?.notes ?? '');
+
+  // Capture VendorProvider before showDialog
+  final vendorProvider = context.read<VendorProvider>();
+  List<Vendor>? vendorList;
+  int? selectedVendorId = expense?.vendorId;
   final selectedDate = ValueNotifier<DateTime>(expense?.date ?? DateTime.now());
 
   await showDialog(
@@ -657,7 +661,56 @@ Future<void> _showExpenseDialog(
                     ),
                   ),
                 ),
-                _expenseField('Vendor', vendorController),
+                // Vendor dropdown
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: FutureBuilder<List<Vendor>>(
+                    future: vendorProvider.getVendors(),
+                    builder: (context, snap) {
+                      final vendors = snap.data ?? [];
+                      if (vendorList == null && vendors.isNotEmpty) {
+                        vendorList = vendors;
+                        // Default to PrintSari Corner (first vendor or the one named as such)
+                        if (selectedVendorId == null) {
+                          final defaultVendor = vendors.firstWhere(
+                            (v) => v.name == 'PrintSari Corner',
+                            orElse: () => vendors.first,
+                          );
+                          selectedVendorId = defaultVendor.id;
+                        }
+                      }
+                      final effectiveValue = vendors.any((v) => v.id == selectedVendorId)
+                          ? selectedVendorId
+                          : (vendors.isNotEmpty ? vendors.first.id : null);
+                      return DropdownButtonFormField<int>(
+                        value: effectiveValue,
+                        dropdownColor: posSurfaceLight,
+                        style: GoogleFonts.outfit(color: Colors.white),
+                        decoration: InputDecoration(
+                          labelText: 'Vendor',
+                          labelStyle: GoogleFonts.outfit(color: posTextMuted),
+                          filled: true,
+                          fillColor: posSurfaceLight,
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                            borderSide: BorderSide.none,
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                            borderSide: const BorderSide(color: posPrimary, width: 1.5),
+                          ),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                        ),
+                        items: vendors
+                            .map((v) => DropdownMenuItem(value: v.id, child: Text(v.name)))
+                            .toList(),
+                        onChanged: (val) {
+                          if (val != null) setState(() => selectedVendorId = val);
+                        },
+                      );
+                    },
+                  ),
+                ),
                 _expenseField('Receipt Number', receiptController),
                 _expenseField('Notes', notesController),
               ],
@@ -682,9 +735,7 @@ Future<void> _showExpenseDialog(
                         double.tryParse(amountController.text) ?? 0,
                     'category_id': selectedCategoryId,
                     'date': selectedDate.value.toIso8601String(),
-                    'vendor': vendorController.text.isEmpty
-                        ? null
-                        : vendorController.text,
+                    'vendor_id': selectedVendorId,
                     'receipt_number': receiptController.text.isEmpty
                         ? null
                         : receiptController.text,
@@ -703,9 +754,7 @@ Future<void> _showExpenseDialog(
                     receiptNumber: receiptController.text.isEmpty
                         ? null
                         : receiptController.text,
-                    vendor: vendorController.text.isEmpty
-                        ? null
-                        : vendorController.text,
+                    vendorId: selectedVendorId,
                     notes: notesController.text.isEmpty
                         ? null
                         : notesController.text,

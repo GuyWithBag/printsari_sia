@@ -12,6 +12,7 @@ class Expense {
   final String? notes;
   final int? linkedTransactionId;
   final int sourceId;
+  final int? vendorId;
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -20,6 +21,7 @@ class Expense {
   final PaymentMethod? paymentMethod;
   final Transaction? linkedTransaction;
   final ExpenseSource? source;
+  final Vendor? vendorData;
 
   Expense({
     required this.id,
@@ -33,12 +35,14 @@ class Expense {
     this.notes,
     this.linkedTransactionId,
     required this.sourceId,
+    this.vendorId,
     required this.createdAt,
     required this.updatedAt,
     this.category,
     this.paymentMethod,
     this.linkedTransaction,
     this.source,
+    this.vendorData,
   });
 
   factory Expense.fromJson(Map<String, dynamic> json) {
@@ -54,6 +58,7 @@ class Expense {
       notes: json['notes'] as String?,
       linkedTransactionId: json['linked_transaction_id'] as int?,
       sourceId: (json['source_id'] as int?) ?? 0,
+      vendorId: json['vendor_id'] as int?,
       createdAt: DateTime.parse(json['created_at'] as String),
       updatedAt: DateTime.parse(json['updated_at'] as String),
       category: json['expense_categories'] != null
@@ -74,6 +79,9 @@ class Expense {
               json['expense_sources'] as Map<String, dynamic>,
             )
           : null,
+      vendorData: json['vendors'] != null
+          ? Vendor.fromJson(json['vendors'] as Map<String, dynamic>)
+          : null,
     );
   }
 
@@ -90,6 +98,7 @@ class Expense {
       'notes': notes,
       'linked_transaction_id': linkedTransactionId,
       'source_id': sourceId,
+      'vendor_id': vendorId,
       'created_at': createdAt.toIso8601String(),
       'updated_at': updatedAt.toIso8601String(),
     };
@@ -107,6 +116,7 @@ class Expense {
       'notes': notes,
       'linked_transaction_id': linkedTransactionId,
       'source_id': sourceId,
+      if (vendorId != null) 'vendor_id': vendorId,
     };
   }
 }

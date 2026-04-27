@@ -10,7 +10,7 @@ class ExpenseProvider extends ChangeNotifier {
   Future<List<Expense>> getExpenses() async {
     final query = await supabase
         .from('expenses')
-        .select('*, expense_categories(*), payment_methods(*), expense_sources(*)')
+        .select('*, expense_categories(*), payment_methods(*), expense_sources(*), vendors(*)')
         .order('date', ascending: false);
     return query.map((r) => Expense.fromJson(r)).toList();
   }
@@ -21,7 +21,7 @@ class ExpenseProvider extends ChangeNotifier {
     final inserted = await supabase
         .from('expenses')
         .insert(data)
-        .select('*, expense_categories(*), payment_methods(*), expense_sources(*)')
+        .select('*, expense_categories(*), payment_methods(*), expense_sources(*), vendors(*)')
         .single();
     final newExpense = Expense.fromJson(inserted);
     notifyListeners();
@@ -43,7 +43,7 @@ class ExpenseProvider extends ChangeNotifier {
         .from('expenses')
         .update(updates)
         .eq('id', id)
-        .select('*, expense_categories(*), payment_methods(*), expense_sources(*)')
+        .select('*, expense_categories(*), payment_methods(*), expense_sources(*), vendors(*)')
         .single();
     notifyListeners();
     return Expense.fromJson(updated);
@@ -67,7 +67,7 @@ class ExpenseProvider extends ChangeNotifier {
   Future<List<Expense>> getExpensesForTransaction(int transactionId) async {
     final query = await supabase
         .from('expenses')
-        .select('*, expense_categories(*), payment_methods(*), expense_sources(*)')
+        .select('*, expense_categories(*), payment_methods(*), expense_sources(*), vendors(*)')
         .eq('linked_transaction_id', transactionId);
     return query.map((r) => Expense.fromJson(r)).toList();
   }

@@ -40,3 +40,4 @@ export 'dtos/stock_in.dart';
 export 'dtos/stock_out.dart';
 export 'dtos/service_supply.dart';
 export 'dtos/machine.dart';
+export 'dtos/vendor.dart';
