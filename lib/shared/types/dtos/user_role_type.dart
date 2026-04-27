@@ -1,5 +1,6 @@
 enum UserRoleType {
   owner('owner'),
+  manager('manager'),
   cashier('cashier');
 
   final String value;

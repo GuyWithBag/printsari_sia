@@ -49,8 +49,12 @@ class UserManagementPage extends HookWidget {
       }
     }
 
-    final owners = users.where((u) => u.role?.roleName == 'owner').toList();
-    final cashiers = users.where((u) => u.role?.roleName != 'owner').toList();
+    final ownerUsers = users.where((u) => u.role?.roleName == 'owner').toList();
+    final managerUsers = users.where((u) => u.role?.roleName == 'manager').toList();
+    final cashierUsers = users.where((u) => u.role?.roleName == 'cashier').toList();
+
+    final auth = context.watch<AuthController>();
+    final currentUserIsOwner = auth.userRoleType == UserRoleType.owner;
 
     return AppPage(
       body: Skeletonizer(
@@ -86,7 +90,7 @@ class UserManagementPage extends HookWidget {
                     ],
                   ),
                   FilledButton.icon(
-                    onPressed: () => _showAddUserDialog(context, refresh),
+                    onPressed: () => _showAddUserDialog(context, refresh, canChangeRole: currentUserIsOwner),
                     icon: const Icon(Icons.add, size: 18),
                     label: Text('Add User', style: GoogleFonts.outfit()),
                     style: FilledButton.styleFrom(
@@ -104,7 +108,7 @@ class UserManagementPage extends HookWidget {
               // Summary cards
               LayoutBuilder(
                 builder: (context, constraints) {
-                  final crossCount = constraints.maxWidth > 700 ? 3 : 1;
+                  final crossCount = constraints.maxWidth > 900 ? 4 : 2;
                   return GridView.count(
                     crossAxisCount: crossCount,
                     shrinkWrap: true,
@@ -116,20 +120,27 @@ class UserManagementPage extends HookWidget {
                       _SummaryCard(
                         label: 'Total Users',
                         count: users.length,
-                        subtitle: 'Active accounts',
+                        subtitle: 'All accounts',
                         icon: Icons.people_outlined,
                         iconColor: posTextMuted,
                       ),
                       _SummaryCard(
                         label: 'Owners',
-                        count: owners.length,
+                        count: ownerUsers.length,
+                        subtitle: 'Super admin',
+                        icon: Icons.admin_panel_settings_outlined,
+                        iconColor: const Color(0xFFFBBF24),
+                      ),
+                      _SummaryCard(
+                        label: 'Managers',
+                        count: managerUsers.length,
                         subtitle: 'Full access',
                         icon: Icons.shield_outlined,
                         iconColor: const Color(0xFF60A5FA),
                       ),
                       _SummaryCard(
                         label: 'Cashiers',
-                        count: cashiers.length,
+                        count: cashierUsers.length,
                         subtitle: 'Limited access',
                         icon: Icons.person_outline,
                         iconColor: const Color(0xFF4ADE80),
@@ -143,10 +154,23 @@ class UserManagementPage extends HookWidget {
               // Owner Accounts
               _UserGroupPanel(
                 title: 'Owner Accounts',
+                icon: Icons.admin_panel_settings_outlined,
+                iconColor: const Color(0xFFFBBF24),
+                users: ownerUsers,
+                currentUserId: currentUserId,
+                canChangeRole: currentUserIsOwner,
+                onRefresh: refresh,
+              ),
+              const SizedBox(height: 16),
+
+              // Manager Accounts
+              _UserGroupPanel(
+                title: 'Manager Accounts',
                 icon: Icons.shield_outlined,
                 iconColor: const Color(0xFF60A5FA),
-                users: owners,
+                users: managerUsers,
                 currentUserId: currentUserId,
+                canChangeRole: currentUserIsOwner,
                 onRefresh: refresh,
               ),
               const SizedBox(height: 16),
@@ -156,8 +180,9 @@ class UserManagementPage extends HookWidget {
                 title: 'Cashier Accounts',
                 icon: Icons.person_outline,
                 iconColor: const Color(0xFF4ADE80),
-                users: cashiers,
+                users: cashierUsers,
                 currentUserId: currentUserId,
+                canChangeRole: currentUserIsOwner,
                 onRefresh: refresh,
               ),
             ],
@@ -253,6 +278,7 @@ class _UserGroupPanel extends StatelessWidget {
   final Color iconColor;
   final List<_UserData> users;
   final String? currentUserId;
+  final bool canChangeRole;
   final VoidCallback onRefresh;
 
   const _UserGroupPanel({
@@ -261,6 +287,7 @@ class _UserGroupPanel extends StatelessWidget {
     required this.iconColor,
     required this.users,
     required this.currentUserId,
+    required this.canChangeRole,
     required this.onRefresh,
   });
 
@@ -303,8 +330,19 @@ class _UserGroupPanel extends StatelessWidget {
           else
             ...users.map((u) {
               final roleName = u.role?.roleName ?? 'N/A';
-              final isOwner = roleName == 'owner';
               final isCurrentUser = u.profile.userId == currentUserId;
+
+              Color roleBadgeColor;
+              switch (roleName) {
+                case 'owner':
+                  roleBadgeColor = const Color(0xFFFBBF24);
+                  break;
+                case 'manager':
+                  roleBadgeColor = const Color(0xFF60A5FA);
+                  break;
+                default:
+                  roleBadgeColor = const Color(0xFF4ADE80);
+              }
 
               return Padding(
                 padding: const EdgeInsets.only(bottom: 12),
@@ -381,9 +419,7 @@ class _UserGroupPanel extends StatelessWidget {
                       padding: const EdgeInsets.symmetric(
                           horizontal: 10, vertical: 4),
                       decoration: BoxDecoration(
-                        color: isOwner
-                            ? const Color(0xFF60A5FA).withValues(alpha: 0.12)
-                            : const Color(0xFF4ADE80).withValues(alpha: 0.12),
+                        color: roleBadgeColor.withValues(alpha: 0.12),
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Text(
@@ -391,9 +427,7 @@ class _UserGroupPanel extends StatelessWidget {
                         style: GoogleFonts.outfit(
                           fontSize: 12,
                           fontWeight: FontWeight.w600,
-                          color: isOwner
-                              ? const Color(0xFF60A5FA)
-                              : const Color(0xFF4ADE80),
+                          color: roleBadgeColor,
                         ),
                       ),
                     ),
@@ -430,6 +464,7 @@ class _UserGroupPanel extends StatelessWidget {
                         u.profile,
                         u.role,
                         onRefresh,
+                        canChangeRole: canChangeRole,
                       ),
                     ),
                   ],
@@ -444,8 +479,9 @@ class _UserGroupPanel extends StatelessWidget {
 
 Future<void> _showAddUserDialog(
   BuildContext context,
-  VoidCallback onRefresh,
-) async {
+  VoidCallback onRefresh, {
+  required bool canChangeRole,
+}) async {
   // Capture authController and supabase BEFORE showDialog so we can restore
   // the owner's session after signUp switches to the new user's session.
   final authController = context.read<AuthController>();
@@ -455,9 +491,17 @@ Future<void> _showAddUserDialog(
   final nameController = TextEditingController();
   final usernameController = TextEditingController();
   final phoneController = TextEditingController();
+  final streetController = TextEditingController();
+  final barangayController = TextEditingController();
+  final cityController = TextEditingController();
+  final provinceController = TextEditingController();
+  final regionController = TextEditingController();
+  final postalCodeController = TextEditingController();
+  final countryController = TextEditingController();
   int selectedRoleId = 2; // default to cashier
   bool obscurePassword = true;
   bool isCreating = false;
+  // Only owners can assign roles other than cashier
 
   await showDialog(
     context: context,
@@ -515,38 +559,61 @@ Future<void> _showAddUserDialog(
                 _userField('Phone (optional)', phoneController,
                     keyboardType: TextInputType.phone),
                 Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
-                  child: DropdownButtonFormField<int>(
-                    value: selectedRoleId,
-                    dropdownColor: posSurfaceLight,
-                    style: GoogleFonts.outfit(color: Colors.white),
-                    decoration: InputDecoration(
-                      labelText: 'Role',
-                      labelStyle: GoogleFonts.outfit(color: posTextMuted),
-                      filled: true,
-                      fillColor: posSurfaceLight,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10),
-                        borderSide: BorderSide.none,
+                  padding: const EdgeInsets.only(bottom: 8, top: 4),
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      'Address (optional)',
+                      style: GoogleFonts.outfit(
+                        color: posTextMuted,
+                        fontSize: 12,
                       ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10),
-                        borderSide: const BorderSide(color: posPrimary, width: 1.5),
-                      ),
-                      contentPadding:
-                          const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                     ),
-                    items: const [
-                      DropdownMenuItem(value: 1, child: Text('Owner')),
-                      DropdownMenuItem(value: 2, child: Text('Cashier')),
-                    ],
-                    onChanged: (value) {
-                      if (value != null) {
-                        setDialogState(() => selectedRoleId = value);
-                      }
-                    },
                   ),
                 ),
+                _userField('Street', streetController),
+                _userField('Barangay', barangayController),
+                _userField('City / Municipality', cityController),
+                _userField('Province', provinceController),
+                _userField('Region', regionController),
+                _userField('Postal Code', postalCodeController,
+                    keyboardType: TextInputType.number),
+                _userField('Country', countryController),
+                if (canChangeRole)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: DropdownButtonFormField<int>(
+                      value: selectedRoleId,
+                      dropdownColor: posSurfaceLight,
+                      style: GoogleFonts.outfit(color: Colors.white),
+                      decoration: InputDecoration(
+                        labelText: 'Role',
+                        labelStyle: GoogleFonts.outfit(color: posTextMuted),
+                        filled: true,
+                        fillColor: posSurfaceLight,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide: BorderSide.none,
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide: const BorderSide(color: posPrimary, width: 1.5),
+                        ),
+                        contentPadding:
+                            const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      ),
+                      items: const [
+                        DropdownMenuItem(value: 3, child: Text('Owner')),
+                        DropdownMenuItem(value: 1, child: Text('Manager')),
+                        DropdownMenuItem(value: 2, child: Text('Cashier')),
+                      ],
+                      onChanged: (value) {
+                        if (value != null) {
+                          setDialogState(() => selectedRoleId = value);
+                        }
+                      },
+                    ),
+                  ),
               ],
             ),
           ),
@@ -609,6 +676,27 @@ Future<void> _showAddUserDialog(
                         'phone': phoneController.text.isEmpty
                             ? null
                             : phoneController.text,
+                        'address_street': streetController.text.isEmpty
+                            ? null
+                            : streetController.text,
+                        'address_barangay': barangayController.text.isEmpty
+                            ? null
+                            : barangayController.text,
+                        'address_city': cityController.text.isEmpty
+                            ? null
+                            : cityController.text,
+                        'address_province': provinceController.text.isEmpty
+                            ? null
+                            : provinceController.text,
+                        'address_region': regionController.text.isEmpty
+                            ? null
+                            : regionController.text,
+                        'address_postal_code': postalCodeController.text.isEmpty
+                            ? null
+                            : postalCodeController.text,
+                        'address_country': countryController.text.isEmpty
+                            ? null
+                            : countryController.text,
                       });
 
                       // Restore owner's session so subsequent operations work
@@ -657,10 +745,18 @@ Future<void> _showEditUserDialog(
   BuildContext context,
   Profile profile,
   UserRole? role,
-  VoidCallback onRefresh,
-) async {
+  VoidCallback onRefresh, {
+  required bool canChangeRole,
+}) async {
   final nameController = TextEditingController(text: profile.name);
   final phoneController = TextEditingController(text: profile.phone ?? '');
+  final streetController = TextEditingController(text: profile.addressStreet ?? '');
+  final barangayController = TextEditingController(text: profile.addressBarangay ?? '');
+  final cityController = TextEditingController(text: profile.addressCity ?? '');
+  final provinceController = TextEditingController(text: profile.addressProvince ?? '');
+  final regionController = TextEditingController(text: profile.addressRegion ?? '');
+  final postalCodeController = TextEditingController(text: profile.addressPostalCode ?? '');
+  final countryController = TextEditingController(text: profile.addressCountry ?? '');
   int selectedRoleId = profile.roleId;
   String? currentPictureUrl = profile.profilePicture;
   Uint8List? pickedImageBytes;
@@ -751,38 +847,61 @@ Future<void> _showEditUserDialog(
                 _userField('Phone', phoneController,
                     keyboardType: TextInputType.phone),
                 Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
-                  child: DropdownButtonFormField<int>(
-                    value: selectedRoleId,
-                    dropdownColor: posSurfaceLight,
-                    style: GoogleFonts.outfit(color: Colors.white),
-                    decoration: InputDecoration(
-                      labelText: 'Role',
-                      labelStyle: GoogleFonts.outfit(color: posTextMuted),
-                      filled: true,
-                      fillColor: posSurfaceLight,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10),
-                        borderSide: BorderSide.none,
+                  padding: const EdgeInsets.only(bottom: 8, top: 4),
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      'Address (optional)',
+                      style: GoogleFonts.outfit(
+                        color: posTextMuted,
+                        fontSize: 12,
                       ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10),
-                        borderSide: const BorderSide(color: posPrimary, width: 1.5),
-                      ),
-                      contentPadding:
-                          const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                     ),
-                    items: const [
-                      DropdownMenuItem(value: 1, child: Text('Owner')),
-                      DropdownMenuItem(value: 2, child: Text('Cashier')),
-                    ],
-                    onChanged: (value) {
-                      if (value != null) {
-                        setDialogState(() => selectedRoleId = value);
-                      }
-                    },
                   ),
                 ),
+                _userField('Street', streetController),
+                _userField('Barangay', barangayController),
+                _userField('City / Municipality', cityController),
+                _userField('Province', provinceController),
+                _userField('Region', regionController),
+                _userField('Postal Code', postalCodeController,
+                    keyboardType: TextInputType.number),
+                _userField('Country', countryController),
+                if (canChangeRole)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: DropdownButtonFormField<int>(
+                      value: selectedRoleId,
+                      dropdownColor: posSurfaceLight,
+                      style: GoogleFonts.outfit(color: Colors.white),
+                      decoration: InputDecoration(
+                        labelText: 'Role',
+                        labelStyle: GoogleFonts.outfit(color: posTextMuted),
+                        filled: true,
+                        fillColor: posSurfaceLight,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide: BorderSide.none,
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide: const BorderSide(color: posPrimary, width: 1.5),
+                        ),
+                        contentPadding:
+                            const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      ),
+                      items: const [
+                        DropdownMenuItem(value: 3, child: Text('Owner')),
+                        DropdownMenuItem(value: 1, child: Text('Manager')),
+                        DropdownMenuItem(value: 2, child: Text('Cashier')),
+                      ],
+                      onChanged: (value) {
+                        if (value != null) {
+                          setDialogState(() => selectedRoleId = value);
+                        }
+                      },
+                    ),
+                  ),
               ],
             ),
           ),
@@ -822,8 +941,29 @@ Future<void> _showEditUserDialog(
                         'phone': phoneController.text.isEmpty
                             ? null
                             : phoneController.text,
-                        'role_id': selectedRoleId,
+                        if (canChangeRole) 'role_id': selectedRoleId,
                         'profile_picture': pictureUrl,
+                        'address_street': streetController.text.isEmpty
+                            ? null
+                            : streetController.text,
+                        'address_barangay': barangayController.text.isEmpty
+                            ? null
+                            : barangayController.text,
+                        'address_city': cityController.text.isEmpty
+                            ? null
+                            : cityController.text,
+                        'address_province': provinceController.text.isEmpty
+                            ? null
+                            : provinceController.text,
+                        'address_region': regionController.text.isEmpty
+                            ? null
+                            : regionController.text,
+                        'address_postal_code': postalCodeController.text.isEmpty
+                            ? null
+                            : postalCodeController.text,
+                        'address_country': countryController.text.isEmpty
+                            ? null
+                            : countryController.text,
                       }).eq('id', profile.id);
 
                       // If editing the current user, refresh the sidebar profile
