@@ -73,16 +73,23 @@ class InventoryProvider extends ChangeNotifier {
         .single();
     final stockInId = stockInRecord['id'] as int;
 
-    // 3. Check if an inventory_items row already exists for this product
-    final existing = await supabase
+    // 3. Check if an inventory_items row already exists for this product + expiry date
+    final expiryStr = expiryDate?.toIso8601String().substring(0, 10);
+    var query = supabase
         .from('inventory_items')
         .select()
-        .eq('product_id', productId)
-        .maybeSingle();
+        .eq('product_id', productId);
+    if (expiryStr != null) {
+      query = query.eq('expiry_date', expiryStr);
+    } else {
+      query = query.isFilter('expiry_date', null);
+    }
+    final existing = await query.maybeSingle();
 
     InventoryItem newItem;
     if (existing != null) {
       // 4. Update: add stock, refresh retail price and stock_in_id
+      final existingId = existing['id'] as int;
       final currentStock = (existing['stock'] as num).toDouble();
       final updated = await supabase
           .from('inventory_items')
@@ -92,14 +99,14 @@ class InventoryProvider extends ChangeNotifier {
             'last_restocked': now.toIso8601String(),
             'stock_in_id': stockInId,
           })
-          .eq('product_id', productId)
+          .eq('id', existingId)
           .select()
           .single();
       newItem = InventoryItem.fromJson(updated);
 
       // Update local cache
       _items = _items
-          ?.map((i) => i.productId == productId ? newItem : i)
+          ?.map((i) => i.id == existingId ? newItem : i)
           .toList();
     } else {
       // 5. Insert new inventory row
@@ -111,6 +118,8 @@ class InventoryProvider extends ChangeNotifier {
             'retail_price': retailPrice,
             'last_restocked': now.toIso8601String(),
             'stock_in_id': stockInId,
+            if (expiryDate != null)
+              'expiry_date': expiryStr,
           })
           .select()
           .single();
@@ -152,6 +161,66 @@ class InventoryProvider extends ChangeNotifier {
       'stock_out_type': stockOutType,
       'stock_out_date': DateTime.now().toIso8601String(),
     });
+  }
+
+  /// Manual stock-out: deducts stock, records in stock_out, creates a purchases expense.
+  Future<void> stockOut({
+    required InventoryItem item,
+    required double quantity,
+    String? notes,
+  }) async {
+    final userId = supabase.auth.currentUser?.id;
+    if (userId == null) throw Exception('Not authenticated');
+    if (quantity <= 0) throw Exception('Quantity must be greater than 0');
+    if (quantity > item.stock) throw Exception('Cannot remove more than current stock');
+
+    // Get user profile id
+    final profileRow = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('user_id', userId)
+        .single();
+    final profileId = profileRow['id'] as int;
+
+    // Deduct from inventory_items
+    await supabase
+        .from('inventory_items')
+        .update({'stock': item.stock - quantity})
+        .eq('id', item.id);
+
+    // Record in stock_out
+    await supabase.from('stock_out').insert({
+      'user_id': profileId,
+      if (item.productId != null) 'product_id': item.productId,
+      if (item.serviceSupplyId != null) 'service_supply_id': item.serviceSupplyId,
+      'inventory_item_id': item.id,
+      'quantity_removed': quantity,
+      'stock_out_type': 'manual',
+      'stock_out_date': DateTime.now().toIso8601String(),
+      if (notes != null) 'notes': notes,
+    });
+
+    // Auto-create expense in 'purchases' category
+    final categoryRow = await supabase
+        .from('expense_categories')
+        .select('id')
+        .eq('category_name', 'purchases')
+        .maybeSingle();
+    if (categoryRow != null) {
+      final categoryId = categoryRow['id'] as int;
+      final amount = item.retailPrice * quantity;
+      final desc = notes?.isNotEmpty == true ? notes! : 'Manual stock-out adjustment';
+      await supabase.from('expenses').insert({
+        'description': desc,
+        'amount': amount,
+        'category_id': categoryId,
+        'date': DateTime.now().toIso8601String(),
+        'source_id': 1,
+      });
+    }
+
+    clearCache();
+    notifyListeners();
   }
 
   Future<List<InventoryItem>> getItems() async {

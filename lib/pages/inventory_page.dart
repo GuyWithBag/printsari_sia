@@ -285,22 +285,32 @@ class InventoryPage extends HookWidget {
                     _InventoryGrid(
                       items: storeItems,
                       products: allProducts,
-                      onStockIn: (product) => showBulkStockInDialog(
+                      onStockIn: (item, product) => _showQuickStockInDialog(
                         context,
-                        allProducts,
+                        item,
+                        product,
                         hardRefresh,
-                        preselected: product,
+                      ),
+                      onStockOut: (item) => _showStockOutDialog(
+                        context,
+                        item,
+                        hardRefresh,
                       ),
                       onEdit: editItem,
                     ),
                     // Printing Supplies Tab — real supply inventory
                     _SupplyInventoryGrid(
                       items: supplyItems,
-                      onStockIn: (supply) => _showSupplyStockInDialog(
+                      onStockIn: (item, supply) => _showQuickSupplyStockInDialog(
                         context,
-                        allServiceSupplies,
+                        item,
+                        supply,
                         hardRefresh,
-                        preselected: supply,
+                      ),
+                      onStockOut: (item) => _showStockOutDialog(
+                        context,
+                        item,
+                        hardRefresh,
                       ),
                       onEdit: editItem,
                     ),
@@ -318,13 +328,15 @@ class InventoryPage extends HookWidget {
 class _InventoryGrid extends StatelessWidget {
   final List<InventoryItem> items;
   final List<Product> products;
-  final void Function(Product product) onStockIn;
+  final void Function(InventoryItem item, Product product) onStockIn;
+  final void Function(InventoryItem item) onStockOut;
   final void Function(InventoryItem item) onEdit;
 
   const _InventoryGrid({
     required this.items,
     required this.products,
     required this.onStockIn,
+    required this.onStockOut,
     required this.onEdit,
   });
 
@@ -361,7 +373,8 @@ class _InventoryGrid extends StatelessWidget {
             title: product?.name ?? 'Unknown Product',
             subtitle: product?.category?.categoryName ?? '',
             onEdit: () => onEdit(item),
-            onStockIn: product != null ? () => onStockIn(product) : null,
+            onStockIn: product != null ? () => onStockIn(item, product) : null,
+            onStockOut: () => onStockOut(item),
           );
         }).toList(),
       ),
@@ -521,14 +534,23 @@ Future<void> _showEditInventoryDialog(
 
 class _SupplyInventoryGrid extends StatelessWidget {
   final List<InventoryItem> items;
-  final void Function(ServiceSupply supply) onStockIn;
+  final void Function(InventoryItem item, ServiceSupply supply) onStockIn;
+  final void Function(InventoryItem item) onStockOut;
   final void Function(InventoryItem item) onEdit;
 
   const _SupplyInventoryGrid({
     required this.items,
     required this.onStockIn,
+    required this.onStockOut,
     required this.onEdit,
   });
+
+  static const _typeIcons = <String, IconData>{
+    'paper': Icons.description_outlined,
+    'ink': Icons.opacity_outlined,
+    'toner': Icons.lens_outlined,
+    'other': Icons.inventory_2_outlined,
+  };
 
   @override
   Widget build(BuildContext context) {
@@ -550,25 +572,712 @@ class _SupplyInventoryGrid extends StatelessWidget {
         ),
       );
     }
+
+    // Group by supply_type
+    final grouped = <String, List<InventoryItem>>{};
+    for (final item in items) {
+      final type = item.serviceSupply?.supplyType ?? 'other';
+      grouped.putIfAbsent(type, () => []).add(item);
+    }
+
     return SingleChildScrollView(
-      child: Wrap(
-        spacing: 16.0,
-        runSpacing: 16.0,
-        children: items.map((item) {
-          final supply = item.serviceSupply;
-          return InventoryCard(
-            item: item,
-            title: supply?.name ?? 'Unknown Supply',
-            subtitle: supply != null
-                ? '${supply.supplyType}${supply.paperSize != null ? ' · ${supply.paperSize}' : ''}'
-                : '',
-            onEdit: () => onEdit(item),
-            onStockIn: supply != null ? () => onStockIn(supply) : null,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: grouped.entries.map((entry) {
+          final type = entry.key;
+          final typeItems = entry.value;
+          final icon = _typeIcons[type] ?? Icons.inventory_2_outlined;
+
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.only(bottom: 12, top: 4),
+                child: Row(
+                  children: [
+                    Icon(icon, size: 18, color: posTextMuted),
+                    const SizedBox(width: 8),
+                    Text(
+                      type[0].toUpperCase() + type.substring(1),
+                      style: GoogleFonts.outfit(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                        color: posTextMuted,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Wrap(
+                spacing: 16.0,
+                runSpacing: 16.0,
+                children: typeItems.map((item) {
+                  final supply = item.serviceSupply;
+                  return _SupplyCard(
+                    item: item,
+                    supply: supply,
+                    icon: icon,
+                    onEdit: () => onEdit(item),
+                    onStockIn: supply != null ? () => onStockIn(item, supply) : null,
+                    onStockOut: () => onStockOut(item),
+                  );
+                }).toList(),
+              ),
+              const SizedBox(height: 24),
+            ],
           );
         }).toList(),
       ),
     );
   }
+}
+
+class _SupplyCard extends StatelessWidget {
+  final InventoryItem item;
+  final ServiceSupply? supply;
+  final IconData icon;
+  final VoidCallback onEdit;
+  final VoidCallback? onStockIn;
+  final VoidCallback onStockOut;
+
+  const _SupplyCard({
+    required this.item,
+    required this.supply,
+    required this.icon,
+    required this.onEdit,
+    this.onStockIn,
+    required this.onStockOut,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isOutOfStock = item.stock <= 0;
+    final isLowStock = !isOutOfStock &&
+        item.reorderLevel != null &&
+        item.stock <= item.reorderLevel!;
+
+    final stockColor = isOutOfStock
+        ? Colors.red.shade400
+        : isLowStock
+            ? Colors.orange.shade400
+            : Colors.white;
+
+    return SizedBox(
+      width: 280,
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: posSurface,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: isOutOfStock
+                ? Colors.red.withValues(alpha: 0.3)
+                : isLowStock
+                    ? Colors.orange.withValues(alpha: 0.3)
+                    : Colors.white.withValues(alpha: 0.06),
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Header: icon + name + edit
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: posPrimary.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(icon, size: 18, color: posPrimary),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        supply?.name ?? 'Unknown Supply',
+                        style: GoogleFonts.outfit(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      if (supply?.unit != null)
+                        Text(
+                          supply!.unit!,
+                          style: GoogleFonts.outfit(
+                            fontSize: 11,
+                            color: posTextMuted,
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  onPressed: onEdit,
+                  icon: const Icon(Icons.edit_square, size: 16),
+                  color: posTextMuted,
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                  style: const ButtonStyle(tapTargetSize: MaterialTapTargetSize.shrinkWrap),
+                ),
+              ],
+            ),
+            const SizedBox(height: 14),
+
+            // Stock count + badge
+            Row(
+              children: [
+                Text(
+                  item.stock.toStringAsFixed(0),
+                  style: GoogleFonts.outfit(
+                    fontSize: 28,
+                    fontWeight: FontWeight.w700,
+                    color: stockColor,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                if (isOutOfStock)
+                  _badge('Out of stock', Colors.red.shade400)
+                else if (isLowStock)
+                  _badge('Low stock', Colors.orange.shade400),
+              ],
+            ),
+            if (supply?.paperSize != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Text(
+                  supply!.paperSize!,
+                  style: GoogleFonts.outfit(fontSize: 12, color: posTextMuted),
+                ),
+              ),
+            const SizedBox(height: 14),
+
+            // Buttons
+            Row(
+              children: [
+                if (onStockIn != null)
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: onStockIn,
+                      icon: const Icon(Icons.add_box_outlined, size: 14),
+                      label: Text('In', style: GoogleFonts.outfit(fontSize: 12)),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: posPrimary,
+                        side: BorderSide(color: posPrimary.withValues(alpha: 0.4)),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        padding: const EdgeInsets.symmetric(vertical: 6),
+                      ),
+                    ),
+                  ),
+                if (onStockIn != null) const SizedBox(width: 8),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: onStockOut,
+                    icon: const Icon(Icons.remove_circle_outline, size: 14),
+                    label: Text('Out', style: GoogleFonts.outfit(fontSize: 12)),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.orange.shade400,
+                      side: BorderSide(color: Colors.orange.withValues(alpha: 0.4)),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      padding: const EdgeInsets.symmetric(vertical: 6),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _badge(String label, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Text(
+        label,
+        style: GoogleFonts.outfit(fontSize: 11, color: color, fontWeight: FontWeight.w600),
+      ),
+    );
+  }
+}
+
+Future<void> _showQuickStockInDialog(
+  BuildContext context,
+  InventoryItem item,
+  Product product,
+  VoidCallback onRefresh,
+) async {
+  final inventoryProvider = context.read<InventoryProvider>();
+  final stockController = TextEditingController();
+  final priceController = TextEditingController(
+    text: item.retailPrice.toStringAsFixed(2),
+  );
+  bool isSaving = false;
+
+  await showDialog(
+    context: context,
+    builder: (ctx) => StatefulBuilder(
+      builder: (ctx, setDialogState) => AlertDialog(
+        backgroundColor: posSurface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text(
+          'Stock In',
+          style: GoogleFonts.outfit(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        content: SizedBox(
+          width: 340,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Padding(
+                padding: const EdgeInsets.only(bottom: 16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      product.name,
+                      style: GoogleFonts.outfit(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    if (item.expiryDate != null)
+                      Text(
+                        'Expiry: ${DateFormat('MMM d, yyyy').format(item.expiryDate!)}',
+                        style: GoogleFonts.outfit(
+                          color: posTextMuted,
+                          fontSize: 12,
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: TextField(
+                  controller: stockController,
+                  keyboardType: TextInputType.number,
+                  autofocus: true,
+                  style: GoogleFonts.outfit(color: Colors.white),
+                  decoration: InputDecoration(
+                    labelText: 'Quantity to add',
+                    labelStyle: GoogleFonts.outfit(color: posTextMuted),
+                    filled: true,
+                    fillColor: posSurfaceLight,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: BorderSide.none,
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: const BorderSide(color: posPrimary, width: 1.5),
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 12,
+                    ),
+                  ),
+                ),
+              ),
+              TextField(
+                controller: priceController,
+                keyboardType: TextInputType.number,
+                style: GoogleFonts.outfit(color: Colors.white),
+                decoration: InputDecoration(
+                  labelText: 'Retail price (₱)',
+                  labelStyle: GoogleFonts.outfit(color: posTextMuted),
+                  filled: true,
+                  fillColor: posSurfaceLight,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: BorderSide.none,
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: const BorderSide(color: posPrimary, width: 1.5),
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 12,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text('Cancel', style: GoogleFonts.outfit(color: posTextMuted)),
+          ),
+          FilledButton(
+            onPressed: isSaving
+                ? null
+                : () async {
+                    final qty = double.tryParse(stockController.text) ?? 0;
+                    final price = double.tryParse(priceController.text) ?? 0;
+                    if (qty <= 0) {
+                      ScaffoldMessenger.of(ctx).showSnackBar(
+                        const SnackBar(
+                          content: Text('Quantity must be greater than 0'),
+                        ),
+                      );
+                      return;
+                    }
+                    setDialogState(() => isSaving = true);
+                    try {
+                      await inventoryProvider.stockIn(
+                        productId: product.id,
+                        quantity: qty,
+                        retailPrice: price > 0 ? price : item.retailPrice,
+                        expiryDate: item.expiryDate,
+                      );
+                      if (ctx.mounted) Navigator.pop(ctx);
+                      onRefresh();
+                    } catch (e) {
+                      debugPrint('Quick stock in error: $e');
+                      if (ctx.mounted) {
+                        setDialogState(() => isSaving = false);
+                        ScaffoldMessenger.of(
+                          ctx,
+                        ).showSnackBar(SnackBar(content: Text('Error: $e')));
+                      }
+                    }
+                  },
+            style: FilledButton.styleFrom(
+              backgroundColor: posPrimary,
+              foregroundColor: Colors.white,
+            ),
+            child: isSaving
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white,
+                    ),
+                  )
+                : Text('Stock In', style: GoogleFonts.outfit()),
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+Future<void> _showQuickSupplyStockInDialog(
+  BuildContext context,
+  InventoryItem item,
+  ServiceSupply supply,
+  VoidCallback onRefresh,
+) async {
+  final inventoryProvider = context.read<InventoryProvider>();
+  final stockController = TextEditingController();
+  final priceController = TextEditingController(
+    text: item.retailPrice.toStringAsFixed(2),
+  );
+  bool isSaving = false;
+
+  await showDialog(
+    context: context,
+    builder: (ctx) => StatefulBuilder(
+      builder: (ctx, setDialogState) => AlertDialog(
+        backgroundColor: posSurface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text(
+          'Stock In',
+          style: GoogleFonts.outfit(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        content: SizedBox(
+          width: 340,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Padding(
+                padding: const EdgeInsets.only(bottom: 16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      supply.name,
+                      style: GoogleFonts.outfit(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    Text(
+                      '${supply.supplyType}${supply.paperSize != null ? ' · ${supply.paperSize}' : ''}',
+                      style: GoogleFonts.outfit(
+                        color: posTextMuted,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: TextField(
+                  controller: stockController,
+                  keyboardType: TextInputType.number,
+                  autofocus: true,
+                  style: GoogleFonts.outfit(color: Colors.white),
+                  decoration: InputDecoration(
+                    labelText: 'Quantity to add',
+                    labelStyle: GoogleFonts.outfit(color: posTextMuted),
+                    filled: true,
+                    fillColor: posSurfaceLight,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: BorderSide.none,
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: const BorderSide(color: posPrimary, width: 1.5),
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 12,
+                    ),
+                  ),
+                ),
+              ),
+              TextField(
+                controller: priceController,
+                keyboardType: TextInputType.number,
+                style: GoogleFonts.outfit(color: Colors.white),
+                decoration: InputDecoration(
+                  labelText: 'Purchase price (₱)',
+                  labelStyle: GoogleFonts.outfit(color: posTextMuted),
+                  filled: true,
+                  fillColor: posSurfaceLight,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: BorderSide.none,
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: const BorderSide(color: posPrimary, width: 1.5),
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 12,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text('Cancel', style: GoogleFonts.outfit(color: posTextMuted)),
+          ),
+          FilledButton(
+            onPressed: isSaving
+                ? null
+                : () async {
+                    final qty = double.tryParse(stockController.text) ?? 0;
+                    final price = double.tryParse(priceController.text) ?? 0;
+                    if (qty <= 0) {
+                      ScaffoldMessenger.of(ctx).showSnackBar(
+                        const SnackBar(
+                          content: Text('Quantity must be greater than 0'),
+                        ),
+                      );
+                      return;
+                    }
+                    setDialogState(() => isSaving = true);
+                    try {
+                      await inventoryProvider.stockInSupply(
+                        serviceSupplyId: supply.id,
+                        quantity: qty,
+                        purchasePrice: price > 0 ? price : supply.purchasePrice,
+                      );
+                      if (ctx.mounted) Navigator.pop(ctx);
+                      onRefresh();
+                    } catch (e) {
+                      debugPrint('Quick supply stock in error: $e');
+                      if (ctx.mounted) {
+                        setDialogState(() => isSaving = false);
+                        ScaffoldMessenger.of(
+                          ctx,
+                        ).showSnackBar(SnackBar(content: Text('Error: $e')));
+                      }
+                    }
+                  },
+            style: FilledButton.styleFrom(
+              backgroundColor: posPrimary,
+              foregroundColor: Colors.white,
+            ),
+            child: isSaving
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white,
+                    ),
+                  )
+                : Text('Stock In', style: GoogleFonts.outfit()),
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+Future<void> _showStockOutDialog(
+  BuildContext context,
+  InventoryItem item,
+  VoidCallback onRefresh,
+) async {
+  final inventoryProvider = context.read<InventoryProvider>();
+  final qtyController = TextEditingController();
+  final notesController = TextEditingController();
+  bool isSaving = false;
+
+  await showDialog(
+    context: context,
+    builder: (ctx) => StatefulBuilder(
+      builder: (ctx, setDialogState) => AlertDialog(
+        backgroundColor: posSurface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text(
+          'Stock Out',
+          style: GoogleFonts.outfit(color: Colors.white, fontWeight: FontWeight.bold),
+        ),
+        content: SizedBox(
+          width: 340,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Padding(
+                padding: const EdgeInsets.only(bottom: 16),
+                child: Text(
+                  'Current stock: ${item.stock.toStringAsFixed(0)}',
+                  style: GoogleFonts.outfit(color: posTextMuted, fontSize: 13),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: TextField(
+                  controller: qtyController,
+                  keyboardType: TextInputType.number,
+                  autofocus: true,
+                  style: GoogleFonts.outfit(color: Colors.white),
+                  decoration: InputDecoration(
+                    labelText: 'Quantity to remove',
+                    labelStyle: GoogleFonts.outfit(color: posTextMuted),
+                    filled: true,
+                    fillColor: posSurfaceLight,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: BorderSide.none,
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: const BorderSide(color: posPrimary, width: 1.5),
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  ),
+                ),
+              ),
+              TextField(
+                controller: notesController,
+                style: GoogleFonts.outfit(color: Colors.white),
+                decoration: InputDecoration(
+                  labelText: 'Notes (optional)',
+                  labelStyle: GoogleFonts.outfit(color: posTextMuted),
+                  filled: true,
+                  fillColor: posSurfaceLight,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: BorderSide.none,
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: const BorderSide(color: posPrimary, width: 1.5),
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text('Cancel', style: GoogleFonts.outfit(color: posTextMuted)),
+          ),
+          FilledButton(
+            onPressed: isSaving
+                ? null
+                : () async {
+                    final qty = double.tryParse(qtyController.text) ?? 0;
+                    if (qty <= 0) {
+                      ScaffoldMessenger.of(ctx).showSnackBar(
+                        const SnackBar(content: Text('Quantity must be greater than 0')),
+                      );
+                      return;
+                    }
+                    if (qty > item.stock) {
+                      ScaffoldMessenger.of(ctx).showSnackBar(
+                        SnackBar(content: Text('Cannot remove more than current stock (${item.stock.toStringAsFixed(0)})')),
+                      );
+                      return;
+                    }
+                    setDialogState(() => isSaving = true);
+                    try {
+                      await inventoryProvider.stockOut(
+                        item: item,
+                        quantity: qty,
+                        notes: notesController.text.isEmpty ? null : notesController.text,
+                      );
+                      if (ctx.mounted) Navigator.pop(ctx);
+                      onRefresh();
+                    } catch (e) {
+                      debugPrint('Stock out error: $e');
+                      if (ctx.mounted) {
+                        setDialogState(() => isSaving = false);
+                        ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text('Error: $e')));
+                      }
+                    }
+                  },
+            style: FilledButton.styleFrom(
+              backgroundColor: Colors.orange.shade700,
+              foregroundColor: Colors.white,
+            ),
+            child: isSaving
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                  )
+                : Text('Stock Out', style: GoogleFonts.outfit()),
+          ),
+        ],
+      ),
+    ),
+  );
 }
 
 Future<void> _showSupplyStockInDialog(

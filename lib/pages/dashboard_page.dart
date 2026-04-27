@@ -460,17 +460,66 @@ class _StoreInventoryPanel extends StatelessWidget {
     final currFmt =
         NumberFormat.currency(symbol: '\u20B1', decimalDigits: 0);
 
+    final lowStockCount = products.where((p) {
+      final inv = inventoryByProduct[p.id];
+      if (inv == null || inv.reorderLevel == null) return false;
+      return inv.stock > 0 && inv.stock <= inv.reorderLevel!;
+    }).length;
+    final outOfStockCount = products.where((p) {
+      final inv = inventoryByProduct[p.id];
+      return (inv?.stock ?? 0) <= 0;
+    }).length;
+
     return _GlassPanel(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'Store Inventory Status',
-            style: GoogleFonts.outfit(
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-              color: Colors.white,
-            ),
+          Row(
+            children: [
+              Text(
+                'Store Inventory Status',
+                style: GoogleFonts.outfit(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.white,
+                ),
+              ),
+              const Spacer(),
+              if (outOfStockCount > 0)
+                Container(
+                  margin: const EdgeInsets.only(left: 6),
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: Colors.red.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    '$outOfStockCount out of stock',
+                    style: GoogleFonts.outfit(
+                      fontSize: 11,
+                      color: Colors.red.shade400,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              if (lowStockCount > 0)
+                Container(
+                  margin: const EdgeInsets.only(left: 6),
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    '$lowStockCount low stock',
+                    style: GoogleFonts.outfit(
+                      fontSize: 11,
+                      color: Colors.orange.shade400,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+            ],
           ),
           const SizedBox(height: 16),
           if (products.isEmpty)
@@ -483,6 +532,15 @@ class _StoreInventoryPanel extends StatelessWidget {
               final inv = inventoryByProduct[p.id];
               final stock = inv?.stock.toInt() ?? 0;
               final price = inv?.retailPrice ?? 0;
+              final isOutOfStock = stock <= 0;
+              final isLowStock = !isOutOfStock &&
+                  inv?.reorderLevel != null &&
+                  (inv!.stock) <= inv.reorderLevel!;
+              final stockColor = isOutOfStock
+                  ? Colors.red.shade400
+                  : isLowStock
+                      ? Colors.orange.shade400
+                      : Colors.white;
               return Padding(
                 padding: const EdgeInsets.only(bottom: 12),
                 child: Row(
@@ -499,15 +557,34 @@ class _StoreInventoryPanel extends StatelessWidget {
                               color: Colors.white,
                             ),
                           ),
-                          Text(
-                            p.description,
-                            style: GoogleFonts.outfit(
-                              fontSize: 12,
-                              color: posTextMuted,
+                          if (isLowStock)
+                            Text(
+                              'Low stock',
+                              style: GoogleFonts.outfit(
+                                fontSize: 11,
+                                color: Colors.orange.shade400,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            )
+                          else if (isOutOfStock)
+                            Text(
+                              'Out of stock',
+                              style: GoogleFonts.outfit(
+                                fontSize: 11,
+                                color: Colors.red.shade400,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            )
+                          else
+                            Text(
+                              p.description,
+                              style: GoogleFonts.outfit(
+                                fontSize: 12,
+                                color: posTextMuted,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                             ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
                         ],
                       ),
                     ),
@@ -519,7 +596,7 @@ class _StoreInventoryPanel extends StatelessWidget {
                           style: GoogleFonts.outfit(
                             fontSize: 14,
                             fontWeight: FontWeight.w600,
-                            color: Colors.white,
+                            color: stockColor,
                           ),
                         ),
                         Text(

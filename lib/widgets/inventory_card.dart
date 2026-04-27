@@ -11,6 +11,7 @@ class InventoryCard extends StatelessWidget {
   final String subtitle;
   final VoidCallback onEdit;
   final VoidCallback? onStockIn;
+  final VoidCallback? onStockOut;
 
   const InventoryCard({
     super.key,
@@ -19,12 +20,16 @@ class InventoryCard extends StatelessWidget {
     required this.subtitle,
     required this.onEdit,
     this.onStockIn,
+    this.onStockOut,
   });
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final bool isOutOfStock = item.stock <= 0;
+    final bool isLowStock = !isOutOfStock &&
+        item.reorderLevel != null &&
+        item.stock <= item.reorderLevel!;
     final String stockLevel = item.stock.toStringAsFixed(0);
     final String price = '₱${item.retailPrice.toStringAsFixed(2)}';
     final expiryDate = item.expiryDate;
@@ -82,7 +87,7 @@ class InventoryCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 24),
 
-                // Out of stock badge
+                // Status badges
                 if (isOutOfStock)
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -105,31 +110,84 @@ class InventoryCard extends StatelessWidget {
                       ],
                     ),
                   ),
-                if (isOutOfStock) const SizedBox(height: 12),
+                if (isLowStock)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.orange.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.warning_amber_outlined, size: 14, color: Colors.orange.shade400),
+                        const SizedBox(width: 4),
+                        Text(
+                          'Low Stock',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: Colors.orange.shade400,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                if (isOutOfStock || isLowStock) const SizedBox(height: 12),
 
                 // Data Rows
-                _buildDataRow(context, 'Stock Level:', stockLevel),
+                _buildDataRow(
+                  context,
+                  'Stock Level:',
+                  stockLevel,
+                  valueColor: isOutOfStock
+                      ? Colors.red.shade400
+                      : isLowStock
+                          ? Colors.orange.shade400
+                          : null,
+                ),
                 const SizedBox(height: 12),
                 _buildDataRow(context, 'Price:', price),
                 const SizedBox(height: 12),
                 _buildDataRow(context, 'Expiry:', expiry),
-                if (onStockIn != null) ...[
+                if (onStockIn != null || onStockOut != null) ...[
                   const SizedBox(height: 16),
-                  SizedBox(
-                    width: double.infinity,
-                    child: OutlinedButton.icon(
-                      onPressed: onStockIn,
-                      icon: const Icon(Icons.add_box_outlined, size: 16),
-                      label: Text('Stock In', style: GoogleFonts.outfit(fontSize: 13)),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: posPrimary,
-                        side: BorderSide(color: posPrimary.withValues(alpha: 0.4)),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10),
+                  Row(
+                    children: [
+                      if (onStockIn != null)
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: onStockIn,
+                            icon: const Icon(Icons.add_box_outlined, size: 16),
+                            label: Text('Stock In', style: GoogleFonts.outfit(fontSize: 13)),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: posPrimary,
+                              side: BorderSide(color: posPrimary.withValues(alpha: 0.4)),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              padding: const EdgeInsets.symmetric(vertical: 8),
+                            ),
+                          ),
                         ),
-                        padding: const EdgeInsets.symmetric(vertical: 8),
-                      ),
-                    ),
+                      if (onStockIn != null && onStockOut != null)
+                        const SizedBox(width: 8),
+                      if (onStockOut != null)
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: onStockOut,
+                            icon: const Icon(Icons.remove_circle_outline, size: 16),
+                            label: Text('Stock Out', style: GoogleFonts.outfit(fontSize: 13)),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: Colors.orange.shade400,
+                              side: BorderSide(color: Colors.orange.withValues(alpha: 0.4)),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              padding: const EdgeInsets.symmetric(vertical: 8),
+                            ),
+                          ),
+                        ),
+                    ],
                   ),
                 ],
               ],
@@ -140,7 +198,7 @@ class InventoryCard extends StatelessWidget {
     );
   }
 
-  Widget _buildDataRow(BuildContext context, String label, String value) {
+  Widget _buildDataRow(BuildContext context, String label, String value, {Color? valueColor}) {
     final theme = Theme.of(context);
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -155,7 +213,7 @@ class InventoryCard extends StatelessWidget {
           value,
           style: theme.textTheme.bodyMedium?.copyWith(
             fontWeight: FontWeight.w500,
-            color: theme.colorScheme.onSurface,
+            color: valueColor ?? theme.colorScheme.onSurface,
           ),
         ),
       ],
