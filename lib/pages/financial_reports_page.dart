@@ -1,3 +1,4 @@
+import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -21,6 +22,7 @@ class FinancialReportsPage extends HookWidget {
     final currentIndex = useState(0);
     final transactionProvider = context.read<TransactionProvider>();
     final expenseProvider = context.read<ExpenseProvider>();
+    final customDateRange = useState<DateTimeRange?>(null);
 
     final dataFuture = useMemoized(
       () => Future.wait([
@@ -97,37 +99,111 @@ class FinancialReportsPage extends HookWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    CircularTabBar(
-                      tabController: tabController,
+                    Row(
                       children: [
-                        CircularTab(
-                          tabController: tabController,
-                          index: 0,
-                          label: 'Daily',
-                          icon: Icons.today_outlined,
-                          indexState: currentIndex,
+                        Expanded(
+                          child: CircularTabBar(
+                            tabController: tabController,
+                            children: [
+                              CircularTab(
+                                tabController: tabController,
+                                index: 0,
+                                label: 'Daily',
+                                icon: Icons.today_outlined,
+                                indexState: currentIndex,
+                              ),
+                              CircularTab(
+                                tabController: tabController,
+                                index: 1,
+                                label: 'Weekly',
+                                icon: Icons.date_range_outlined,
+                                indexState: currentIndex,
+                              ),
+                              CircularTab(
+                                tabController: tabController,
+                                index: 2,
+                                label: 'Monthly',
+                                icon: Icons.calendar_month_outlined,
+                                indexState: currentIndex,
+                              ),
+                              CircularTab(
+                                tabController: tabController,
+                                index: 3,
+                                label: 'Yearly',
+                                icon: Icons.calendar_today_outlined,
+                                indexState: currentIndex,
+                              ),
+                            ],
+                          ),
                         ),
-                        CircularTab(
-                          tabController: tabController,
-                          index: 1,
-                          label: 'Weekly',
-                          icon: Icons.date_range_outlined,
-                          indexState: currentIndex,
+                        const SizedBox(width: 12),
+                        OutlinedButton.icon(
+                          onPressed: () async {
+                            final now = DateTime.now();
+                            final picked = await showDateRangePicker(
+                              context: context,
+                              firstDate: DateTime(2020),
+                              lastDate: now,
+                              initialDateRange: customDateRange.value ??
+                                  DateTimeRange(
+                                    start: now.subtract(const Duration(days: 30)),
+                                    end: now,
+                                  ),
+                              builder: (ctx, child) => Theme(
+                                data: ThemeData.dark().copyWith(
+                                  colorScheme: const ColorScheme.dark(
+                                    primary: posPrimary,
+                                    surface: posSurface,
+                                  ),
+                                ),
+                                child: child!,
+                              ),
+                            );
+                            if (picked != null) {
+                              customDateRange.value = picked;
+                            }
+                          },
+                          icon: Icon(
+                            Icons.date_range,
+                            size: 16,
+                            color: customDateRange.value != null
+                                ? posPrimary
+                                : Colors.white,
+                          ),
+                          label: Text(
+                            customDateRange.value != null
+                                ? '${DateFormat('MMM d').format(customDateRange.value!.start)} – ${DateFormat('MMM d').format(customDateRange.value!.end)}'
+                                : 'Date Range',
+                            style: GoogleFonts.outfit(
+                              color: customDateRange.value != null
+                                  ? posPrimary
+                                  : Colors.white,
+                              fontSize: 13,
+                            ),
+                          ),
+                          style: OutlinedButton.styleFrom(
+                            side: BorderSide(
+                              color: customDateRange.value != null
+                                  ? posPrimary
+                                  : Colors.white.withValues(alpha: 0.3),
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 12, vertical: 10),
+                          ),
                         ),
-                        CircularTab(
-                          tabController: tabController,
-                          index: 2,
-                          label: 'Monthly',
-                          icon: Icons.calendar_month_outlined,
-                          indexState: currentIndex,
-                        ),
-                        CircularTab(
-                          tabController: tabController,
-                          index: 3,
-                          label: 'Yearly',
-                          icon: Icons.calendar_today_outlined,
-                          indexState: currentIndex,
-                        ),
+                        if (customDateRange.value != null) ...[
+                          const SizedBox(width: 6),
+                          IconButton(
+                            icon: const Icon(Icons.close, size: 16, color: posTextMuted),
+                            tooltip: 'Clear date range',
+                            onPressed: () => customDateRange.value = null,
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(),
+                          ),
+                        ],
                       ],
                     ),
                     const SizedBox(height: 24),
@@ -143,6 +219,7 @@ class FinancialReportsPage extends HookWidget {
                                       snapshot.data![1] as List<Expense>,
                                   periodDays: 0,
                                   periodLabel: 'Today',
+                                  customDateRange: customDateRange.value,
                                 ),
                                 _ReportView(
                                   transactions:
@@ -151,6 +228,7 @@ class FinancialReportsPage extends HookWidget {
                                       snapshot.data![1] as List<Expense>,
                                   periodDays: 7,
                                   periodLabel: 'Last 7 Days',
+                                  customDateRange: customDateRange.value,
                                 ),
                                 _ReportView(
                                   transactions:
@@ -159,6 +237,7 @@ class FinancialReportsPage extends HookWidget {
                                       snapshot.data![1] as List<Expense>,
                                   periodDays: 30,
                                   periodLabel: 'Last 30 Days',
+                                  customDateRange: customDateRange.value,
                                 ),
                                 _ReportView(
                                   transactions:
@@ -167,6 +246,7 @@ class FinancialReportsPage extends HookWidget {
                                       snapshot.data![1] as List<Expense>,
                                   periodDays: 365,
                                   periodLabel: 'Last 12 Months',
+                                  customDateRange: customDateRange.value,
                                 ),
                               ],
                             )
@@ -188,29 +268,43 @@ class _ReportView extends StatelessWidget {
   final List<Expense> expenses;
   final int periodDays;
   final String periodLabel;
+  final DateTimeRange? customDateRange;
 
   const _ReportView({
     required this.transactions,
     required this.expenses,
     required this.periodDays,
     required this.periodLabel,
+    this.customDateRange,
   });
 
   @override
   Widget build(BuildContext context) {
     final now = DateTime.now();
     final startOfToday = DateTime(now.year, now.month, now.day);
-    final DateTime cutoff;
-    if (periodDays == 0) {
+
+    DateTime cutoff;
+    DateTime? rangeEnd;
+
+    if (customDateRange != null) {
+      cutoff = DateTime(customDateRange!.start.year, customDateRange!.start.month, customDateRange!.start.day);
+      rangeEnd = DateTime(customDateRange!.end.year, customDateRange!.end.month, customDateRange!.end.day, 23, 59, 59);
+    } else if (periodDays == 0) {
       cutoff = startOfToday;
     } else {
       cutoff = startOfToday.subtract(Duration(days: periodDays));
     }
 
-    final filteredTransactions =
-        transactions.where((t) => t.date.isAfter(cutoff)).toList();
-    final filteredExpenses =
-        expenses.where((e) => e.date.isAfter(cutoff)).toList();
+    final filteredTransactions = transactions.where((t) {
+      if (!t.date.isAfter(cutoff)) return false;
+      if (rangeEnd != null && t.date.isAfter(rangeEnd)) return false;
+      return true;
+    }).toList();
+    final filteredExpenses = expenses.where((e) {
+      if (!e.date.isAfter(cutoff)) return false;
+      if (rangeEnd != null && e.date.isAfter(rangeEnd)) return false;
+      return true;
+    }).toList();
 
     final totalRevenue =
         filteredTransactions.fold(0.0, (sum, t) => sum + t.total);
@@ -288,6 +382,15 @@ class _ReportView extends StatelessWidget {
                 color: posPrimary,
               ),
             ],
+          ),
+          const SizedBox(height: 24),
+          _TrendChart(
+            transactions: filteredTransactions,
+            expenses: filteredExpenses,
+            periodDays: customDateRange != null
+                ? customDateRange!.end.difference(customDateRange!.start).inDays + 1
+                : (periodDays == 0 ? 1 : periodDays),
+            startDate: cutoff,
           ),
           const SizedBox(height: 24),
           Text(
@@ -390,6 +493,188 @@ class _ReportView extends StatelessWidget {
             ),
         ],
       ),
+    );
+  }
+}
+
+class _TrendChart extends StatelessWidget {
+  final List<Transaction> transactions;
+  final List<Expense> expenses;
+  final int periodDays;
+  final DateTime startDate;
+
+  const _TrendChart({
+    required this.transactions,
+    required this.expenses,
+    required this.periodDays,
+    required this.startDate,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (transactions.isEmpty && expenses.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    // Determine bucket size: daily if period <= 90, weekly otherwise
+    final bucketDays = periodDays <= 90 ? 1 : 7;
+    final bucketCount = (periodDays / bucketDays).ceil().clamp(1, 365);
+
+    // Build buckets
+    final revenueByBucket = List.filled(bucketCount, 0.0);
+    final expensesByBucket = List.filled(bucketCount, 0.0);
+
+    for (final t in transactions) {
+      final diff = t.date.difference(startDate).inDays;
+      final idx = (diff / bucketDays).floor();
+      if (idx >= 0 && idx < bucketCount) {
+        revenueByBucket[idx] += t.total;
+      }
+    }
+    for (final e in expenses) {
+      final diff = e.date.difference(startDate).inDays;
+      final idx = (diff / bucketDays).floor();
+      if (idx >= 0 && idx < bucketCount) {
+        expensesByBucket[idx] += e.amount;
+      }
+    }
+
+    final profitByBucket = List.generate(
+        bucketCount, (i) => revenueByBucket[i] - expensesByBucket[i]);
+
+    double maxY = 0;
+    for (int i = 0; i < bucketCount; i++) {
+      maxY = [maxY, revenueByBucket[i], expensesByBucket[i], profitByBucket[i].abs()].reduce((a, b) => a > b ? a : b);
+    }
+    if (maxY == 0) maxY = 100;
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: posSurface,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Text(
+                'Trend Analysis',
+                style: GoogleFonts.outfit(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.white,
+                ),
+              ),
+              const Spacer(),
+              _legendDot(posPrimary, 'Revenue'),
+              const SizedBox(width: 12),
+              _legendDot(const Color(0xFFEF4444), 'Expenses'),
+              const SizedBox(width: 12),
+              _legendDot(const Color(0xFF22C55E), 'Profit'),
+            ],
+          ),
+          const SizedBox(height: 20),
+          SizedBox(
+            height: 200,
+            child: LineChart(
+              LineChartData(
+                minY: 0,
+                maxY: maxY * 1.1,
+                gridData: FlGridData(
+                  show: true,
+                  getDrawingHorizontalLine: (_) => FlLine(
+                    color: Colors.white.withValues(alpha: 0.05),
+                    strokeWidth: 1,
+                  ),
+                  getDrawingVerticalLine: (_) => FlLine(
+                    color: Colors.white.withValues(alpha: 0.05),
+                    strokeWidth: 1,
+                  ),
+                ),
+                borderData: FlBorderData(show: false),
+                titlesData: FlTitlesData(
+                  leftTitles: AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: true,
+                      reservedSize: 48,
+                      getTitlesWidget: (v, _) => Text(
+                        v >= 1000 ? '${(v / 1000).toStringAsFixed(0)}k' : v.toStringAsFixed(0),
+                        style: GoogleFonts.outfit(fontSize: 10, color: posTextMuted),
+                      ),
+                    ),
+                  ),
+                  bottomTitles: AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: bucketCount <= 31,
+                      interval: (bucketCount / 6).ceilToDouble().clamp(1, bucketCount.toDouble()),
+                      getTitlesWidget: (v, _) {
+                        final date = startDate.add(Duration(days: (v * bucketDays).toInt()));
+                        return Text(
+                          DateFormat('M/d').format(date),
+                          style: GoogleFonts.outfit(fontSize: 10, color: posTextMuted),
+                        );
+                      },
+                    ),
+                  ),
+                  topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                  rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                ),
+                lineTouchData: LineTouchData(
+                  touchTooltipData: LineTouchTooltipData(
+                    getTooltipColor: (_) => posSurfaceLight,
+                    getTooltipItems: (spots) => spots.map((s) {
+                      final colors = [posPrimary, const Color(0xFFEF4444), const Color(0xFF22C55E)];
+                      final labels = ['Rev', 'Exp', 'Profit'];
+                      final idx = s.barIndex;
+                      return LineTooltipItem(
+                        '${labels[idx]}: ₱${s.y.toStringAsFixed(0)}',
+                        GoogleFonts.outfit(fontSize: 11, color: colors[idx], fontWeight: FontWeight.w600),
+                      );
+                    }).toList(),
+                  ),
+                ),
+                lineBarsData: [
+                  _buildLine(revenueByBucket, posPrimary),
+                  _buildLine(expensesByBucket, const Color(0xFFEF4444)),
+                  _buildLine(profitByBucket, const Color(0xFF22C55E)),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  LineChartBarData _buildLine(List<double> data, Color color) {
+    return LineChartBarData(
+      spots: List.generate(data.length, (i) => FlSpot(i.toDouble(), data[i])),
+      isCurved: true,
+      color: color,
+      barWidth: 2,
+      dotData: const FlDotData(show: false),
+      belowBarData: BarAreaData(
+        show: true,
+        color: color.withValues(alpha: 0.06),
+      ),
+    );
+  }
+
+  Widget _legendDot(Color color, String label) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 10,
+          height: 10,
+          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+        ),
+        const SizedBox(width: 4),
+        Text(label, style: GoogleFonts.outfit(fontSize: 11, color: posTextMuted)),
+      ],
     );
   }
 }
