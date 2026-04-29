@@ -223,6 +223,20 @@ class InventoryProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Stocks out remaining quantity (if any), then deletes the inventory record.
+  Future<void> deleteItem(InventoryItem item) async {
+    if (item.stock > 0) {
+      await stockOut(
+        item: item,
+        quantity: item.stock,
+        notes: 'Removed from inventory',
+      );
+    }
+    await supabase.from('inventory_items').delete().eq('id', item.id);
+    _items?.removeWhere((i) => i.id == item.id);
+    notifyListeners();
+  }
+
   Future<List<InventoryItem>> getItems() async {
     if (_items != null) return _items!;
 

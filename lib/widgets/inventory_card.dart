@@ -12,6 +12,8 @@ class InventoryCard extends StatelessWidget {
   final VoidCallback onEdit;
   final VoidCallback? onStockIn;
   final VoidCallback? onStockOut;
+  final bool isSelected;
+  final bool isSelecting;
 
   const InventoryCard({
     super.key,
@@ -21,6 +23,8 @@ class InventoryCard extends StatelessWidget {
     required this.onEdit,
     this.onStockIn,
     this.onStockOut,
+    this.isSelected = false,
+    this.isSelecting = false,
   });
 
   @override
@@ -42,13 +46,22 @@ class InventoryCard extends StatelessWidget {
       child: SizedBox(
         width: 320,
         child: Card(
+          color: isSelected
+              ? posPrimary.withValues(alpha: 0.08)
+              : null,
+          shape: isSelected
+              ? RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  side: const BorderSide(color: posPrimary, width: 2),
+                )
+              : null,
           child: Padding(
             padding: const EdgeInsets.all(16.0),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                // Header Row: Titles + Edit IconButton
+                // Header Row: Titles + Edit/Checkbox
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -72,17 +85,36 @@ class InventoryCard extends StatelessWidget {
                         ],
                       ),
                     ),
-                    IconButton(
-                      onPressed: onEdit,
-                      icon: const Icon(Icons.edit_square),
-                      iconSize: 20,
-                      color: theme.colorScheme.onSurfaceVariant,
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(),
-                      style: const ButtonStyle(
-                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    if (isSelecting)
+                      Container(
+                        width: 22,
+                        height: 22,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: isSelected ? posPrimary : Colors.transparent,
+                          border: Border.all(
+                            color: isSelected
+                                ? posPrimary
+                                : theme.colorScheme.onSurfaceVariant,
+                            width: 2,
+                          ),
+                        ),
+                        child: isSelected
+                            ? const Icon(Icons.check, size: 14, color: Colors.white)
+                            : null,
+                      )
+                    else
+                      IconButton(
+                        onPressed: onEdit,
+                        icon: const Icon(Icons.edit_square),
+                        iconSize: 20,
+                        color: theme.colorScheme.onSurfaceVariant,
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                        style: const ButtonStyle(
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        ),
                       ),
-                    ),
                   ],
                 ),
                 const SizedBox(height: 24),

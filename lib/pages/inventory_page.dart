@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
+import 'package:printsari_sia/providers/activity_log_provider.dart';
 import 'package:printsari_sia/providers/inventory_provider.dart';
 import 'package:printsari_sia/providers/product_provider.dart';
 import 'package:printsari_sia/shared/themes/colors.dart';
@@ -29,6 +30,7 @@ class InventoryPage extends HookWidget {
 
     final inventory = context.read<InventoryProvider>();
     final productProvider = context.read<ProductProvider>();
+    final activityLog = context.read<ActivityLogProvider>();
 
     // Start realtime subscriptions once
     useEffect(() {
@@ -281,6 +283,13 @@ class InventoryPage extends HookWidget {
                         hardRefresh,
                       ),
                       onEdit: editItem,
+                      onDelete: (items) => _showDeleteInventoryDialog(
+                        context,
+                        items,
+                        inventory,
+                        activityLog,
+                        hardRefresh,
+                      ),
                     ),
                     // Printing Supplies Tab — real supply inventory
                     _SupplyInventoryGrid(
@@ -315,6 +324,7 @@ class _InventoryGrid extends HookWidget {
   final void Function(InventoryItem item, Product product) onStockIn;
   final void Function(InventoryItem item) onStockOut;
   final void Function(InventoryItem item) onEdit;
+  final void Function(List<InventoryItem> items) onDelete;
 
   const _InventoryGrid({
     required this.items,
@@ -322,12 +332,15 @@ class _InventoryGrid extends HookWidget {
     required this.onStockIn,
     required this.onStockOut,
     required this.onEdit,
+    required this.onDelete,
   });
 
   @override
   Widget build(BuildContext context) {
     final searchController = useTextEditingController();
     final searchQuery = useState('');
+    final selectedIds = useState<Set<int>>({});
+    final isSelecting = selectedIds.value.isNotEmpty;
 
     final filtered = items.where((item) {
       if (searchQuery.value.isEmpty) return true;
@@ -335,26 +348,69 @@ class _InventoryGrid extends HookWidget {
       return name.toLowerCase().contains(searchQuery.value.toLowerCase());
     }).toList();
 
+    void toggleSelect(int id) {
+      final next = Set<int>.from(selectedIds.value);
+      if (next.contains(id)) {
+        next.remove(id);
+      } else {
+        next.add(id);
+      }
+      selectedIds.value = next;
+    }
+
     return Column(
       children: [
-        TextField(
-          controller: searchController,
-          onChanged: (v) => searchQuery.value = v,
-          style: GoogleFonts.outfit(color: Colors.white),
-          decoration: InputDecoration(
-            hintText: 'Search products...',
-            hintStyle: GoogleFonts.outfit(color: posTextMuted),
-            prefixIcon: const Icon(Icons.search, color: posTextMuted),
-            filled: true,
-            fillColor: posSurfaceLight,
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(10),
-              borderSide: BorderSide.none,
+        // Selection bar or search bar
+        if (isSelecting)
+          Row(
+            children: [
+              IconButton(
+                icon: const Icon(Icons.close, color: Colors.white),
+                onPressed: () => selectedIds.value = {},
+                tooltip: 'Cancel selection',
+              ),
+              Text(
+                '${selectedIds.value.length} selected',
+                style: GoogleFonts.outfit(color: Colors.white, fontWeight: FontWeight.w500),
+              ),
+              const Spacer(),
+              FilledButton.icon(
+                onPressed: () {
+                  final selected = items
+                      .where((i) => selectedIds.value.contains(i.id))
+                      .toList();
+                  onDelete(selected);
+                  selectedIds.value = {};
+                },
+                icon: const Icon(Icons.delete_outline, size: 16),
+                label: Text('Delete', style: GoogleFonts.outfit()),
+                style: FilledButton.styleFrom(
+                  backgroundColor: Colors.red.shade700,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+              ),
+            ],
+          )
+        else
+          TextField(
+            controller: searchController,
+            onChanged: (v) => searchQuery.value = v,
+            style: GoogleFonts.outfit(color: Colors.white),
+            decoration: InputDecoration(
+              hintText: 'Search products...',
+              hintStyle: GoogleFonts.outfit(color: posTextMuted),
+              prefixIcon: const Icon(Icons.search, color: posTextMuted),
+              filled: true,
+              fillColor: posSurfaceLight,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide: BorderSide.none,
+              ),
+              contentPadding:
+                  const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
             ),
-            contentPadding:
-                const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
           ),
-        ),
         const SizedBox(height: 16),
         if (filtered.isEmpty)
           Expanded(
@@ -375,14 +431,22 @@ class _InventoryGrid extends HookWidget {
                 runSpacing: 16.0,
                 children: filtered.map((item) {
                   final product = item.product;
-                  return InventoryCard(
-                    item: item,
-                    title: product?.name ?? 'Unknown Product',
-                    subtitle: product?.productCategory ?? '',
-                    onEdit: () => onEdit(item),
-                    onStockIn:
-                        product != null ? () => onStockIn(item, product) : null,
-                    onStockOut: () => onStockOut(item),
+                  final isSelected = selectedIds.value.contains(item.id);
+                  return GestureDetector(
+                    onLongPress: () => toggleSelect(item.id),
+                    onTap: isSelecting ? () => toggleSelect(item.id) : null,
+                    child: InventoryCard(
+                      item: item,
+                      title: product?.name ?? 'Unknown Product',
+                      subtitle: product?.productCategory ?? '',
+                      isSelected: isSelected,
+                      isSelecting: isSelecting,
+                      onEdit: isSelecting ? () {} : () => onEdit(item),
+                      onStockIn: (isSelecting || product == null)
+                          ? null
+                          : () => onStockIn(item, product),
+                      onStockOut: isSelecting ? null : () => onStockOut(item),
+                    ),
                   );
                 }).toList(),
               ),
@@ -871,6 +935,69 @@ class _SupplyCard extends StatelessWidget {
         style: GoogleFonts.outfit(fontSize: 11, color: color, fontWeight: FontWeight.w600),
       ),
     );
+  }
+}
+
+Future<void> _showDeleteInventoryDialog(
+  BuildContext context,
+  List<InventoryItem> items,
+  InventoryProvider inventoryProvider,
+  ActivityLogProvider activityLog,
+  VoidCallback onRefresh,
+) async {
+  final count = items.length;
+  final confirmed = await showDialog<bool>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      backgroundColor: posSurface,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      title: Text(
+        'Delete $count item${count == 1 ? '' : 's'}?',
+        style: GoogleFonts.outfit(color: Colors.white, fontWeight: FontWeight.bold),
+      ),
+      content: Text(
+        'Remaining stock will be stocked out to 0 and the item${count == 1 ? '' : 's'} will be removed from inventory.',
+        style: GoogleFonts.outfit(color: posTextMuted, fontSize: 13),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(ctx, false),
+          child: Text('Cancel', style: GoogleFonts.outfit(color: posTextMuted)),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.pop(ctx, true),
+          style: FilledButton.styleFrom(
+            backgroundColor: Colors.red.shade700,
+            foregroundColor: Colors.white,
+          ),
+          child: Text('Delete', style: GoogleFonts.outfit()),
+        ),
+      ],
+    ),
+  );
+
+  if (confirmed != true || !context.mounted) return;
+
+  try {
+    for (final item in items) {
+      await inventoryProvider.deleteItem(item);
+      final name = item.product?.name ?? item.serviceSupply?.name ?? 'Item';
+      await activityLog.log(
+        actionName: 'inventory_depleted',
+        description: 'Deleted inventory item: $name (stocked out ${item.stock.toStringAsFixed(0)} units)',
+      );
+    }
+    onRefresh();
+  } catch (e) {
+    debugPrint('Delete inventory error: $e');
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error deleting items: $e'),
+          backgroundColor: Colors.red.shade700,
+        ),
+      );
+    }
   }
 }
 
