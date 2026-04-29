@@ -163,34 +163,14 @@ class InventoryPage extends HookWidget {
             ),
           ],
           if (snapshot.hasData && currentIndex.value == 1) ...[
-            OutlinedButton.icon(
+            FilledButton.icon(
               onPressed: () => _showBulkSupplyStockInDialog(
                 context,
                 allServiceSupplies,
                 hardRefresh,
               ),
-              icon: const Icon(Icons.playlist_add_rounded, size: 16),
-              label: Text(
-                'Bulk Stock In – Supplies',
-                style: GoogleFonts.outfit(),
-              ),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: Colors.white,
-                side: BorderSide(color: Colors.white.withValues(alpha: 0.2)),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
-              ),
-            ),
-            const SizedBox(width: 8),
-            FilledButton.icon(
-              onPressed: () => _showSupplyStockInDialog(
-                context,
-                allServiceSupplies,
-                hardRefresh,
-              ),
               icon: const Icon(Icons.add_box_outlined, size: 16),
-              label: Text('Stock In – Supplies', style: GoogleFonts.outfit()),
+              label: Text('Stock In', style: GoogleFonts.outfit()),
               style: FilledButton.styleFrom(
                 backgroundColor: posPrimary,
                 foregroundColor: Colors.white,
@@ -371,7 +351,7 @@ class _InventoryGrid extends StatelessWidget {
           return InventoryCard(
             item: item,
             title: product?.name ?? 'Unknown Product',
-            subtitle: product?.category?.categoryName ?? '',
+            subtitle: product?.productCategory ?? '',
             onEdit: () => onEdit(item),
             onStockIn: product != null ? () => onStockIn(item, product) : null,
             onStockOut: () => onStockOut(item),
@@ -708,14 +688,6 @@ class _SupplyCard extends StatelessWidget {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
-                      if (supply?.unit != null)
-                        Text(
-                          supply!.unit!,
-                          style: GoogleFonts.outfit(
-                            fontSize: 11,
-                            color: posTextMuted,
-                          ),
-                        ),
                     ],
                   ),
                 ),

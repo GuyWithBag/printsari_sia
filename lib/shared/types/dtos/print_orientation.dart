@@ -1,4 +1,4 @@
-import 'package:printsari_sia/shared/types/types.dart';
+import 'package:printsari_sia/shared/types/dtos/print_orientation_type.dart';
 
 class PrintOrientation {
   final int id;

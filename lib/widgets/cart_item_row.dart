@@ -5,7 +5,7 @@ import 'package:printsari_sia/shared/types/types.dart';
 
 class CartItemRow extends StatelessWidget {
   final TransactionItem item;
-  final VoidCallback onIncrease;
+  final VoidCallback? onIncrease;
   final VoidCallback onDecrease;
   final VoidCallback onRemove;
 
@@ -127,13 +127,18 @@ class CartItemRow extends StatelessWidget {
     );
   }
 
-  Widget _qtyBtn(IconData icon, VoidCallback onTap) {
+  Widget _qtyBtn(IconData icon, VoidCallback? onTap) {
+    final enabled = onTap != null;
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(6),
       child: Padding(
         padding: const EdgeInsets.all(5),
-        child: Icon(icon, size: 12, color: warmGray),
+        child: Icon(
+          icon,
+          size: 12,
+          color: enabled ? warmGray : warmGray.withValues(alpha: 0.25),
+        ),
       ),
     );
   }

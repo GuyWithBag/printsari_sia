@@ -310,6 +310,13 @@ Future<void> _showEditProfileDialog(BuildContext context, AuthController auth) a
   final nameController = TextEditingController(text: profile.name);
   final usernameController = TextEditingController(text: profile.username);
   final phoneController = TextEditingController(text: profile.phone ?? '');
+  final streetController = TextEditingController(text: profile.addressStreet ?? '');
+  final barangayController = TextEditingController(text: profile.addressBarangay ?? '');
+  final cityController = TextEditingController(text: profile.addressCity ?? '');
+  final provinceController = TextEditingController(text: profile.addressProvince ?? '');
+  final regionController = TextEditingController(text: profile.addressRegion ?? '');
+  final postalCodeController = TextEditingController(text: profile.addressPostalCode ?? '');
+  final countryController = TextEditingController(text: profile.addressCountry ?? '');
   String? currentPictureUrl = profile.profilePicture;
   Uint8List? pickedImageBytes;
   String? pickedImageName;
@@ -399,6 +406,24 @@ Future<void> _showEditProfileDialog(BuildContext context, AuthController auth) a
                 _profileField('Username', usernameController),
                 _profileField('Phone', phoneController,
                     keyboardType: TextInputType.phone),
+                const SizedBox(height: 8),
+                Text(
+                  'Address',
+                  style: GoogleFonts.outfit(
+                    color: posTextMuted,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                _profileField('Street', streetController),
+                _profileField('Barangay', barangayController),
+                _profileField('City / Municipality', cityController),
+                _profileField('Province', provinceController),
+                _profileField('Region', regionController),
+                _profileField('Postal Code', postalCodeController,
+                    keyboardType: TextInputType.number),
+                _profileField('Country', countryController),
               ],
             ),
           ),
@@ -440,6 +465,27 @@ Future<void> _showEditProfileDialog(BuildContext context, AuthController auth) a
                             ? null
                             : phoneController.text,
                         'profile_picture': pictureUrl,
+                        'address_street': streetController.text.isEmpty
+                            ? null
+                            : streetController.text,
+                        'address_barangay': barangayController.text.isEmpty
+                            ? null
+                            : barangayController.text,
+                        'address_city': cityController.text.isEmpty
+                            ? null
+                            : cityController.text,
+                        'address_province': provinceController.text.isEmpty
+                            ? null
+                            : provinceController.text,
+                        'address_region': regionController.text.isEmpty
+                            ? null
+                            : regionController.text,
+                        'address_postal_code': postalCodeController.text.isEmpty
+                            ? null
+                            : postalCodeController.text,
+                        'address_country': countryController.text.isEmpty
+                            ? null
+                            : countryController.text,
                       }).eq('id', profile.id);
 
                       // Refresh the auth controller's profile

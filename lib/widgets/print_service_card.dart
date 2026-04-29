@@ -4,12 +4,15 @@ import 'package:printsari_sia/shared/themes/colors.dart';
 import 'package:printsari_sia/shared/types/types.dart';
 
 class PrintServiceCard extends StatelessWidget {
-  final PrintService service;
+  final ServiceType service;
 
   const PrintServiceCard({required this.service});
 
   @override
   Widget build(BuildContext context) {
+    final totalCost = service.cost?.serviceTotalCost;
+    final sellingPrice = service.cost?.serviceSellingPrice;
+
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
@@ -31,11 +34,11 @@ class PrintServiceCard extends StatelessWidget {
           Row(
             children: [
               if (service.paperSize != null)
-                _badge(service.paperSize!.sizeName),
+                _badge(service.paperSize!),
               if (service.paperSize != null && service.colorMode != null)
                 const SizedBox(width: 4),
               if (service.colorMode != null)
-                _badge(service.colorMode!.modeName),
+                _badge(service.colorMode!),
             ],
           ),
           const SizedBox(height: 6),
@@ -50,18 +53,21 @@ class PrintServiceCard extends StatelessWidget {
             overflow: TextOverflow.ellipsis,
           ),
           const Spacer(),
-          Text(
-            'Cost: P${service.totalCostPerPage.toStringAsFixed(2)}/pg',
-            style: GoogleFonts.outfit(
-              color: warmGray.withValues(alpha: 0.5),
-              fontSize: 10,
+          if (totalCost != null)
+            Text(
+              'Cost: P${totalCost.toStringAsFixed(2)}/pg',
+              style: GoogleFonts.outfit(
+                color: warmGray.withValues(alpha: 0.5),
+                fontSize: 10,
+              ),
             ),
-          ),
           const SizedBox(height: 4),
           Text(
-            'P${service.basePrice.toStringAsFixed(2)} / page',
+            sellingPrice != null
+                ? 'P${sellingPrice.toStringAsFixed(2)} / page'
+                : 'No price set',
             style: GoogleFonts.outfit(
-              color: posPrimary,
+              color: sellingPrice != null ? posPrimary : warmGray,
               fontSize: 17,
               fontWeight: FontWeight.w700,
             ),

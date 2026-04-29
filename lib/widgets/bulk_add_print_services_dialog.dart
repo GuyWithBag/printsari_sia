@@ -6,7 +6,6 @@ import 'package:printsari_sia/shared/themes/colors.dart';
 import 'package:printsari_sia/shared/types/types.dart';
 import 'package:printsari_sia/widgets/bulk_stock_in_dialog.dart';
 import 'package:provider/provider.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
 Future<void> showBulkAddPrintServicesDialog(
   BuildContext context,
@@ -18,40 +17,31 @@ Future<void> showBulkAddPrintServicesDialog(
       Provider.of<ActivityLogProvider>(context, listen: false);
 
   // Fetch lookup data before showing dialog
-  final supabase = Supabase.instance.client;
   final results = await Future.wait([
-    supabase.from('paper_sizes').select().order('id'),
-    supabase.from('color_modes').select().order('id'),
-    supabase.from('machines').select().order('name'),
+    productProviderRef.getServices(),
+    productProviderRef.getMachines(),
+    productProviderRef.getServiceSupplies(),
   ]);
-  final paperSizes = (results[0] as List)
-      .map((r) => PaperSize.fromJson(r as Map<String, dynamic>))
-      .toList();
-  final colorModes = (results[1] as List)
-      .map((r) => ColorMode.fromJson(r as Map<String, dynamic>))
-      .toList();
-  final machines = (results[2] as List)
-      .map((r) => Machine.fromJson(r as Map<String, dynamic>))
-      .toList();
+  final services = results[0] as List<Service>;
+  final machines = results[1] as List<Machine>;
+  final supplies = results[2] as List<ServiceSupply>;
 
   if (!context.mounted) return;
 
-  if (paperSizes.isEmpty || colorModes.isEmpty) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Paper sizes or color modes not found.')),
-    );
-    return;
-  }
-
   Map<String, dynamic> _newRow() => {
         'name': '',
-        'basePrice': '',
-        'paperSizeId': paperSizes.first.id,
-        'colorModeId': colorModes.first.id,
+        'paperSize': '',
+        'colorMode': '',
+        'serviceId': services.isNotEmpty ? services.first.id : null,
         'machineId': null,
+        'serviceSupplyId': supplies.isNotEmpty ? supplies.first.id : null,
+        'sellingPrice': '',
+        'supplyCost': '',
+        'inkCost': '',
+        'electricityCost': '',
+        'laborCost': '',
       };
 
-  // Each row: {name, basePrice, paperSizeId, colorModeId, machineId}
   final rows = <Map<String, dynamic>>[_newRow()];
 
   await showDialog(
@@ -70,7 +60,7 @@ Future<void> showBulkAddPrintServicesDialog(
           title: Row(
             children: [
               Text(
-                'Add Print Services',
+                'Bulk Add Service Types',
                 style: GoogleFonts.outfit(
                     color: Colors.white, fontWeight: FontWeight.bold),
               ),
@@ -84,114 +74,185 @@ Future<void> showBulkAddPrintServicesDialog(
             ],
           ),
           content: SizedBox(
-            width: 820,
+            width: 1100,
             child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
-                    child: Row(
+              scrollDirection: Axis.vertical,
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
                       children: [
-                        Expanded(flex: 3, child: Text('Name *', style: GoogleFonts.outfit(color: posTextMuted, fontSize: 12))),
+                        SizedBox(width: 160, child: Text('Name *', style: GoogleFonts.outfit(color: posTextMuted, fontSize: 12))),
                         const SizedBox(width: 8),
-                        Expanded(flex: 2, child: Text('Base Price *', style: GoogleFonts.outfit(color: posTextMuted, fontSize: 12))),
+                        SizedBox(width: 110, child: Text('Service', style: GoogleFonts.outfit(color: posTextMuted, fontSize: 12))),
                         const SizedBox(width: 8),
-                        Expanded(flex: 2, child: Text('Paper Size', style: GoogleFonts.outfit(color: posTextMuted, fontSize: 12))),
+                        SizedBox(width: 100, child: Text('Paper Size', style: GoogleFonts.outfit(color: posTextMuted, fontSize: 12))),
                         const SizedBox(width: 8),
-                        Expanded(flex: 2, child: Text('Color Mode', style: GoogleFonts.outfit(color: posTextMuted, fontSize: 12))),
+                        SizedBox(width: 100, child: Text('Color Mode', style: GoogleFonts.outfit(color: posTextMuted, fontSize: 12))),
                         const SizedBox(width: 8),
-                        Expanded(flex: 2, child: Text('Machine', style: GoogleFonts.outfit(color: posTextMuted, fontSize: 12))),
+                        SizedBox(width: 110, child: Text('Machine', style: GoogleFonts.outfit(color: posTextMuted, fontSize: 12))),
+                        const SizedBox(width: 8),
+                        SizedBox(width: 110, child: Text('Supply', style: GoogleFonts.outfit(color: posTextMuted, fontSize: 12))),
+                        const SizedBox(width: 8),
+                        SizedBox(width: 90, child: Text('Sell Price', style: GoogleFonts.outfit(color: posTextMuted, fontSize: 12))),
+                        const SizedBox(width: 8),
+                        SizedBox(width: 80, child: Text('Supply ₱', style: GoogleFonts.outfit(color: posTextMuted, fontSize: 12))),
+                        const SizedBox(width: 8),
+                        SizedBox(width: 80, child: Text('Ink ₱', style: GoogleFonts.outfit(color: posTextMuted, fontSize: 12))),
+                        const SizedBox(width: 8),
+                        SizedBox(width: 80, child: Text('Electricity ₱', style: GoogleFonts.outfit(color: posTextMuted, fontSize: 12))),
+                        const SizedBox(width: 8),
+                        SizedBox(width: 80, child: Text('Labor ₱', style: GoogleFonts.outfit(color: posTextMuted, fontSize: 12))),
                         const SizedBox(width: 36),
                       ],
                     ),
-                  ),
-                  ...rows.asMap().entries.map((entry) {
-                    final i = entry.key;
-                    final row = entry.value;
-                    return Padding(
-                      padding: const EdgeInsets.only(bottom: 8),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            flex: 3,
-                            child: bulkTextField(
-                              hint: 'Service name',
-                              initialValue: row['name'] as String,
-                              onChanged: (v) => row['name'] = v,
+                    const SizedBox(height: 8),
+                    ...rows.asMap().entries.map((entry) {
+                      final i = entry.key;
+                      final row = entry.value;
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: Row(
+                          children: [
+                            SizedBox(
+                              width: 160,
+                              child: bulkTextField(
+                                hint: 'Type name',
+                                initialValue: row['name'] as String,
+                                onChanged: (v) => row['name'] = v,
+                              ),
                             ),
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            flex: 2,
-                            child: bulkTextField(
-                              hint: '0.00',
-                              initialValue: row['basePrice'] as String,
-                              numeric: true,
-                              onChanged: (v) => row['basePrice'] = v,
+                            const SizedBox(width: 8),
+                            SizedBox(
+                              width: 110,
+                              child: _compactDropdown<int?>(
+                                value: row['serviceId'] as int?,
+                                items: [
+                                  DropdownMenuItem<int?>(
+                                      value: null,
+                                      child: Text('None', style: GoogleFonts.outfit(color: posTextMuted))),
+                                  ...services.map((s) => DropdownMenuItem<int?>(
+                                      value: s.id,
+                                      child: Text(s.name, overflow: TextOverflow.ellipsis))),
+                                ],
+                                onChanged: (v) => setDialogState(() => row['serviceId'] = v),
+                              ),
                             ),
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            flex: 2,
-                            child: _compactDropdown<int>(
-                              value: row['paperSizeId'] as int,
-                              items: paperSizes
-                                  .map((ps) => DropdownMenuItem(
-                                      value: ps.id,
-                                      child: Text(ps.sizeName,
-                                          overflow: TextOverflow.ellipsis)))
-                                  .toList(),
-                              onChanged: (v) => setDialogState(
-                                  () => row['paperSizeId'] = v ?? paperSizes.first.id),
+                            const SizedBox(width: 8),
+                            SizedBox(
+                              width: 100,
+                              child: bulkTextField(
+                                hint: 'e.g. A4',
+                                initialValue: row['paperSize'] as String,
+                                onChanged: (v) => row['paperSize'] = v,
+                              ),
                             ),
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            flex: 2,
-                            child: _compactDropdown<int>(
-                              value: row['colorModeId'] as int,
-                              items: colorModes
-                                  .map((cm) => DropdownMenuItem(
-                                      value: cm.id,
-                                      child: Text(cm.modeName,
-                                          overflow: TextOverflow.ellipsis)))
-                                  .toList(),
-                              onChanged: (v) => setDialogState(
-                                  () => row['colorModeId'] = v ?? colorModes.first.id),
+                            const SizedBox(width: 8),
+                            SizedBox(
+                              width: 100,
+                              child: bulkTextField(
+                                hint: 'e.g. BW',
+                                initialValue: row['colorMode'] as String,
+                                onChanged: (v) => row['colorMode'] = v,
+                              ),
                             ),
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            flex: 2,
-                            child: _compactDropdown<int?>(
-                              value: row['machineId'] as int?,
-                              items: [
-                                DropdownMenuItem<int?>(
-                                    value: null,
-                                    child: Text('None',
-                                        style: GoogleFonts.outfit(
-                                            color: posTextMuted))),
-                                ...machines.map((m) => DropdownMenuItem<int?>(
-                                    value: m.id,
-                                    child: Text(m.name,
-                                        overflow: TextOverflow.ellipsis))),
-                              ],
-                              onChanged: (v) =>
-                                  setDialogState(() => row['machineId'] = v),
+                            const SizedBox(width: 8),
+                            SizedBox(
+                              width: 110,
+                              child: _compactDropdown<int?>(
+                                value: row['machineId'] as int?,
+                                items: [
+                                  DropdownMenuItem<int?>(
+                                      value: null,
+                                      child: Text('None', style: GoogleFonts.outfit(color: posTextMuted))),
+                                  ...machines.map((m) => DropdownMenuItem<int?>(
+                                      value: m.id,
+                                      child: Text(m.name, overflow: TextOverflow.ellipsis))),
+                                ],
+                                onChanged: (v) => setDialogState(() => row['machineId'] = v),
+                              ),
                             ),
-                          ),
-                          IconButton(
-                            icon: const Icon(Icons.remove_circle_outline,
-                                color: Color(0xFFEF4444), size: 18),
-                            onPressed:
-                                rows.length > 1 ? () => removeRow(i) : null,
-                          ),
-                        ],
-                      ),
-                    );
-                  }),
-                ],
+                            const SizedBox(width: 8),
+                            SizedBox(
+                              width: 110,
+                              child: _compactDropdown<int?>(
+                                value: row['serviceSupplyId'] as int?,
+                                items: [
+                                  DropdownMenuItem<int?>(
+                                      value: null,
+                                      child: Text('None', style: GoogleFonts.outfit(color: posTextMuted))),
+                                  ...supplies.map((s) => DropdownMenuItem<int?>(
+                                      value: s.id,
+                                      child: Text(s.name, overflow: TextOverflow.ellipsis))),
+                                ],
+                                onChanged: (v) => setDialogState(() => row['serviceSupplyId'] = v),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            SizedBox(
+                              width: 90,
+                              child: bulkTextField(
+                                hint: '0.00',
+                                initialValue: row['sellingPrice'] as String,
+                                numeric: true,
+                                onChanged: (v) => row['sellingPrice'] = v,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            SizedBox(
+                              width: 80,
+                              child: bulkTextField(
+                                hint: '0.00',
+                                initialValue: row['supplyCost'] as String,
+                                numeric: true,
+                                onChanged: (v) => row['supplyCost'] = v,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            SizedBox(
+                              width: 80,
+                              child: bulkTextField(
+                                hint: '0.00',
+                                initialValue: row['inkCost'] as String,
+                                numeric: true,
+                                onChanged: (v) => row['inkCost'] = v,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            SizedBox(
+                              width: 80,
+                              child: bulkTextField(
+                                hint: '0.00',
+                                initialValue: row['electricityCost'] as String,
+                                numeric: true,
+                                onChanged: (v) => row['electricityCost'] = v,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            SizedBox(
+                              width: 80,
+                              child: bulkTextField(
+                                hint: '0.00',
+                                initialValue: row['laborCost'] as String,
+                                numeric: true,
+                                onChanged: (v) => row['laborCost'] = v,
+                              ),
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.remove_circle_outline,
+                                  color: Color(0xFFEF4444), size: 18),
+                              onPressed:
+                                  rows.length > 1 ? () => removeRow(i) : null,
+                            ),
+                          ],
+                        ),
+                      );
+                    }),
+                  ],
+                ),
               ),
             ),
           ),
@@ -211,8 +272,7 @@ Future<void> showBulkAddPrintServicesDialog(
                       if (validRows.isEmpty) {
                         ScaffoldMessenger.of(ctx).showSnackBar(
                           const SnackBar(
-                              content:
-                                  Text('Enter at least one service name')),
+                              content: Text('Enter at least one type name')),
                         );
                         return;
                       }
@@ -221,36 +281,53 @@ Future<void> showBulkAddPrintServicesDialog(
                       try {
                         final now = DateTime.now();
                         for (final row in validRows) {
-                          final basePrice =
-                              double.tryParse(row['basePrice'] as String) ?? 0;
-                          await productProviderRef.createPrintService(
-                            PrintService(
+                          final st = await productProviderRef.createServiceType(
+                            ServiceType(
                               id: 0,
                               name: (row['name'] as String).trim(),
-                              description: (row['name'] as String).trim(),
-                              paperSizeId: row['paperSizeId'] as int,
-                              colorModeId: row['colorModeId'] as int,
-                              basePrice: basePrice,
-                              inkCostPerPage: 0,
-                              paperCostPerPage: 0,
-                              electricityCostPerPage: 0,
-                              maintenanceCostPerPage: 0,
-                              totalCostPerPage: 0,
+                              serviceId: row['serviceId'] as int?,
                               machineId: row['machineId'] as int?,
+                              serviceSupplyId: row['serviceSupplyId'] as int?,
+                              paperSize: (row['paperSize'] as String).isEmpty
+                                  ? null
+                                  : row['paperSize'] as String,
+                              colorMode: (row['colorMode'] as String).isEmpty
+                                  ? null
+                                  : row['colorMode'] as String,
                               createdAt: now,
                               updatedAt: now,
                             ),
                           );
+                          final sellingPrice =
+                              double.tryParse(row['sellingPrice'] as String) ?? 0;
+                          final supplyCost =
+                              double.tryParse(row['supplyCost'] as String) ?? 0;
+                          final inkCost =
+                              double.tryParse(row['inkCost'] as String) ?? 0;
+                          final electricityCost =
+                              double.tryParse(row['electricityCost'] as String) ?? 0;
+                          final laborCost =
+                              double.tryParse(row['laborCost'] as String) ?? 0;
+                          await productProviderRef.upsertServiceTypeCost(
+                            st.id,
+                            {
+                              'service_supply_cost': supplyCost,
+                              'ink_cost': inkCost,
+                              'electricity_cost': electricityCost,
+                              'labor_cost': laborCost,
+                              'service_selling_price': sellingPrice,
+                            },
+                          );
                           saved++;
                         }
                         activityLogRef.log(
-                          actionName: 'Print Service Added',
-                          description: 'Bulk added $saved print services',
+                          actionName: 'Service Type Added',
+                          description: 'Bulk added $saved service types',
                         );
                         if (ctx.mounted) Navigator.pop(ctx);
                         onRefresh();
                       } catch (e) {
-                        debugPrint('Bulk add print services error: $e');
+                        debugPrint('Bulk add service types error: $e');
                         if (ctx.mounted) {
                           setDialogState(() => isSaving = false);
                           ScaffoldMessenger.of(ctx).showSnackBar(

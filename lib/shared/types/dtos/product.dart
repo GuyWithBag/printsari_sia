@@ -1,64 +1,46 @@
-import 'package:printsari_sia/shared/types/types.dart';
-
 class Product {
   final int id;
   final String name;
-  final String description;
-  final int categoryId;
+  final String productCategory;
+  final String productType;
   final double purchasePrice;
   final double? sellingPrice;
-  final bool perishable;
-  final String? sku;
-  final String? barcode;
-  final String? supplier;
+  final double? productProfit;
   final DateTime? expiryDate;
   final DateTime createdAt;
   final DateTime updatedAt;
 
-  // Optional joined data
-  final ProductCategory? category;
-
   Product({
     required this.id,
     required this.name,
-    required this.description,
-    required this.categoryId,
+    required this.productCategory,
+    required this.productType,
     required this.purchasePrice,
     this.sellingPrice,
-    this.perishable = true,
-    this.sku,
-    this.barcode,
-    this.supplier,
+    this.productProfit,
     this.expiryDate,
     required this.createdAt,
     required this.updatedAt,
-    this.category,
   });
 
   factory Product.fromJson(Map<String, dynamic> json) {
     return Product(
       id: json['id'] as int,
       name: json['name'] as String,
-      description: json['description'] as String,
-      categoryId: json['category_id'] as int,
+      productCategory: (json['product_category'] as String?) ?? '',
+      productType: (json['product_type'] as String?) ?? '',
       purchasePrice: (json['purchase_price'] as num).toDouble(),
       sellingPrice: json['selling_price'] != null
           ? (json['selling_price'] as num).toDouble()
           : null,
-      perishable: json['perishable'] == true || json['perishable'] == null,
-      sku: json['sku'] as String?,
-      barcode: json['barcode'] as String?,
-      supplier: json['supplier'] as String?,
+      productProfit: json['product_profit'] != null
+          ? (json['product_profit'] as num).toDouble()
+          : null,
       expiryDate: json['expiry_date'] != null
           ? DateTime.parse(json['expiry_date'] as String)
           : null,
       createdAt: DateTime.parse(json['created_at'] as String),
       updatedAt: DateTime.parse(json['updated_at'] as String),
-      category: json['product_categories'] != null
-          ? ProductCategory.fromJson(
-              json['product_categories'] as Map<String, dynamic>,
-            )
-          : null,
     );
   }
 
@@ -66,14 +48,10 @@ class Product {
     return {
       'id': id,
       'name': name,
-      'description': description,
-      'category_id': categoryId,
+      'product_category': productCategory,
+      'product_type': productType,
       'purchase_price': purchasePrice,
       'selling_price': sellingPrice,
-      'perishable': perishable,
-      'sku': sku,
-      'barcode': barcode,
-      'supplier': supplier,
       'expiry_date': expiryDate?.toIso8601String(),
       'created_at': createdAt.toIso8601String(),
       'updated_at': updatedAt.toIso8601String(),
@@ -83,15 +61,11 @@ class Product {
   Map<String, dynamic> toInsertJson() {
     return {
       'name': name,
-      'description': description,
-      'category_id': categoryId,
+      'product_category': productCategory,
+      'product_type': productType,
       'purchase_price': purchasePrice,
       'selling_price': sellingPrice,
-      'perishable': perishable,
-      'sku': sku,
-      'barcode': barcode,
-      'supplier': supplier,
-      'expiry_date': perishable ? expiryDate?.toIso8601String() : null,
+      if (expiryDate != null) 'expiry_date': expiryDate!.toIso8601String(),
     };
   }
 }

@@ -1,4 +1,4 @@
-import 'package:printsari_sia/shared/types/types.dart';
+import 'package:printsari_sia/shared/types/dtos/color_mode_type.dart';
 
 class ColorMode {
   final int id;

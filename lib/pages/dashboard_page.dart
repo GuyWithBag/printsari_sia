@@ -39,7 +39,7 @@ class DashboardPage extends HookWidget {
         expenseProvider.getExpenses(),
         inventoryProvider.getItems(),
         productProvider.getProducts(),
-        productProvider.getPrintServices(),
+        productProvider.getServiceTypes(),
       ]),
       [refreshKey.value],
     );
@@ -54,7 +54,7 @@ class DashboardPage extends HookWidget {
     List<Expense> todayExpenses = [];
     List<InventoryItem> inventoryItems = [];
     List<Product> products = [];
-    List<PrintService> printServices = [];
+    List<ServiceType> printServices = [];
     List<Transaction> recentTransactions = [];
 
     if (snapshot.hasData) {
@@ -63,7 +63,7 @@ class DashboardPage extends HookWidget {
       final allExpenses = data[1] as List<Expense>;
       inventoryItems = data[2] as List<InventoryItem>;
       products = data[3] as List<Product>;
-      printServices = data[4] as List<PrintService>;
+      printServices = data[4] as List<ServiceType>;
 
       todayTransactions = allTransactions.where((t) {
         return t.date.year == now.year &&
@@ -92,10 +92,8 @@ class DashboardPage extends HookWidget {
     final currFmt =
         NumberFormat.currency(symbol: '\u20B1', decimalDigits: 2);
 
-    // Split inventory into store products and print services
-    final storeProducts = products
-        .where((p) => p.category?.categoryName == 'store' || p.categoryId == 1)
-        .toList();
+    // All products are store products now (no FK category)
+    final storeProducts = products;
     // Map productId -> InventoryItem for stock lookup
     final inventoryByProduct = <int, InventoryItem>{};
     for (final item in inventoryItems) {
@@ -577,7 +575,7 @@ class _StoreInventoryPanel extends StatelessWidget {
                             )
                           else
                             Text(
-                              p.description,
+                              p.productCategory,
                               style: GoogleFonts.outfit(
                                 fontSize: 12,
                                 color: posTextMuted,
@@ -621,7 +619,7 @@ class _StoreInventoryPanel extends StatelessWidget {
 // ---------- Printing Supplies panel ----------
 
 class _PrintingSuppliesPanel extends StatelessWidget {
-  final List<PrintService> services;
+  final List<ServiceType> services;
   const _PrintingSuppliesPanel({required this.services});
 
   @override
@@ -634,7 +632,7 @@ class _PrintingSuppliesPanel extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Printing Supplies Status',
+            'Printing Services',
             style: GoogleFonts.outfit(
               fontSize: 16,
               fontWeight: FontWeight.w600,
@@ -644,12 +642,12 @@ class _PrintingSuppliesPanel extends StatelessWidget {
           const SizedBox(height: 16),
           if (services.isEmpty)
             Text(
-              'No print services.',
+              'No service types.',
               style: GoogleFonts.outfit(color: posTextMuted),
             )
           else
             ...services.map((s) {
-              final stock = s.paperStock?.toInt() ?? 0;
+              final sellingPrice = s.cost?.serviceSellingPrice;
               return Padding(
                 padding: const EdgeInsets.only(bottom: 12),
                 child: Row(
@@ -666,37 +664,28 @@ class _PrintingSuppliesPanel extends StatelessWidget {
                               color: Colors.white,
                             ),
                           ),
-                          Text(
-                            s.description,
-                            style: GoogleFonts.outfit(
-                              fontSize: 12,
-                              color: posTextMuted,
+                          if (s.service != null)
+                            Text(
+                              s.service!.name,
+                              style: GoogleFonts.outfit(
+                                fontSize: 12,
+                                color: posTextMuted,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                             ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
                         ],
                       ),
                     ),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        Text(
-                          '$stock units',
-                          style: GoogleFonts.outfit(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.white,
-                          ),
-                        ),
-                        Text(
-                          currFmt.format(s.basePrice),
-                          style: GoogleFonts.outfit(
-                            fontSize: 12,
-                            color: posTextMuted,
-                          ),
-                        ),
-                      ],
+                    Text(
+                      sellingPrice != null
+                          ? currFmt.format(sellingPrice)
+                          : '—',
+                      style: GoogleFonts.outfit(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white,
+                      ),
                     ),
                   ],
                 ),

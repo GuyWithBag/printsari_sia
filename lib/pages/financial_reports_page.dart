@@ -3,6 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart';
 import 'package:printsari_sia/providers/expense_provider.dart';
 import 'package:printsari_sia/providers/transaction_provider.dart';
 import 'package:printsari_sia/shared/themes/colors.dart';
@@ -324,13 +327,42 @@ class _ReportView extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            periodLabel,
-            style: GoogleFonts.outfit(
-              fontSize: 18,
-              fontWeight: FontWeight.w600,
-              color: Colors.white,
-            ),
+          Row(
+            children: [
+              Text(
+                periodLabel,
+                style: GoogleFonts.outfit(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.white,
+                ),
+              ),
+              const Spacer(),
+              FilledButton.icon(
+                onPressed: () => _exportFinancialReport(
+                  context,
+                  periodLabel: periodLabel,
+                  filteredTransactions: filteredTransactions,
+                  filteredExpenses: filteredExpenses,
+                  totalRevenue: totalRevenue,
+                  storeRevenue: storeRevenue,
+                  printingRevenue: printingRevenue,
+                  totalExpenses: totalExpenses,
+                  profit: profit,
+                  profitMargin: profitMargin,
+                ),
+                icon: const Icon(Icons.picture_as_pdf_outlined, size: 16),
+                label: Text('Export PDF', style: GoogleFonts.outfit(fontSize: 13)),
+                style: FilledButton.styleFrom(
+                  backgroundColor: posPrimary,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 16),
           Wrap(
@@ -549,6 +581,7 @@ class _TrendChart extends StatelessWidget {
     if (maxY == 0) maxY = 100;
 
     return Container(
+      clipBehavior: Clip.hardEdge,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: posSurface,
@@ -577,72 +610,87 @@ class _TrendChart extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 20),
-          SizedBox(
-            height: 200,
-            child: LineChart(
-              LineChartData(
-                minY: 0,
-                maxY: maxY * 1.1,
-                gridData: FlGridData(
-                  show: true,
-                  getDrawingHorizontalLine: (_) => FlLine(
-                    color: Colors.white.withValues(alpha: 0.05),
-                    strokeWidth: 1,
-                  ),
-                  getDrawingVerticalLine: (_) => FlLine(
-                    color: Colors.white.withValues(alpha: 0.05),
-                    strokeWidth: 1,
-                  ),
-                ),
-                borderData: FlBorderData(show: false),
-                titlesData: FlTitlesData(
-                  leftTitles: AxisTitles(
-                    sideTitles: SideTitles(
-                      showTitles: true,
-                      reservedSize: 48,
-                      getTitlesWidget: (v, _) => Text(
-                        v >= 1000 ? '${(v / 1000).toStringAsFixed(0)}k' : v.toStringAsFixed(0),
-                        style: GoogleFonts.outfit(fontSize: 10, color: posTextMuted),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              // Give each bucket at least 12 px so lines never overlap.
+              // If the natural width is smaller, the chart fills the container.
+              final minWidth = bucketCount * 12.0;
+              final chartWidth = minWidth > constraints.maxWidth
+                  ? minWidth
+                  : constraints.maxWidth;
+
+              return SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: SizedBox(
+                  width: chartWidth,
+                  height: 200,
+                  child: LineChart(
+                    LineChartData(
+                      minY: 0,
+                      maxY: maxY * 1.1,
+                      gridData: FlGridData(
+                        show: true,
+                        getDrawingHorizontalLine: (_) => FlLine(
+                          color: Colors.white.withValues(alpha: 0.05),
+                          strokeWidth: 1,
+                        ),
+                        getDrawingVerticalLine: (_) => FlLine(
+                          color: Colors.white.withValues(alpha: 0.05),
+                          strokeWidth: 1,
+                        ),
                       ),
+                      borderData: FlBorderData(show: false),
+                      titlesData: FlTitlesData(
+                        leftTitles: AxisTitles(
+                          sideTitles: SideTitles(
+                            showTitles: true,
+                            reservedSize: 48,
+                            getTitlesWidget: (v, _) => Text(
+                              v >= 1000 ? '${(v / 1000).toStringAsFixed(0)}k' : v.toStringAsFixed(0),
+                              style: GoogleFonts.outfit(fontSize: 10, color: posTextMuted),
+                            ),
+                          ),
+                        ),
+                        bottomTitles: AxisTitles(
+                          sideTitles: SideTitles(
+                            showTitles: true,
+                            interval: (bucketCount / 8).ceilToDouble().clamp(1, bucketCount.toDouble()),
+                            getTitlesWidget: (v, _) {
+                              final date = startDate.add(Duration(days: (v * bucketDays).toInt()));
+                              return Text(
+                                DateFormat('M/d').format(date),
+                                style: GoogleFonts.outfit(fontSize: 10, color: posTextMuted),
+                              );
+                            },
+                          ),
+                        ),
+                        topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                        rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                      ),
+                      lineTouchData: LineTouchData(
+                        touchTooltipData: LineTouchTooltipData(
+                          getTooltipColor: (_) => posSurfaceLight,
+                          getTooltipItems: (spots) => spots.map((s) {
+                            final colors = [posPrimary, const Color(0xFFEF4444), const Color(0xFF22C55E)];
+                            final labels = ['Rev', 'Exp', 'Profit'];
+                            final idx = s.barIndex;
+                            return LineTooltipItem(
+                              '${labels[idx]}: ₱${s.y.toStringAsFixed(0)}',
+                              GoogleFonts.outfit(fontSize: 11, color: colors[idx], fontWeight: FontWeight.w600),
+                            );
+                          }).toList(),
+                        ),
+                      ),
+                      lineBarsData: [
+                        _buildLine(revenueByBucket, posPrimary),
+                        _buildLine(expensesByBucket, const Color(0xFFEF4444)),
+                        _buildLine(profitByBucket, const Color(0xFF22C55E)),
+                      ],
                     ),
                   ),
-                  bottomTitles: AxisTitles(
-                    sideTitles: SideTitles(
-                      showTitles: bucketCount <= 31,
-                      interval: (bucketCount / 6).ceilToDouble().clamp(1, bucketCount.toDouble()),
-                      getTitlesWidget: (v, _) {
-                        final date = startDate.add(Duration(days: (v * bucketDays).toInt()));
-                        return Text(
-                          DateFormat('M/d').format(date),
-                          style: GoogleFonts.outfit(fontSize: 10, color: posTextMuted),
-                        );
-                      },
-                    ),
-                  ),
-                  topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                  rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
                 ),
-                lineTouchData: LineTouchData(
-                  touchTooltipData: LineTouchTooltipData(
-                    getTooltipColor: (_) => posSurfaceLight,
-                    getTooltipItems: (spots) => spots.map((s) {
-                      final colors = [posPrimary, const Color(0xFFEF4444), const Color(0xFF22C55E)];
-                      final labels = ['Rev', 'Exp', 'Profit'];
-                      final idx = s.barIndex;
-                      return LineTooltipItem(
-                        '${labels[idx]}: ₱${s.y.toStringAsFixed(0)}',
-                        GoogleFonts.outfit(fontSize: 11, color: colors[idx], fontWeight: FontWeight.w600),
-                      );
-                    }).toList(),
-                  ),
-                ),
-                lineBarsData: [
-                  _buildLine(revenueByBucket, posPrimary),
-                  _buildLine(expensesByBucket, const Color(0xFFEF4444)),
-                  _buildLine(profitByBucket, const Color(0xFF22C55E)),
-                ],
-              ),
-            ),
+              );
+            },
           ),
         ],
       ),
@@ -677,6 +725,310 @@ class _TrendChart extends StatelessWidget {
       ],
     );
   }
+}
+
+Future<void> _exportFinancialReport(
+  BuildContext context, {
+  required String periodLabel,
+  required List<Transaction> filteredTransactions,
+  required List<Expense> filteredExpenses,
+  required double totalRevenue,
+  required double storeRevenue,
+  required double printingRevenue,
+  required double totalExpenses,
+  required double profit,
+  required double profitMargin,
+}) async {
+  final currency = NumberFormat.currency(symbol: '₱', decimalDigits: 2);
+  final dateFormat = DateFormat('MMM dd, yyyy');
+  final generatedAt = DateFormat('MMM dd, yyyy · h:mm a').format(DateTime.now());
+
+  Future<pw.Document> buildDoc() async {
+    final regular = await PdfGoogleFonts.notoSansRegular();
+    final bold = await PdfGoogleFonts.notoSansBold();
+
+    pw.TextStyle s(double size, {bool isBold = false, PdfColor? color}) =>
+        pw.TextStyle(
+          font: isBold ? bold : regular,
+          fontSize: size,
+          color: color ?? PdfColors.white,
+        );
+
+    final headerBg = PdfColor.fromHex('1E293B');
+    final rowBg = PdfColor.fromHex('0F172A');
+    final altRowBg = PdfColor.fromHex('162032');
+    final accentColor = PdfColor.fromHex('6366F1');
+    final mutedColor = PdfColor.fromHex('94A3B8');
+    final redColor = PdfColor.fromHex('EF4444');
+    final greenColor = PdfColor.fromHex('22C55E');
+
+    final doc = pw.Document();
+
+    // ── Helpers ──
+    pw.Widget metricCell(String label, String value, {PdfColor? valueColor}) {
+      return pw.Container(
+        padding: const pw.EdgeInsets.all(10),
+        decoration: pw.BoxDecoration(
+          color: rowBg,
+          border: pw.Border.all(color: PdfColor.fromHex('334155'), width: 0.5),
+          borderRadius: pw.BorderRadius.circular(6),
+        ),
+        child: pw.Column(
+          crossAxisAlignment: pw.CrossAxisAlignment.start,
+          children: [
+            pw.Text(label, style: s(8, color: mutedColor)),
+            pw.SizedBox(height: 4),
+            pw.Text(value, style: s(11, isBold: true, color: valueColor ?? PdfColors.white)),
+          ],
+        ),
+      );
+    }
+
+    pw.Widget headerCell(String text) => pw.Container(
+          padding: const pw.EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+          color: headerBg,
+          child: pw.Text(text, style: s(8, isBold: true, color: mutedColor)),
+        );
+
+    pw.Widget dataCell(String text, {bool isRight = false, PdfColor? color}) =>
+        pw.Container(
+          padding: const pw.EdgeInsets.symmetric(horizontal: 6, vertical: 5),
+          child: pw.Text(
+            text,
+            style: s(8, color: color ?? PdfColors.white),
+            textAlign: isRight ? pw.TextAlign.right : pw.TextAlign.left,
+          ),
+        );
+
+    doc.addPage(
+      pw.MultiPage(
+        pageFormat: PdfPageFormat.a4,
+        margin: const pw.EdgeInsets.all(32),
+        theme: pw.ThemeData.withFont(base: regular, bold: bold),
+        pageTheme: pw.PageTheme(
+          pageFormat: PdfPageFormat.a4,
+          theme: pw.ThemeData.withFont(base: regular, bold: bold),
+          buildBackground: (ctx) => pw.FullPage(
+            ignoreMargins: true,
+            child: pw.Container(color: PdfColor.fromHex('0F172A')),
+          ),
+        ),
+        header: (ctx) => pw.Column(
+          crossAxisAlignment: pw.CrossAxisAlignment.start,
+          children: [
+            pw.Row(
+              mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+              children: [
+                pw.Column(
+                  crossAxisAlignment: pw.CrossAxisAlignment.start,
+                  children: [
+                    pw.Text('PrintSari Corner', style: s(16, isBold: true, color: accentColor)),
+                    pw.Text('Financial Report · $periodLabel', style: s(10, color: mutedColor)),
+                  ],
+                ),
+                pw.Column(
+                  crossAxisAlignment: pw.CrossAxisAlignment.end,
+                  children: [
+                    pw.Text('Generated', style: s(8, color: mutedColor)),
+                    pw.Text(generatedAt, style: s(8, color: PdfColors.white)),
+                  ],
+                ),
+              ],
+            ),
+            pw.SizedBox(height: 6),
+            pw.Divider(color: PdfColor.fromHex('334155'), thickness: 0.5),
+            pw.SizedBox(height: 10),
+          ],
+        ),
+        build: (ctx) => [
+          // ── Summary metrics grid ──
+          pw.Text('Summary', style: s(12, isBold: true)),
+          pw.SizedBox(height: 8),
+          pw.GridView(
+            crossAxisCount: 4,
+            childAspectRatio: 2.2,
+            crossAxisSpacing: 6,
+            mainAxisSpacing: 6,
+            children: [
+              metricCell('Total Revenue', currency.format(totalRevenue), valueColor: accentColor),
+              metricCell('Store Revenue', currency.format(storeRevenue)),
+              metricCell('Printing Revenue', currency.format(printingRevenue)),
+              metricCell('Total Expenses', currency.format(totalExpenses), valueColor: redColor),
+              metricCell('Net Profit', currency.format(profit), valueColor: profit >= 0 ? greenColor : redColor),
+              metricCell('Profit Margin', '${profitMargin.toStringAsFixed(1)}%', valueColor: profit >= 0 ? greenColor : redColor),
+              metricCell('Transactions', '${filteredTransactions.length}'),
+              metricCell('Expenses Recorded', '${filteredExpenses.length}'),
+            ],
+          ),
+          pw.SizedBox(height: 20),
+
+          // ── Transactions table ──
+          pw.Text('Transactions (${filteredTransactions.length})', style: s(12, isBold: true)),
+          pw.SizedBox(height: 8),
+          if (filteredTransactions.isEmpty)
+            pw.Container(
+              width: double.infinity,
+              padding: const pw.EdgeInsets.all(16),
+              decoration: pw.BoxDecoration(
+                color: rowBg,
+                border: pw.Border.all(color: PdfColor.fromHex('334155'), width: 0.5),
+                borderRadius: pw.BorderRadius.circular(6),
+              ),
+              child: pw.Text('No transactions for this period.', style: s(9, color: mutedColor), textAlign: pw.TextAlign.center),
+            )
+          else
+            pw.Table(
+              columnWidths: {
+                0: const pw.FlexColumnWidth(1.8),
+                1: const pw.FlexColumnWidth(2.2),
+                2: const pw.FlexColumnWidth(1.5),
+                3: const pw.FlexColumnWidth(1.4),
+                4: const pw.FlexColumnWidth(1.4),
+                5: const pw.FlexColumnWidth(1.4),
+                6: const pw.FlexColumnWidth(1.4),
+              },
+              border: pw.TableBorder.all(color: PdfColor.fromHex('334155'), width: 0.3),
+              children: [
+                pw.TableRow(
+                  decoration: pw.BoxDecoration(color: headerBg),
+                  children: [
+                    headerCell('Date'),
+                    headerCell('Transaction #'),
+                    headerCell('Total'),
+                    headerCell('Store Rev.'),
+                    headerCell('Print Rev.'),
+                    headerCell('Cost'),
+                    headerCell('Profit'),
+                  ],
+                ),
+                ...filteredTransactions.asMap().entries.map((entry) {
+                  final i = entry.key;
+                  final t = entry.value;
+                  final txProfit = t.grossProfit ?? 0;
+                  final bg = i.isEven ? rowBg : altRowBg;
+                  return pw.TableRow(
+                    decoration: pw.BoxDecoration(color: bg),
+                    children: [
+                      dataCell(dateFormat.format(t.date)),
+                      dataCell(t.transactionNumber),
+                      dataCell(currency.format(t.total), isRight: true),
+                      dataCell(currency.format(t.storeRevenue), isRight: true),
+                      dataCell(currency.format(t.printingRevenue), isRight: true),
+                      dataCell(currency.format(t.totalCost ?? 0), isRight: true),
+                      dataCell(currency.format(txProfit), isRight: true, color: txProfit >= 0 ? greenColor : redColor),
+                    ],
+                  );
+                }),
+              ],
+            ),
+          pw.SizedBox(height: 20),
+
+          // ── Expenses table ──
+          pw.Text('Expenses (${filteredExpenses.length})', style: s(12, isBold: true)),
+          pw.SizedBox(height: 8),
+          if (filteredExpenses.isEmpty)
+            pw.Container(
+              width: double.infinity,
+              padding: const pw.EdgeInsets.all(16),
+              decoration: pw.BoxDecoration(
+                color: rowBg,
+                border: pw.Border.all(color: PdfColor.fromHex('334155'), width: 0.5),
+                borderRadius: pw.BorderRadius.circular(6),
+              ),
+              child: pw.Text('No expenses for this period.', style: s(9, color: mutedColor), textAlign: pw.TextAlign.center),
+            )
+          else
+            pw.Table(
+              columnWidths: {
+                0: const pw.FlexColumnWidth(1.5),
+                1: const pw.FlexColumnWidth(3.0),
+                2: const pw.FlexColumnWidth(1.8),
+                3: const pw.FlexColumnWidth(1.8),
+              },
+              border: pw.TableBorder.all(color: PdfColor.fromHex('334155'), width: 0.3),
+              children: [
+                pw.TableRow(
+                  decoration: pw.BoxDecoration(color: headerBg),
+                  children: [
+                    headerCell('Date'),
+                    headerCell('Description'),
+                    headerCell('Category'),
+                    headerCell('Amount'),
+                  ],
+                ),
+                ...filteredExpenses.asMap().entries.map((entry) {
+                  final i = entry.key;
+                  final e = entry.value;
+                  final bg = i.isEven ? rowBg : altRowBg;
+                  return pw.TableRow(
+                    decoration: pw.BoxDecoration(color: bg),
+                    children: [
+                      dataCell(dateFormat.format(e.date)),
+                      dataCell(e.description),
+                      dataCell(e.category?.categoryName ?? 'Uncategorized'),
+                      dataCell(currency.format(e.amount), isRight: true, color: redColor),
+                    ],
+                  );
+                }),
+              ],
+            ),
+        ],
+      ),
+    );
+
+    return doc;
+  }
+
+  if (!context.mounted) return;
+
+  await showDialog(
+    context: context,
+    builder: (ctx) => Dialog(
+      backgroundColor: posSurface,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: SizedBox(
+        width: 700,
+        height: 760,
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 16, 8, 8),
+              child: Row(
+                children: [
+                  Text(
+                    'Export — $periodLabel',
+                    style: GoogleFonts.outfit(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                    ),
+                  ),
+                  const Spacer(),
+                  IconButton(
+                    icon: const Icon(Icons.close, color: posTextMuted),
+                    onPressed: () => Navigator.pop(ctx),
+                  ),
+                ],
+              ),
+            ),
+            Expanded(
+              child: PdfPreview(
+                build: (_) async {
+                  final doc = await buildDoc();
+                  return doc.save();
+                },
+                canChangePageFormat: false,
+                canChangeOrientation: false,
+                allowPrinting: true,
+                allowSharing: true,
+                initialPageFormat: PdfPageFormat.a4,
+              ),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
 }
 
 class _MetricCard extends StatelessWidget {

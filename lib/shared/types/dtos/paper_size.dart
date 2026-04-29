@@ -1,4 +1,4 @@
-import 'package:printsari_sia/shared/types/types.dart';
+import 'package:printsari_sia/shared/types/dtos/paper_size_type.dart';
 
 class PaperSize {
   final int id;

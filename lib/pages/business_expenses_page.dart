@@ -8,6 +8,7 @@ import 'package:printsari_sia/providers/vendor_provider.dart';
 import 'package:printsari_sia/shared/themes/colors.dart';
 import 'package:printsari_sia/shared/types/types.dart';
 import 'package:printsari_sia/widgets/app_page.dart';
+import 'package:printsari_sia/widgets/searchable_transaction_dropdown.dart';
 import 'package:printsari_sia/widgets/selection_bar.dart';
 import 'package:provider/provider.dart';
 import 'package:skeletonizer/skeletonizer.dart';
@@ -529,8 +530,10 @@ Future<void> _showExpenseDialog(
   final notesController =
       TextEditingController(text: expense?.notes ?? '');
 
-  // Capture VendorProvider before showDialog
+  // Capture providers before showDialog
+  final expenseProvider = context.read<ExpenseProvider>();
   final vendorProvider = context.read<VendorProvider>();
+  final transactionProvider = context.read<TransactionProvider>();
   List<Vendor>? vendorList;
   int? selectedVendorId = expense?.vendorId;
   final selectedDate = ValueNotifier<DateTime>(expense?.date ?? DateTime.now());
@@ -711,7 +714,25 @@ Future<void> _showExpenseDialog(
                     },
                   ),
                 ),
-                _expenseField('Receipt Number', receiptController),
+                // Transaction number searchable dropdown
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: FutureBuilder<List<Transaction>>(
+                    future: transactionProvider.getTransactions(),
+                    builder: (context, snap) {
+                      final transactions = snap.data ?? [];
+                      return SearchableTransactionDropdown(
+                        transactions: transactions,
+                        value: receiptController.text.isEmpty
+                            ? null
+                            : receiptController.text,
+                        onChanged: (val) {
+                          receiptController.text = val ?? '';
+                        },
+                      );
+                    },
+                  ),
+                ),
                 _expenseField('Notes', notesController),
               ],
             ),
@@ -725,8 +746,7 @@ Future<void> _showExpenseDialog(
           ),
           FilledButton(
             onPressed: () async {
-              final provider =
-                  Provider.of<ExpenseProvider>(ctx, listen: false);
+              final provider = expenseProvider;
               try {
                 if (isEditing) {
                   await provider.updateExpense(expense.id, {

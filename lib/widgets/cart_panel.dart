@@ -15,10 +15,12 @@ import 'package:provider/provider.dart';
 class CartPanel extends HookWidget {
   final TransactionProvider transactionProvider;
   final ValueNotifier<int> selectedPaymentMethod;
+  final List<InventoryItem> inventory;
 
   const CartPanel({
     required this.transactionProvider,
     required this.selectedPaymentMethod,
+    required this.inventory,
   });
 
   @override
@@ -187,10 +189,30 @@ class CartPanel extends HookWidget {
                     ),
                     itemBuilder: (context, index) {
                       final item = cart[index];
+
+                      // For store items, cap at available inventory stock.
+                      VoidCallback? increaseCallback;
+                      if (item.inventoryId != null) {
+                        final invItem = inventory
+                            .where((i) => i.id == item.inventoryId)
+                            .firstOrNull;
+                        final totalInCart = cart
+                            .where((c) => c.inventoryId == item.inventoryId)
+                            .fold(0.0, (sum, c) => sum + c.quantity);
+                        final available = (invItem?.stock ?? 0) - totalInCart + item.quantity;
+                        if (item.quantity < available) {
+                          increaseCallback = () => transactionProvider
+                              .updateCartItemQuantity(index, item.quantity + 1);
+                        }
+                      } else {
+                        // Print services have no stock limit.
+                        increaseCallback = () => transactionProvider
+                            .updateCartItemQuantity(index, item.quantity + 1);
+                      }
+
                       return CartItemRow(
                         item: item,
-                        onIncrease: () => transactionProvider
-                            .updateCartItemQuantity(index, item.quantity + 1),
+                        onIncrease: increaseCallback,
                         onDecrease: () {
                           if (item.quantity > 1) {
                             transactionProvider.updateCartItemQuantity(

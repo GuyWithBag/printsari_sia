@@ -159,18 +159,19 @@ class TransactionProvider extends ChangeNotifier {
         if (item.printOrderId != null) {
           final printOrderRow = await supabase
               .from('print_orders')
-              .select('*, print_services(*)')
+              .select('*, service_types(*, service_type_costs(*))')
               .eq('id', item.printOrderId!)
               .single();
           final printOrder = PrintOrder.fromJson(printOrderRow);
-          final service = printOrder.service!;
+          final service = printOrder.serviceType;
+          final cost = service?.cost;
 
           final expenseDate = now.toIso8601String();
           final expenses = [
             {
               'description':
                   'Ink cost - ${item.productName} (${printOrder.quantity} pages)',
-              'amount': service.inkCostPerPage * printOrder.quantity,
+              'amount': (cost?.inkCost ?? 0) * printOrder.quantity,
               'category_id': 1,
               'date': expenseDate,
               'linked_transaction_id': transactionId,
@@ -178,8 +179,8 @@ class TransactionProvider extends ChangeNotifier {
             },
             {
               'description':
-                  'Paper cost - ${item.productName} (${printOrder.quantity} pages)',
-              'amount': service.paperCostPerPage * printOrder.quantity,
+                  'Supply cost - ${item.productName} (${printOrder.quantity} pages)',
+              'amount': (cost?.serviceSupplyCost ?? 0) * printOrder.quantity,
               'category_id': 2,
               'date': expenseDate,
               'linked_transaction_id': transactionId,
@@ -188,7 +189,7 @@ class TransactionProvider extends ChangeNotifier {
             {
               'description':
                   'Electricity cost - ${item.productName} (${printOrder.quantity} pages)',
-              'amount': service.electricityCostPerPage * printOrder.quantity,
+              'amount': (cost?.electricityCost ?? 0) * printOrder.quantity,
               'category_id': 3,
               'date': expenseDate,
               'linked_transaction_id': transactionId,
@@ -196,8 +197,8 @@ class TransactionProvider extends ChangeNotifier {
             },
             {
               'description':
-                  'Maintenance cost - ${item.productName} (${printOrder.quantity} pages)',
-              'amount': service.maintenanceCostPerPage * printOrder.quantity,
+                  'Labor cost - ${item.productName} (${printOrder.quantity} pages)',
+              'amount': (cost?.laborCost ?? 0) * printOrder.quantity,
               'category_id': 4,
               'date': expenseDate,
               'linked_transaction_id': transactionId,
@@ -207,12 +208,12 @@ class TransactionProvider extends ChangeNotifier {
 
           await supabase.from('expenses').insert(expenses);
 
-          // Deduct supply stock if this service links to a service supply
-          if (service.serviceSupplyId != null) {
+          // Deduct supply stock if this service type links to a service supply
+          if (service?.serviceSupplyId != null) {
             final supplyRow = await supabase
                 .from('inventory_items')
                 .select('id, stock')
-                .eq('service_supply_id', service.serviceSupplyId!)
+                .eq('service_supply_id', service!.serviceSupplyId!)
                 .maybeSingle();
             if (supplyRow != null) {
               final currentStock = (supplyRow['stock'] as num).toDouble();
@@ -236,7 +237,7 @@ class TransactionProvider extends ChangeNotifier {
                     'user_id': profileRow['id'] as int,
                     'quantity_removed': deduction,
                     'transaction_id': transactionId,
-                    'service_supply_id': service.serviceSupplyId,
+                    'service_supply_id': service!.serviceSupplyId,
                     'inventory_item_id': supplyInventoryId,
                     'stock_out_type': 'sale',
                     'stock_out_date': now.toIso8601String(),

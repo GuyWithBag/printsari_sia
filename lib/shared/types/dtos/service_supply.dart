@@ -3,7 +3,6 @@ class ServiceSupply {
   final String name;
   final String supplyType;
   final String? paperSize;
-  final String? unit;
   final double purchasePrice;
   final DateTime createdAt;
   final DateTime updatedAt;
@@ -13,7 +12,6 @@ class ServiceSupply {
     required this.name,
     required this.supplyType,
     this.paperSize,
-    this.unit,
     required this.purchasePrice,
     required this.createdAt,
     required this.updatedAt,
@@ -25,7 +23,6 @@ class ServiceSupply {
       name: json['name'] as String,
       supplyType: json['supply_type'] as String,
       paperSize: json['paper_size'] as String?,
-      unit: json['unit'] as String?,
       purchasePrice: (json['purchase_price'] as num).toDouble(),
       createdAt: DateTime.parse(json['created_at'] as String),
       updatedAt: DateTime.parse(json['updated_at'] as String),
@@ -38,7 +35,6 @@ class ServiceSupply {
       'name': name,
       'supply_type': supplyType,
       'paper_size': paperSize,
-      'unit': unit,
       'purchase_price': purchasePrice,
       'created_at': createdAt.toIso8601String(),
       'updated_at': updatedAt.toIso8601String(),
@@ -50,7 +46,6 @@ class ServiceSupply {
       'name': name,
       'supply_type': supplyType,
       if (paperSize != null) 'paper_size': paperSize,
-      if (unit != null) 'unit': unit,
       'purchase_price': purchasePrice,
     };
   }

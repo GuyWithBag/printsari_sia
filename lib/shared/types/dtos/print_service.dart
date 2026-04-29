@@ -1,4 +1,9 @@
-import 'package:printsari_sia/shared/types/types.dart';
+import 'package:printsari_sia/shared/types/dtos/color_mode.dart';
+import 'package:printsari_sia/shared/types/dtos/machine.dart';
+import 'package:printsari_sia/shared/types/dtos/paper_size.dart';
+import 'package:printsari_sia/shared/types/dtos/print_finish.dart';
+import 'package:printsari_sia/shared/types/dtos/print_orientation.dart';
+import 'package:printsari_sia/shared/types/dtos/service_supply.dart';
 
 class PrintService {
   final int id;

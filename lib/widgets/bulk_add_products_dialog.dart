@@ -14,9 +14,9 @@ Future<void> showBulkAddProductsDialog(
   final productProviderRef = Provider.of<ProductProvider>(context, listen: false);
   final activityLogRef = Provider.of<ActivityLogProvider>(context, listen: false);
 
-  // Each row: {name, purchasePrice, sellingPrice, categoryId, perishable}
+  // Each row: {name, purchasePrice, sellingPrice, productCategory, productType}
   final rows = <Map<String, dynamic>>[
-    {'name': '', 'purchasePrice': '', 'sellingPrice': '', 'categoryId': 1, 'perishable': true},
+    {'name': '', 'purchasePrice': '', 'sellingPrice': '', 'productCategory': '', 'productType': ''},
   ];
 
   await showDialog(
@@ -26,7 +26,7 @@ Future<void> showBulkAddProductsDialog(
         bool isSaving = false;
 
         void addRow() => setDialogState(() => rows.add(
-            {'name': '', 'purchasePrice': '', 'sellingPrice': '', 'categoryId': 1, 'perishable': true}));
+            {'name': '', 'purchasePrice': '', 'sellingPrice': '', 'productCategory': '', 'productType': ''}));
         void removeRow(int i) => setDialogState(() => rows.removeAt(i));
 
         return AlertDialog(
@@ -65,7 +65,7 @@ Future<void> showBulkAddProductsDialog(
                         const SizedBox(width: 8),
                         Expanded(flex: 2, child: Text('Category', style: GoogleFonts.outfit(color: posTextMuted, fontSize: 12))),
                         const SizedBox(width: 8),
-                        SizedBox(width: 80, child: Text('Perishable', style: GoogleFonts.outfit(color: posTextMuted, fontSize: 12))),
+                        Expanded(flex: 2, child: Text('Type', style: GoogleFonts.outfit(color: posTextMuted, fontSize: 12))),
                         const SizedBox(width: 36),
                       ],
                     ),
@@ -108,36 +108,19 @@ Future<void> showBulkAddProductsDialog(
                           const SizedBox(width: 8),
                           Expanded(
                             flex: 2,
-                            child: Container(
-                              height: 44,
-                              padding: const EdgeInsets.symmetric(horizontal: 10),
-                              decoration: BoxDecoration(
-                                color: posSurfaceLight,
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: DropdownButtonHideUnderline(
-                                child: DropdownButton<int>(
-                                  value: row['categoryId'] as int,
-                                  dropdownColor: posSurfaceLight,
-                                  style: GoogleFonts.outfit(color: Colors.white, fontSize: 13),
-                                  isExpanded: true,
-                                  items: const [
-                                    DropdownMenuItem(value: 1, child: Text('Store')),
-                                    DropdownMenuItem(value: 2, child: Text('Printing')),
-                                  ],
-                                  onChanged: (v) => setDialogState(() => row['categoryId'] = v ?? 1),
-                                ),
-                              ),
+                            child: bulkTextField(
+                              hint: 'e.g. Snacks',
+                              initialValue: row['productCategory'] as String,
+                              onChanged: (v) => row['productCategory'] = v,
                             ),
                           ),
                           const SizedBox(width: 8),
-                          SizedBox(
-                            width: 80,
-                            child: Checkbox(
-                              value: row['perishable'] as bool,
-                              activeColor: posPrimary,
-                              checkColor: Colors.white,
-                              onChanged: (v) => setDialogState(() => row['perishable'] = v ?? true),
+                          Expanded(
+                            flex: 2,
+                            child: bulkTextField(
+                              hint: 'e.g. Food',
+                              initialValue: row['productType'] as String,
+                              onChanged: (v) => row['productType'] = v,
                             ),
                           ),
                           IconButton(
@@ -184,11 +167,10 @@ Future<void> showBulkAddProductsDialog(
                           await productProviderRef.createProduct(Product(
                             id: 0,
                             name: name,
-                            description: name,
-                            categoryId: row['categoryId'] as int,
+                            productCategory: row['productCategory'] as String,
+                            productType: row['productType'] as String,
                             purchasePrice: purchasePrice,
                             sellingPrice: sellingPrice,
-                            perishable: row['perishable'] as bool,
                             createdAt: now,
                             updatedAt: now,
                           ));

@@ -467,6 +467,18 @@ class _UserGroupPanel extends StatelessWidget {
                         canChangeRole: canChangeRole,
                       ),
                     ),
+                    // Delete button (owners only, never self)
+                    if (!isCurrentUser && canChangeRole)
+                      IconButton(
+                        icon: const Icon(Icons.delete_outline,
+                            size: 18, color: Color(0xFFEF4444)),
+                        tooltip: 'Delete user',
+                        onPressed: () => _showDeleteUserDialog(
+                          context,
+                          u.profile,
+                          onRefresh,
+                        ),
+                      ),
                   ],
                 ),
               );
@@ -474,6 +486,78 @@ class _UserGroupPanel extends StatelessWidget {
         ],
       ),
     );
+  }
+}
+
+Future<void> _showDeleteUserDialog(
+  BuildContext context,
+  Profile profile,
+  VoidCallback onRefresh,
+) async {
+  final confirmed = await showDialog<bool>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      backgroundColor: posSurface,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      title: Text(
+        'Delete User',
+        style: GoogleFonts.outfit(
+          color: Colors.white,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+      content: RichText(
+        text: TextSpan(
+          style: GoogleFonts.outfit(color: posTextMuted, fontSize: 14),
+          children: [
+            const TextSpan(text: 'Are you sure you want to delete '),
+            TextSpan(
+              text: profile.name,
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const TextSpan(
+              text: '? This will permanently remove their profile and cannot be undone.',
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(ctx, false),
+          child: Text('Cancel', style: GoogleFonts.outfit(color: posTextMuted)),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.pop(ctx, true),
+          style: FilledButton.styleFrom(
+            backgroundColor: const Color(0xFFEF4444),
+            foregroundColor: Colors.white,
+          ),
+          child: Text('Delete', style: GoogleFonts.outfit()),
+        ),
+      ],
+    ),
+  );
+
+  if (confirmed != true) return;
+  if (!context.mounted) return;
+
+  try {
+    final supabase = Supabase.instance.client;
+    await supabase.from('profiles').delete().eq('id', profile.id);
+    onRefresh();
+  } catch (e) {
+    debugPrint('Error deleting user: $e');
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error deleting user: $e'),
+          backgroundColor: const Color(0xFFEF4444),
+        ),
+      );
+    }
   }
 }
 
@@ -648,13 +732,16 @@ Future<void> _showAddUserDialog(
                     final username = usernameController.text.trim();
                     final generatedEmail = '$username@printsari.internal';
 
-                    try {
-                      // Save owner's session BEFORE signUp.
-                      // supabase.auth.signUp() auto-logs in the new user,
-                      // replacing the current session. We restore it afterwards.
-                      final ownerAccessToken =
-                          supabase.auth.currentSession?.accessToken;
+                    // Save owner's refresh token BEFORE signUp.
+                    // signUp() replaces the in-memory session with the new
+                    // user's session. setSession(accessToken) fails because it
+                    // internally tries to refresh using the now-replaced token.
+                    // refreshSession(refreshToken: ownerRefreshToken) restores
+                    // the owner session directly, bypassing in-memory state.
+                    final ownerRefreshToken =
+                        supabase.auth.currentSession?.refreshToken;
 
+                    try {
                       // Sign up the new user via Supabase Auth
                       final authResponse = await supabase.auth.signUp(
                         email: generatedEmail,
@@ -699,9 +786,9 @@ Future<void> _showAddUserDialog(
                             : countryController.text,
                       });
 
-                      // Restore owner's session so subsequent operations work
-                      if (ownerAccessToken != null) {
-                        await supabase.auth.setSession(ownerAccessToken);
+                      // Restore owner's session using the saved refresh token.
+                      if (ownerRefreshToken != null) {
+                        await supabase.auth.refreshSession(ownerRefreshToken);
                         await authController.restoreSession();
                       }
 
@@ -710,6 +797,17 @@ Future<void> _showAddUserDialog(
                     } catch (e) {
                       debugPrint('Error creating user: $e');
                       if (ctx.mounted) {
+                        // If session restoration failed, the owner may be in a
+                        // broken state (logged in as the new user). Sign out so
+                        // they can re-authenticate cleanly.
+                        final isSessionError = e.toString().contains('Refresh token') ||
+                            e.toString().contains('session') ||
+                            e.toString().contains('token');
+                        if (isSessionError) {
+                          Navigator.pop(ctx);
+                          authController.signOut(ctx);
+                          return;
+                        }
                         setDialogState(() => isCreating = false);
                         ScaffoldMessenger.of(ctx).showSnackBar(
                           SnackBar(

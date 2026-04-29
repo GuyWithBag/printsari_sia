@@ -1,4 +1,4 @@
-import 'package:printsari_sia/shared/types/types.dart';
+import 'package:printsari_sia/shared/types/dtos/print_finish_type.dart';
 
 class PrintFinish {
   final int id;

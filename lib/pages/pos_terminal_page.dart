@@ -29,7 +29,7 @@ class POSTerminalPage extends HookWidget {
       productProvider,
     ]);
     final servicesFuture = useMemoized(
-      () => productProvider.getPrintServices(),
+      () => productProvider.getServiceTypes(),
       [productProvider],
     );
     final inventoryFuture = useMemoized(
@@ -70,6 +70,7 @@ class POSTerminalPage extends HookWidget {
             child: CartPanel(
               transactionProvider: transactionProvider,
               selectedPaymentMethod: selectedPaymentMethod,
+              inventory: inventorySnapshot.data ?? [],
             ),
           ),
         ],

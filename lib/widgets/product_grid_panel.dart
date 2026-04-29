@@ -16,7 +16,7 @@ class ProductGridPanel extends HookWidget {
   final ValueNotifier<String> searchQuery;
   final ValueNotifier<int> tabIndex;
   final AsyncSnapshot<List<Product>> productsSnapshot;
-  final AsyncSnapshot<List<PrintService>> servicesSnapshot;
+  final AsyncSnapshot<List<ServiceType>> servicesSnapshot;
   final AsyncSnapshot<List<InventoryItem>> inventorySnapshot;
   final TransactionProvider transactionProvider;
 
@@ -54,15 +54,15 @@ class ProductGridPanel extends HookWidget {
       if (product == null) return false;
       if (query.isEmpty) return true;
       return product.name.toLowerCase().contains(query) ||
-          (product.category?.categoryName.toLowerCase().contains(query) ??
-              false);
+          product.productCategory.toLowerCase().contains(query) ||
+          product.productType.toLowerCase().contains(query);
     }).toList();
 
     final filteredServices = allServices.where((s) {
       if (query.isEmpty) return true;
       return s.name.toLowerCase().contains(query) ||
-          (s.paperSize?.sizeName.toLowerCase().contains(query) ?? false) ||
-          (s.colorMode?.modeName.toLowerCase().contains(query) ?? false);
+          (s.paperSize?.toLowerCase().contains(query) ?? false) ||
+          (s.colorMode?.toLowerCase().contains(query) ?? false);
     }).toList();
 
     final isProductTab = tabIndex.value == 0;
@@ -368,7 +368,7 @@ class ProductGridPanel extends HookWidget {
   // ── Service Grid ──
   Widget _buildServiceGrid(
     BuildContext context,
-    List<PrintService> filteredServices,
+    List<ServiceType> filteredServices,
     int page,
   ) {
     final isLoading =
@@ -410,8 +410,9 @@ class ProductGridPanel extends HookWidget {
   // ── Page count dialog for print services ──
   Future<void> _showPageCountDialog(
     BuildContext context,
-    PrintService service,
+    ServiceType service,
   ) async {
+    final sellingPrice = service.cost?.serviceSellingPrice ?? 0.0;
     final pageCountController = TextEditingController(text: '1');
     final result = await showDialog<int>(
       context: context,
@@ -438,7 +439,7 @@ class ProductGridPanel extends HookWidget {
             ),
             const SizedBox(height: 4),
             Text(
-              'Base price: P${service.basePrice.toStringAsFixed(2)} / page',
+              'Price: P${sellingPrice.toStringAsFixed(2)} / page',
               style: GoogleFonts.outfit(color: posTextMuted, fontSize: 13),
             ),
             const SizedBox(height: 16),
@@ -497,23 +498,23 @@ class ProductGridPanel extends HookWidget {
 
     try {
       final pageCount = result;
-      final totalPrice = service.basePrice * pageCount;
-      final inkUsed = service.inkCostPerPage * pageCount;
-      final paperUsed = service.paperCostPerPage * pageCount;
-      final electricityUsed = service.electricityCostPerPage * pageCount;
-      final totalCost = service.totalCostPerPage * pageCount;
+      final totalPrice = sellingPrice * pageCount;
+      final inkCost = (service.cost?.inkCost ?? 0) * pageCount;
+      final supplyCost = (service.cost?.serviceSupplyCost ?? 0) * pageCount;
+      final electricityCost = (service.cost?.electricityCost ?? 0) * pageCount;
+      final totalCost = (service.cost?.serviceTotalCost ?? 0) * pageCount;
       final profitMargin = totalPrice - totalCost;
 
       final supabase = Supabase.instance.client;
       final insertedOrder = await supabase
           .from('print_orders')
           .insert({
-            'service_id': service.id,
+            'service_type_id': service.id,
             'quantity': pageCount,
             'total_price': totalPrice,
-            'ink_used': inkUsed,
-            'paper_used': paperUsed,
-            'electricity_used': electricityUsed,
+            'ink_used': inkCost,
+            'paper_used': supplyCost,
+            'electricity_used': electricityCost,
             'total_cost': totalCost,
             'profit_margin': profitMargin,
           })
@@ -529,7 +530,7 @@ class ProductGridPanel extends HookWidget {
           productId: null,
           productName: service.name,
           quantity: pageCount.toDouble(),
-          unitPrice: service.basePrice,
+          unitPrice: sellingPrice,
           subtotal: totalPrice,
           categoryId: 2,
           printOrderId: printOrderId,
@@ -881,7 +882,7 @@ class _StoreProductCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Category badge
-          if (product.category != null)
+          if (product.productCategory.isNotEmpty)
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
               decoration: BoxDecoration(
@@ -889,7 +890,7 @@ class _StoreProductCard extends StatelessWidget {
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Text(
-                product.category!.categoryName,
+                product.productCategory,
                 style: GoogleFonts.outfit(
                   color: posPrimary,
                   fontSize: 10,
@@ -934,7 +935,7 @@ class _StoreProductCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 4),
-          if (product.perishable && inventoryItem?.expiryDate != null)
+          if (inventoryItem?.expiryDate != null)
             Text(
               'Exp: ${DateFormat('MMM d, yyyy').format(inventoryItem!.expiryDate!)}',
               style: GoogleFonts.outfit(

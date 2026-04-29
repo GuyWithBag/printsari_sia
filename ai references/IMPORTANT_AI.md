@@ -41,8 +41,12 @@ After `signUp()` completes and the new user's profile is inserted, **always rest
 // 1. Capture the auth controller BEFORE showDialog (valid context)
 final authController = context.read<AuthController>();
 
-// 2. Save owner's access token BEFORE signUp
-final ownerAccessToken = supabase.auth.currentSession?.accessToken;
+// 2. Save owner's REFRESH token BEFORE signUp
+//    ⚠️  Do NOT save the access token — setSession(accessToken) will fail.
+//    In supabase_flutter 2.x, setSession() internally refreshes using the
+//    in-memory refresh token, which is replaced by signUp(). Use
+//    refreshSession(refreshToken:) instead, which bypasses in-memory state.
+final ownerRefreshToken = supabase.auth.currentSession?.refreshToken;
 
 // 3. signUp — this replaces the current session with the new user's session
 final authResponse = await supabase.auth.signUp(email: ..., password: ...);
@@ -50,9 +54,9 @@ final authResponse = await supabase.auth.signUp(email: ..., password: ...);
 // 4. Insert new user's profile (new user's session is active, RLS allows it)
 await supabase.from('profiles').insert({...});
 
-// 5. Restore owner's session
-if (ownerAccessToken != null) {
-  await supabase.auth.setSession(ownerAccessToken);
+// 5. Restore owner's session using the saved refresh token
+if (ownerRefreshToken != null) {
+  await supabase.auth.refreshSession(ownerRefreshToken); // positional, not named
   await authController.restoreSession(); // syncs AuthController's local state
 }
 ```
@@ -62,6 +66,9 @@ Without step 5, the owner is invisibly logged in as the new cashier. This causes
 - Deactivate button to silently fail (wrong user identity)
 - Inventory stock-in to fail
 - Any owner-gated operation to break
+
+**Why `setSession(accessToken)` fails (do not revert to it):**
+`setSession` in gotrue-dart v2 validates by calling the refresh endpoint using the **currently stored** refresh token. After `signUp()`, the stored refresh token is the new user's — not the owner's. Passing the owner's access token with the new user's refresh token returns HTTP 400 "Refresh token is not valid". Using `refreshSession(refreshToken: ownerRefreshToken)` skips the in-memory state entirely and works correctly.
 
 ## No Hive Cache
 
