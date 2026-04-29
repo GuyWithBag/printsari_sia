@@ -16,7 +16,8 @@ class ProductGridPanel extends HookWidget {
   final ValueNotifier<String> searchQuery;
   final ValueNotifier<int> tabIndex;
   final AsyncSnapshot<List<Product>> productsSnapshot;
-  final AsyncSnapshot<List<ServiceType>> servicesSnapshot;
+  final AsyncSnapshot<List<Service>> servicesSnapshot;
+  final AsyncSnapshot<List<ServiceType>> serviceTypesSnapshot;
   final AsyncSnapshot<List<InventoryItem>> inventorySnapshot;
   final TransactionProvider transactionProvider;
 
@@ -26,6 +27,7 @@ class ProductGridPanel extends HookWidget {
     required this.tabIndex,
     required this.productsSnapshot,
     required this.servicesSnapshot,
+    required this.serviceTypesSnapshot,
     required this.inventorySnapshot,
     required this.transactionProvider,
   });
@@ -46,6 +48,7 @@ class ProductGridPanel extends HookWidget {
     final allProducts = productsSnapshot.data ?? [];
     final allInventory = inventorySnapshot.data ?? [];
     final allServices = servicesSnapshot.data ?? [];
+    final allServiceTypes = serviceTypesSnapshot.data ?? [];
     final query = searchQuery.value.toLowerCase();
 
     final filteredBatches = allInventory.where((inv) {
@@ -60,9 +63,7 @@ class ProductGridPanel extends HookWidget {
 
     final filteredServices = allServices.where((s) {
       if (query.isEmpty) return true;
-      return s.name.toLowerCase().contains(query) ||
-          (s.paperSize?.toLowerCase().contains(query) ?? false) ||
-          (s.colorMode?.toLowerCase().contains(query) ?? false);
+      return s.name.toLowerCase().contains(query);
     }).toList();
 
     final isProductTab = tabIndex.value == 0;
@@ -167,7 +168,7 @@ class ProductGridPanel extends HookWidget {
                 child: tabIndex.value == 0
                     ? _buildProductGrid(
                         context, filteredBatches, allProducts, safePage)
-                    : _buildServiceGrid(context, filteredServices, safePage),
+                    : _buildServiceGrid(context, filteredServices, allServiceTypes, safePage),
               ),
             ),
           ),
@@ -368,15 +369,17 @@ class ProductGridPanel extends HookWidget {
   // ── Service Grid ──
   Widget _buildServiceGrid(
     BuildContext context,
-    List<ServiceType> filteredServices,
+    List<Service> filteredServices,
+    List<ServiceType> allServiceTypes,
     int page,
   ) {
     final isLoading =
-        servicesSnapshot.connectionState == ConnectionState.waiting;
+        servicesSnapshot.connectionState == ConnectionState.waiting ||
+        serviceTypesSnapshot.connectionState == ConnectionState.waiting;
 
     if (isLoading) return _buildSkeletonGrid();
 
-    if (servicesSnapshot.hasError) {
+    if (servicesSnapshot.hasError || serviceTypesSnapshot.hasError) {
       return _emptyState(Icons.error_outline, 'Failed to load print services');
     }
 
@@ -399,12 +402,94 @@ class ProductGridPanel extends HookWidget {
       itemCount: pageItems.length,
       itemBuilder: (context, index) {
         final service = pageItems[index];
+        final types = allServiceTypes
+            .where((t) => t.serviceId == service.id)
+            .toList();
+        final prices = types
+            .where((t) => (t.cost?.serviceSellingPrice ?? 0) > 0)
+            .map((t) => t.cost!.serviceSellingPrice);
+        final minPrice = prices.isEmpty
+            ? null
+            : prices.reduce((a, b) => a < b ? a : b);
         return _BounceTapCard(
-          child: PrintServiceCard(service: service),
-          onTap: () => _showPageCountDialog(context, service),
+          child: PrintServiceCard(service: service, minPrice: minPrice),
+          onTap: () => _showServiceDialog(context, service, types),
         );
       },
     );
+  }
+
+  // ── Service type selection → page count ──
+  Future<void> _showServiceDialog(
+    BuildContext context,
+    Service service,
+    List<ServiceType> types,
+  ) async {
+    if (types.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('No service types configured for ${service.name}'),
+          backgroundColor: Colors.red.shade700,
+        ),
+      );
+      return;
+    }
+
+    if (types.length == 1) {
+      await _showPageCountDialog(context, types.first);
+      return;
+    }
+
+    // Multiple types — let user pick
+    final selected = await showDialog<ServiceType>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: posSurface,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+          side: BorderSide(color: Colors.white.withValues(alpha: 0.08)),
+        ),
+        title: Text(
+          service.name,
+          style: GoogleFonts.outfit(
+            color: Colors.white,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: types.map((t) {
+            final price = t.cost?.serviceSellingPrice;
+            return ListTile(
+              contentPadding: EdgeInsets.zero,
+              title: Text(
+                t.name,
+                style: GoogleFonts.outfit(color: Colors.white),
+              ),
+              subtitle: price != null
+                  ? Text(
+                      'P${price.toStringAsFixed(2)} / page',
+                      style: GoogleFonts.outfit(
+                        color: posTextMuted,
+                        fontSize: 12,
+                      ),
+                    )
+                  : null,
+              onTap: () => Navigator.of(ctx).pop(t),
+            );
+          }).toList(),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(null),
+            child: Text('Cancel', style: GoogleFonts.outfit(color: posTextMuted)),
+          ),
+        ],
+      ),
+    );
+
+    if (selected == null || !context.mounted) return;
+    await _showPageCountDialog(context, selected);
   }
 
   // ── Page count dialog for print services ──
