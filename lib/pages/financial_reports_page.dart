@@ -644,9 +644,12 @@ class _TrendChart extends StatelessWidget {
                           sideTitles: SideTitles(
                             showTitles: true,
                             reservedSize: 48,
-                            getTitlesWidget: (v, _) => Text(
-                              v >= 1000 ? '${(v / 1000).toStringAsFixed(0)}k' : v.toStringAsFixed(0),
-                              style: GoogleFonts.outfit(fontSize: 10, color: posTextMuted),
+                            getTitlesWidget: (v, meta) => SideTitleWidget(
+                              meta: meta,
+                              child: Text(
+                                v >= 1000 ? '${(v / 1000).toStringAsFixed(0)}k' : v.toStringAsFixed(0),
+                                style: GoogleFonts.outfit(fontSize: 10, color: posTextMuted),
+                              ),
                             ),
                           ),
                         ),
@@ -655,11 +658,14 @@ class _TrendChart extends StatelessWidget {
                             showTitles: true,
                             reservedSize: 28,
                             interval: (bucketCount / 8).ceilToDouble().clamp(1, bucketCount.toDouble()),
-                            getTitlesWidget: (v, _) {
+                            getTitlesWidget: (v, meta) {
                               final date = startDate.add(Duration(days: (v * bucketDays).toInt()));
-                              return Text(
-                                DateFormat('M/d').format(date),
-                                style: GoogleFonts.outfit(fontSize: 10, color: posTextMuted),
+                              return SideTitleWidget(
+                                meta: meta,
+                                child: Text(
+                                  DateFormat('M/d').format(date),
+                                  style: GoogleFonts.outfit(fontSize: 10, color: posTextMuted),
+                                ),
                               );
                             },
                           ),
