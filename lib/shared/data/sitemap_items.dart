@@ -5,7 +5,7 @@ const siteMapItems = <SiteMapItem>[
     title: 'Dashboard',
     iconPath: 'assets/house.svg',
     path: '/',
-    roles: [UserRoleType.cashier, UserRoleType.owner],
+    roles: [UserRoleType.cashier, UserRoleType.owner, UserRoleType.manager],
   ),
   SiteMapItem(
     title: 'Products & Services',
