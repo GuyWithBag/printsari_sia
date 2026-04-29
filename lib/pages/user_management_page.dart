@@ -860,6 +860,7 @@ Future<void> _showEditUserDialog(
   Uint8List? pickedImageBytes;
   String? pickedImageName;
   bool isSaving = false;
+  final authController = Provider.of<AuthController>(context, listen: false);
 
   await showDialog(
     context: context,
@@ -1068,7 +1069,7 @@ Future<void> _showEditUserDialog(
                       if (ctx.mounted) {
                         final currentUserId = supabase.auth.currentUser?.id;
                         if (profile.userId == currentUserId) {
-                          await ctx.read<AuthController>().restoreSession();
+                          await authController.restoreSession();
                         }
                         if (ctx.mounted) Navigator.pop(ctx);
                       }

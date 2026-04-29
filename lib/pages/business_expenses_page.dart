@@ -814,6 +814,7 @@ Future<void> _showDeleteExpenseDialog(
   Expense expense,
   VoidCallback onRefresh,
 ) async {
+  final provider = Provider.of<ExpenseProvider>(context, listen: false);
   await showDialog(
     context: context,
     builder: (ctx) => AlertDialog(
@@ -838,8 +839,6 @@ Future<void> _showDeleteExpenseDialog(
         ),
         FilledButton(
           onPressed: () async {
-            final provider =
-                Provider.of<ExpenseProvider>(ctx, listen: false);
             try {
               await provider.deleteExpense(expense.id);
               if (ctx.mounted) Navigator.pop(ctx);

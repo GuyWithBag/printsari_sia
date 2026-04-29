@@ -228,7 +228,7 @@ class InventoryProvider extends ChangeNotifier {
 
     final query = await supabase
         .from('inventory_items')
-        .select('*, service_supplies(*)');
+        .select('*, service_supplies(*), products(*)');
     _items = query.map((r) => InventoryItem.fromJson(r)).toList();
     _hasPendingChanges = false;
     return _items!;

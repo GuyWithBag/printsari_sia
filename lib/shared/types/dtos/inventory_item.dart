@@ -16,6 +16,7 @@ class InventoryItem {
 
   // Optional joined data
   final ServiceSupply? serviceSupply;
+  final Product? product;
 
   bool get isSupplyItem => serviceSupplyId != null;
 
@@ -33,6 +34,7 @@ class InventoryItem {
     required this.createdAt,
     required this.updatedAt,
     this.serviceSupply,
+    this.product,
   });
 
   factory InventoryItem.fromJson(Map<String, dynamic> json) {
@@ -59,6 +61,9 @@ class InventoryItem {
           ? ServiceSupply.fromJson(
               json['service_supplies'] as Map<String, dynamic>,
             )
+          : null,
+      product: json['products'] != null
+          ? Product.fromJson(json['products'] as Map<String, dynamic>)
           : null,
     );
   }

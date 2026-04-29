@@ -581,7 +581,6 @@ class _TrendChart extends StatelessWidget {
     if (maxY == 0) maxY = 100;
 
     return Container(
-      clipBehavior: Clip.hardEdge,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: posSurface,
@@ -623,7 +622,7 @@ class _TrendChart extends StatelessWidget {
                 scrollDirection: Axis.horizontal,
                 child: SizedBox(
                   width: chartWidth,
-                  height: 200,
+                  height: 260,
                   child: LineChart(
                     LineChartData(
                       minY: 0,
@@ -654,6 +653,7 @@ class _TrendChart extends StatelessWidget {
                         bottomTitles: AxisTitles(
                           sideTitles: SideTitles(
                             showTitles: true,
+                            reservedSize: 28,
                             interval: (bucketCount / 8).ceilToDouble().clamp(1, bucketCount.toDouble()),
                             getTitlesWidget: (v, _) {
                               final date = startDate.add(Duration(days: (v * bucketDays).toInt()));
@@ -802,11 +802,9 @@ Future<void> _exportFinancialReport(
 
     doc.addPage(
       pw.MultiPage(
-        pageFormat: PdfPageFormat.a4,
-        margin: const pw.EdgeInsets.all(32),
-        theme: pw.ThemeData.withFont(base: regular, bold: bold),
         pageTheme: pw.PageTheme(
           pageFormat: PdfPageFormat.a4,
+          margin: const pw.EdgeInsets.all(32),
           theme: pw.ThemeData.withFont(base: regular, bold: bold),
           buildBackground: (ctx) => pw.FullPage(
             ignoreMargins: true,
