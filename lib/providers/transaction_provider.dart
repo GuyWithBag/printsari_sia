@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:printsari_sia/providers/activity_log_provider.dart';
 import 'package:printsari_sia/shared/types/types.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -70,6 +71,7 @@ class TransactionProvider extends ChangeNotifier {
   Future<Transaction?> checkout({
     required int cashierId,
     required int paymentMethodId,
+    required ActivityLogProvider activityLog,
     int? customerId,
     String? notes,
   }) async {
@@ -159,61 +161,29 @@ class TransactionProvider extends ChangeNotifier {
         if (item.printOrderId != null) {
           final printOrderRow = await supabase
               .from('print_orders')
-              .select('*, service_types(*, service_type_costs(*))')
+              .select('*, service_supplies(*)')
               .eq('id', item.printOrderId!)
               .single();
           final printOrder = PrintOrder.fromJson(printOrderRow);
-          final service = printOrder.serviceType;
-          final cost = service?.cost;
+          final supply = printOrder.serviceSupply;
 
-          final expenseDate = now.toIso8601String();
-          final expenses = [
-            {
-              'description':
-                  'Ink cost - ${item.productName} (${printOrder.quantity} pages)',
-              'amount': (cost?.inkCost ?? 0) * printOrder.quantity,
-              'category_id': 1,
-              'date': expenseDate,
-              'linked_transaction_id': transactionId,
-              'source_id': 2,
-            },
-            {
+          if (supply != null) {
+            final expenseDate = now.toIso8601String();
+            await supabase.from('expenses').insert({
               'description':
                   'Supply cost - ${item.productName} (${printOrder.quantity} pages)',
-              'amount': (cost?.serviceSupplyCost ?? 0) * printOrder.quantity,
+              'amount': supply.purchasePrice * printOrder.quantity,
               'category_id': 2,
               'date': expenseDate,
               'linked_transaction_id': transactionId,
               'source_id': 2,
-            },
-            {
-              'description':
-                  'Electricity cost - ${item.productName} (${printOrder.quantity} pages)',
-              'amount': (cost?.electricityCost ?? 0) * printOrder.quantity,
-              'category_id': 3,
-              'date': expenseDate,
-              'linked_transaction_id': transactionId,
-              'source_id': 2,
-            },
-            {
-              'description':
-                  'Labor cost - ${item.productName} (${printOrder.quantity} pages)',
-              'amount': (cost?.laborCost ?? 0) * printOrder.quantity,
-              'category_id': 4,
-              'date': expenseDate,
-              'linked_transaction_id': transactionId,
-              'source_id': 2,
-            },
-          ];
+            });
 
-          await supabase.from('expenses').insert(expenses);
-
-          // Deduct supply stock if this service type links to a service supply
-          if (service?.serviceSupplyId != null) {
+            // Deduct supply stock
             final supplyRow = await supabase
                 .from('inventory_items')
                 .select('id, stock')
-                .eq('service_supply_id', service!.serviceSupplyId!)
+                .eq('service_supply_id', supply.id)
                 .maybeSingle();
             if (supplyRow != null) {
               final currentStock = (supplyRow['stock'] as num).toDouble();
@@ -224,7 +194,6 @@ class TransactionProvider extends ChangeNotifier {
                   .update({'stock': (currentStock - deduction).clamp(0.0, double.infinity)})
                   .eq('id', supplyInventoryId);
 
-              // Get cashier profile id for stock_out record
               final currentUser = supabase.auth.currentUser;
               if (currentUser != null) {
                 final profileRow = await supabase
@@ -237,7 +206,7 @@ class TransactionProvider extends ChangeNotifier {
                     'user_id': profileRow['id'] as int,
                     'quantity_removed': deduction,
                     'transaction_id': transactionId,
-                    'service_supply_id': service!.serviceSupplyId,
+                    'service_supply_id': supply.id,
                     'inventory_item_id': supplyInventoryId,
                     'stock_out_type': 'sale',
                     'stock_out_date': now.toIso8601String(),
@@ -253,6 +222,12 @@ class TransactionProvider extends ChangeNotifier {
       _transactions = null;
       _completedTransactionCount++;
       notifyListeners();
+
+      activityLog.log(
+        actionName: 'transaction_created',
+        description:
+            'Transaction $transactionNumber completed — total: ₱${subtotal.toStringAsFixed(2)}',
+      );
 
       return Transaction.fromJson(insertedTransaction);
     } catch (e) {

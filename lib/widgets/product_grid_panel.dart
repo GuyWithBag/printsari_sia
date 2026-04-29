@@ -16,8 +16,7 @@ class ProductGridPanel extends HookWidget {
   final ValueNotifier<String> searchQuery;
   final ValueNotifier<int> tabIndex;
   final AsyncSnapshot<List<Product>> productsSnapshot;
-  final AsyncSnapshot<List<Service>> servicesSnapshot;
-  final AsyncSnapshot<List<ServiceType>> serviceTypesSnapshot;
+  final AsyncSnapshot<List<ServiceSupply>> serviceSuppliesSnapshot;
   final AsyncSnapshot<List<InventoryItem>> inventorySnapshot;
   final TransactionProvider transactionProvider;
 
@@ -26,8 +25,7 @@ class ProductGridPanel extends HookWidget {
     required this.searchQuery,
     required this.tabIndex,
     required this.productsSnapshot,
-    required this.servicesSnapshot,
-    required this.serviceTypesSnapshot,
+    required this.serviceSuppliesSnapshot,
     required this.inventorySnapshot,
     required this.transactionProvider,
   });
@@ -47,8 +45,7 @@ class ProductGridPanel extends HookWidget {
     // Compute filtered items for pagination totals
     final allProducts = productsSnapshot.data ?? [];
     final allInventory = inventorySnapshot.data ?? [];
-    final allServices = servicesSnapshot.data ?? [];
-    final allServiceTypes = serviceTypesSnapshot.data ?? [];
+    final allSupplies = serviceSuppliesSnapshot.data ?? [];
     final query = searchQuery.value.toLowerCase();
 
     final filteredBatches = allInventory.where((inv) {
@@ -61,14 +58,15 @@ class ProductGridPanel extends HookWidget {
           product.productType.toLowerCase().contains(query);
     }).toList();
 
-    final filteredServices = allServices.where((s) {
+    final filteredSupplies = allSupplies.where((s) {
       if (query.isEmpty) return true;
-      return s.name.toLowerCase().contains(query);
+      return s.name.toLowerCase().contains(query) ||
+          s.supplyType.toLowerCase().contains(query);
     }).toList();
 
     final isProductTab = tabIndex.value == 0;
     final filteredCount =
-        isProductTab ? filteredBatches.length : filteredServices.length;
+        isProductTab ? filteredBatches.length : filteredSupplies.length;
     final totalPages = (filteredCount / _pageSize).ceil().clamp(1, 99999);
     final safePage = currentPage.value.clamp(0, totalPages - 1);
 
@@ -168,7 +166,7 @@ class ProductGridPanel extends HookWidget {
                 child: tabIndex.value == 0
                     ? _buildProductGrid(
                         context, filteredBatches, allProducts, safePage)
-                    : _buildServiceGrid(context, filteredServices, allServiceTypes, safePage),
+                    : _buildServiceGrid(context, filteredSupplies, safePage),
               ),
             ),
           ),
@@ -293,7 +291,7 @@ class ProductGridPanel extends HookWidget {
             ),
             const SizedBox(height: 4),
             Text(
-              'Price: P${inventoryItem.retailPrice.toStringAsFixed(2)} · Stock: ${maxQty.toStringAsFixed(0)}',
+              'Price: P${(product.sellingPrice ?? inventoryItem.purchasePrice).toStringAsFixed(2)} · Stock: ${maxQty.toStringAsFixed(0)}',
               style: GoogleFonts.outfit(color: posTextMuted, fontSize: 13),
             ),
             const SizedBox(height: 16),
@@ -356,10 +354,10 @@ class ProductGridPanel extends HookWidget {
         productId: product.id,
         productName: product.name,
         quantity: result.toDouble(),
-        unitPrice: inventoryItem.retailPrice,
-        subtotal: inventoryItem.retailPrice * result,
+        unitPrice: product.sellingPrice ?? inventoryItem.purchasePrice,
+        subtotal: (product.sellingPrice ?? inventoryItem.purchasePrice) * result,
         categoryId: 1,
-        itemCost: product.purchasePrice * result,
+        itemCost: inventoryItem.purchasePrice * result,
         createdAt: now,
         updatedAt: now,
       ),
@@ -369,30 +367,28 @@ class ProductGridPanel extends HookWidget {
   // ── Service Grid ──
   Widget _buildServiceGrid(
     BuildContext context,
-    List<Service> filteredServices,
-    List<ServiceType> allServiceTypes,
+    List<ServiceSupply> filteredSupplies,
     int page,
   ) {
     final isLoading =
-        servicesSnapshot.connectionState == ConnectionState.waiting ||
-        serviceTypesSnapshot.connectionState == ConnectionState.waiting;
+        serviceSuppliesSnapshot.connectionState == ConnectionState.waiting;
 
     if (isLoading) return _buildSkeletonGrid();
 
-    if (servicesSnapshot.hasError || serviceTypesSnapshot.hasError) {
+    if (serviceSuppliesSnapshot.hasError) {
       return _emptyState(Icons.error_outline, 'Failed to load print services');
     }
 
-    if (filteredServices.isEmpty) {
+    if (filteredSupplies.isEmpty) {
       return _emptyState(Icons.print_disabled, 'No print services found');
     }
 
     final start = page * _pageSize;
-    final end = (start + _pageSize).clamp(0, filteredServices.length);
-    final pageItems = filteredServices.sublist(start, end);
+    final end = (start + _pageSize).clamp(0, filteredSupplies.length);
+    final pageItems = filteredSupplies.sublist(start, end);
 
     return GridView.builder(
-      key: ValueKey('services-$page'),
+      key: ValueKey('supplies-$page'),
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 3,
         childAspectRatio: 1.05,
@@ -401,103 +397,21 @@ class ProductGridPanel extends HookWidget {
       ),
       itemCount: pageItems.length,
       itemBuilder: (context, index) {
-        final service = pageItems[index];
-        final types = allServiceTypes
-            .where((t) => t.serviceId == service.id)
-            .toList();
-        final prices = types
-            .where((t) => (t.cost?.serviceSellingPrice ?? 0) > 0)
-            .map((t) => t.cost!.serviceSellingPrice);
-        final minPrice = prices.isEmpty
-            ? null
-            : prices.reduce((a, b) => a < b ? a : b);
+        final supply = pageItems[index];
         return _BounceTapCard(
-          child: PrintServiceCard(service: service, minPrice: minPrice),
-          onTap: () => _showServiceDialog(context, service, types),
+          child: PrintServiceCard(supply: supply),
+          onTap: () => _showPageCountDialog(context, supply),
         );
       },
     );
   }
 
-  // ── Service type selection → page count ──
-  Future<void> _showServiceDialog(
-    BuildContext context,
-    Service service,
-    List<ServiceType> types,
-  ) async {
-    if (types.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('No service types configured for ${service.name}'),
-          backgroundColor: Colors.red.shade700,
-        ),
-      );
-      return;
-    }
-
-    if (types.length == 1) {
-      await _showPageCountDialog(context, types.first);
-      return;
-    }
-
-    // Multiple types — let user pick
-    final selected = await showDialog<ServiceType>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: posSurface,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
-          side: BorderSide(color: Colors.white.withValues(alpha: 0.08)),
-        ),
-        title: Text(
-          service.name,
-          style: GoogleFonts.outfit(
-            color: Colors.white,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: types.map((t) {
-            final price = t.cost?.serviceSellingPrice;
-            return ListTile(
-              contentPadding: EdgeInsets.zero,
-              title: Text(
-                t.name,
-                style: GoogleFonts.outfit(color: Colors.white),
-              ),
-              subtitle: price != null
-                  ? Text(
-                      'P${price.toStringAsFixed(2)} / page',
-                      style: GoogleFonts.outfit(
-                        color: posTextMuted,
-                        fontSize: 12,
-                      ),
-                    )
-                  : null,
-              onTap: () => Navigator.of(ctx).pop(t),
-            );
-          }).toList(),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(null),
-            child: Text('Cancel', style: GoogleFonts.outfit(color: posTextMuted)),
-          ),
-        ],
-      ),
-    );
-
-    if (selected == null || !context.mounted) return;
-    await _showPageCountDialog(context, selected);
-  }
-
   // ── Page count dialog for print services ──
   Future<void> _showPageCountDialog(
     BuildContext context,
-    ServiceType service,
+    ServiceSupply supply,
   ) async {
-    final sellingPrice = service.cost?.serviceSellingPrice ?? 0.0;
+    final sellingPrice = supply.sellingPrice;
     final pageCountController = TextEditingController(text: '1');
     final result = await showDialog<int>(
       context: context,
@@ -519,12 +433,14 @@ class ProductGridPanel extends HookWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              service.name,
+              supply.name,
               style: GoogleFonts.outfit(color: posAccent, fontSize: 14),
             ),
             const SizedBox(height: 4),
             Text(
-              'Price: P${sellingPrice.toStringAsFixed(2)} / page',
+              sellingPrice > 0
+                  ? 'P${sellingPrice.toStringAsFixed(2)} / page'
+                  : 'No price set',
               style: GoogleFonts.outfit(color: posTextMuted, fontSize: 13),
             ),
             const SizedBox(height: 16),
@@ -584,22 +500,16 @@ class ProductGridPanel extends HookWidget {
     try {
       final pageCount = result;
       final totalPrice = sellingPrice * pageCount;
-      final inkCost = (service.cost?.inkCost ?? 0) * pageCount;
-      final supplyCost = (service.cost?.serviceSupplyCost ?? 0) * pageCount;
-      final electricityCost = (service.cost?.electricityCost ?? 0) * pageCount;
-      final totalCost = (service.cost?.serviceTotalCost ?? 0) * pageCount;
+      final totalCost = supply.purchasePrice * pageCount;
       final profitMargin = totalPrice - totalCost;
 
       final supabase = Supabase.instance.client;
       final insertedOrder = await supabase
           .from('print_orders')
           .insert({
-            'service_type_id': service.id,
+            'service_supply_id': supply.id,
             'quantity': pageCount,
             'total_price': totalPrice,
-            'ink_used': inkCost,
-            'paper_used': supplyCost,
-            'electricity_used': electricityCost,
             'total_cost': totalCost,
             'profit_margin': profitMargin,
           })
@@ -613,7 +523,7 @@ class ProductGridPanel extends HookWidget {
           id: 0,
           transactionId: 0,
           productId: null,
-          productName: service.name,
+          productName: supply.name,
           quantity: pageCount.toDouble(),
           unitPrice: sellingPrice,
           subtotal: totalPrice,
@@ -943,7 +853,7 @@ class _StoreProductCard extends StatelessWidget {
     final rawStock = inventoryItem?.stock ?? 0;
     final stock = rawStock - cartQuantity;
     final isOutOfStock = inventoryItem == null || stock <= 0;
-    final price = inventoryItem?.retailPrice ?? 0;
+    final price = product.sellingPrice ?? inventoryItem?.purchasePrice ?? 0;
 
     return Container(
       decoration: BoxDecoration(

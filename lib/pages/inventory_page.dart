@@ -466,7 +466,7 @@ Future<void> _showEditInventoryDialog(
 }) async {
   final supabase = Supabase.instance.client;
   final priceController = TextEditingController(
-    text: item.retailPrice.toStringAsFixed(2),
+    text: item.purchasePrice.toStringAsFixed(2),
   );
   final reorderController = TextEditingController(
     text: (item.reorderLevel ?? 0).toStringAsFixed(0),
@@ -595,7 +595,7 @@ Future<void> _showEditInventoryDialog(
                       await supabase
                           .from('inventory_items')
                           .update({
-                            'retail_price': price,
+                            'purchase_price': price,
                             if (reorder != null) 'reorder_level': reorder,
                             if (!item.isSupplyItem && selectedProduct != null)
                               'product_id': selectedProduct!.id,
@@ -1041,7 +1041,7 @@ class _QuickStockInDialog extends HookWidget {
     final selectedProduct = useState(initialProduct);
     final stockController = useTextEditingController();
     final priceController = useTextEditingController(
-      text: item.retailPrice.toStringAsFixed(2),
+      text: item.purchasePrice.toStringAsFixed(2),
     );
     final isSaving = useState(false);
 
@@ -1159,7 +1159,7 @@ class _QuickStockInDialog extends HookWidget {
                     await inventoryProvider.stockIn(
                       productId: selectedProduct.value.id,
                       quantity: qty,
-                      retailPrice: price > 0 ? price : item.retailPrice,
+                      purchasePrice: price > 0 ? price : item.purchasePrice,
                       expiryDate: item.expiryDate,
                     );
                     if (context.mounted) Navigator.pop(context);
@@ -1203,7 +1203,7 @@ Future<void> _showQuickSupplyStockInDialog(
   final inventoryProvider = context.read<InventoryProvider>();
   final stockController = TextEditingController();
   final priceController = TextEditingController(
-    text: item.retailPrice.toStringAsFixed(2),
+    text: item.purchasePrice.toStringAsFixed(2),
   );
   bool isSaving = false;
 

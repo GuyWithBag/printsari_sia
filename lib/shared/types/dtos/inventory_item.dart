@@ -5,7 +5,7 @@ class InventoryItem {
   final int? productId;
   final int? serviceSupplyId;
   final double stock;
-  final double retailPrice;
+  final double purchasePrice;
   final double? reorderLevel;
   final String? location;
   final DateTime? lastRestocked;
@@ -25,7 +25,7 @@ class InventoryItem {
     this.productId,
     this.serviceSupplyId,
     required this.stock,
-    required this.retailPrice,
+    required this.purchasePrice,
     this.reorderLevel,
     this.location,
     this.lastRestocked,
@@ -43,7 +43,7 @@ class InventoryItem {
       productId: json['product_id'] as int?,
       serviceSupplyId: json['service_supply_id'] as int?,
       stock: (json['stock'] as num).toDouble(),
-      retailPrice: (json['retail_price'] as num).toDouble(),
+      purchasePrice: (json['purchase_price'] as num).toDouble(),
       reorderLevel: json['reorder_level'] != null
           ? (json['reorder_level'] as num).toDouble()
           : null,
@@ -74,7 +74,7 @@ class InventoryItem {
       'product_id': productId,
       'service_supply_id': serviceSupplyId,
       'stock': stock,
-      'retail_price': retailPrice,
+      'purchase_price': purchasePrice,
       'reorder_level': reorderLevel,
       'location': location,
       'last_restocked': lastRestocked?.toIso8601String(),
@@ -89,7 +89,7 @@ class InventoryItem {
       if (productId != null) 'product_id': productId,
       if (serviceSupplyId != null) 'service_supply_id': serviceSupplyId,
       'stock': stock,
-      'retail_price': retailPrice,
+      'purchase_price': purchasePrice,
       'reorder_level': reorderLevel,
       'location': location,
       'last_restocked': lastRestocked?.toIso8601String(),

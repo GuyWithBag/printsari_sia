@@ -39,7 +39,7 @@ class DashboardPage extends HookWidget {
         expenseProvider.getExpenses(),
         inventoryProvider.getItems(),
         productProvider.getProducts(),
-        productProvider.getServiceTypes(),
+        productProvider.getServiceSupplies(),
       ]),
       [refreshKey.value],
     );
@@ -54,7 +54,7 @@ class DashboardPage extends HookWidget {
     List<Expense> todayExpenses = [];
     List<InventoryItem> inventoryItems = [];
     List<Product> products = [];
-    List<ServiceType> printServices = [];
+    List<ServiceSupply> printServices = [];
     List<Transaction> recentTransactions = [];
 
     if (snapshot.hasData) {
@@ -63,7 +63,7 @@ class DashboardPage extends HookWidget {
       final allExpenses = data[1] as List<Expense>;
       inventoryItems = data[2] as List<InventoryItem>;
       products = data[3] as List<Product>;
-      printServices = data[4] as List<ServiceType>;
+      printServices = data[4] as List<ServiceSupply>;
 
       todayTransactions = allTransactions.where((t) {
         return t.date.year == now.year &&
@@ -529,7 +529,7 @@ class _StoreInventoryPanel extends StatelessWidget {
             ...products.map((p) {
               final inv = inventoryByProduct[p.id];
               final stock = inv?.stock.toInt() ?? 0;
-              final price = inv?.retailPrice ?? 0;
+              final price = inv?.purchasePrice ?? 0;
               final isOutOfStock = stock <= 0;
               final isLowStock = !isOutOfStock &&
                   inv?.reorderLevel != null &&
@@ -619,7 +619,7 @@ class _StoreInventoryPanel extends StatelessWidget {
 // ---------- Printing Supplies panel ----------
 
 class _PrintingSuppliesPanel extends StatelessWidget {
-  final List<ServiceType> services;
+  final List<ServiceSupply> services;
   const _PrintingSuppliesPanel({required this.services});
 
   @override
@@ -642,12 +642,11 @@ class _PrintingSuppliesPanel extends StatelessWidget {
           const SizedBox(height: 16),
           if (services.isEmpty)
             Text(
-              'No service types.',
+              'No service supplies.',
               style: GoogleFonts.outfit(color: posTextMuted),
             )
           else
             ...services.map((s) {
-              final sellingPrice = s.cost?.serviceSellingPrice;
               return Padding(
                 padding: const EdgeInsets.only(bottom: 12),
                 child: Row(
@@ -664,22 +663,21 @@ class _PrintingSuppliesPanel extends StatelessWidget {
                               color: Colors.white,
                             ),
                           ),
-                          if (s.service != null)
-                            Text(
-                              s.service!.name,
-                              style: GoogleFonts.outfit(
-                                fontSize: 12,
-                                color: posTextMuted,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
+                          Text(
+                            s.supplyType,
+                            style: GoogleFonts.outfit(
+                              fontSize: 12,
+                              color: posTextMuted,
                             ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
                         ],
                       ),
                     ),
                     Text(
-                      sellingPrice != null
-                          ? currFmt.format(sellingPrice)
+                      s.sellingPrice > 0
+                          ? currFmt.format(s.sellingPrice)
                           : '—',
                       style: GoogleFonts.outfit(
                         fontSize: 14,

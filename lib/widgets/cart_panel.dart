@@ -378,9 +378,11 @@ class CartPanel extends HookWidget {
 
     try {
       final cashierId = context.read<AuthController>().userProfile!.id;
+      final activityLog = context.read<ActivityLogProvider>();
       final result = await transactionProvider.checkout(
         cashierId: cashierId,
         paymentMethodId: selectedPaymentMethod.value,
+        activityLog: activityLog,
       );
 
       if (!context.mounted) return;

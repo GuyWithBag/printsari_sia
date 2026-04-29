@@ -7,8 +7,6 @@ class ProductProvider extends ChangeNotifier {
   final supabase = Supabase.instance.client;
 
   List<Product>? _products;
-  List<Service>? _services;
-  List<ServiceType>? _serviceTypes;
   List<Machine>? _machines;
   List<ServiceSupply>? _serviceSupplies;
   bool _hasPendingChanges = false;
@@ -29,15 +27,6 @@ class ProductProvider extends ChangeNotifier {
             notifyListeners();
           },
         )
-        .onPostgresChanges(
-          event: PostgresChangeEvent.all,
-          schema: 'public',
-          table: 'service_types',
-          callback: (_) {
-            _hasPendingChanges = true;
-            notifyListeners();
-          },
-        )
         .subscribe();
   }
 
@@ -47,15 +36,11 @@ class ProductProvider extends ChangeNotifier {
   }
 
   void clearProductsCache() => _products = null;
-  void clearServicesCache() => _services = null;
-  void clearServiceTypesCache() => _serviceTypes = null;
   void clearMachinesCache() => _machines = null;
   void clearServiceSuppliesCache() => _serviceSupplies = null;
 
   void clearAllCache() {
     clearProductsCache();
-    clearServicesCache();
-    clearServiceTypesCache();
     clearMachinesCache();
     clearServiceSuppliesCache();
   }
@@ -64,10 +49,42 @@ class ProductProvider extends ChangeNotifier {
 
   Future<List<Product>> getProducts() async {
     if (_products != null) return _products!;
-    final query = await supabase.from('products').select().order('name');
+    final query = await supabase
+        .from('products')
+        .select()
+        .eq('is_archived', false)
+        .order('name');
     _products = query.map((r) => Product.fromJson(r)).toList();
     _hasPendingChanges = false;
     return _products!;
+  }
+
+  Future<List<Product>> getArchivedProducts() async {
+    final query = await supabase
+        .from('products')
+        .select()
+        .eq('is_archived', true)
+        .order('name');
+    return query.map((r) => Product.fromJson(r)).toList();
+  }
+
+  Future<void> archiveProduct(int id) async {
+    await supabase
+        .from('products')
+        .update({'is_archived': true})
+        .eq('id', id);
+    _products?.removeWhere((p) => p.id == id);
+    notifyListeners();
+  }
+
+  Future<void> restoreProduct(int id) async {
+    await supabase
+        .from('products')
+        .update({'is_archived': false})
+        .eq('id', id);
+    // Clear cache so the restored product appears on next fetch
+    _products = null;
+    notifyListeners();
   }
 
   Future<Product> createProduct(Product product) async {
@@ -103,138 +120,6 @@ class ProductProvider extends ChangeNotifier {
     await supabase.from('products').delete().eq('id', id);
     _products?.removeWhere((p) => p.id == id);
     notifyListeners();
-  }
-
-  // ── Services ──────────────────────────────────────────────────────────────
-
-  Future<List<Service>> getServices() async {
-    if (_services != null) return _services!;
-    final query = await supabase.from('services').select().order('name');
-    _services = query.map((r) => Service.fromJson(r)).toList();
-    return _services!;
-  }
-
-  Future<Service> createService(String name) async {
-    final inserted = await supabase
-        .from('services')
-        .insert({'name': name})
-        .select()
-        .single();
-    final newService = Service.fromJson(inserted);
-    _services ??= [];
-    _services!.add(newService);
-    notifyListeners();
-    return newService;
-  }
-
-  Future<Service> updateService(int id, Map<String, dynamic> updates) async {
-    final updated = await supabase
-        .from('services')
-        .update(updates)
-        .eq('id', id)
-        .select()
-        .single();
-    final updatedService = Service.fromJson(updated);
-    if (_services != null) {
-      final idx = _services!.indexWhere((s) => s.id == id);
-      if (idx != -1) _services![idx] = updatedService;
-    }
-    notifyListeners();
-    return updatedService;
-  }
-
-  Future<void> deleteService(int id) async {
-    await supabase.from('services').delete().eq('id', id);
-    _services?.removeWhere((s) => s.id == id);
-    _serviceTypes?.removeWhere((st) => st.serviceId == id);
-    notifyListeners();
-  }
-
-  // ── Service Types ─────────────────────────────────────────────────────────
-
-  Future<List<ServiceType>> getServiceTypes() async {
-    if (_serviceTypes != null) return _serviceTypes!;
-    final query = await supabase
-        .from('service_types')
-        .select(
-            '*, services(*), service_supplies(*), machines(*), service_type_costs(*)')
-        .order('name');
-    _serviceTypes = query.map((r) => ServiceType.fromJson(r)).toList();
-    _hasPendingChanges = false;
-    return _serviceTypes!;
-  }
-
-  Future<ServiceType> createServiceType(ServiceType st) async {
-    final inserted = await supabase
-        .from('service_types')
-        .insert(st.toInsertJson())
-        .select(
-            '*, services(*), service_supplies(*), machines(*), service_type_costs(*)')
-        .single();
-    final newSt = ServiceType.fromJson(inserted);
-    _serviceTypes ??= [];
-    _serviceTypes!.add(newSt);
-    notifyListeners();
-    return newSt;
-  }
-
-  Future<ServiceType> updateServiceType(
-      int id, Map<String, dynamic> updates) async {
-    final updated = await supabase
-        .from('service_types')
-        .update(updates)
-        .eq('id', id)
-        .select(
-            '*, services(*), service_supplies(*), machines(*), service_type_costs(*)')
-        .single();
-    final updatedSt = ServiceType.fromJson(updated);
-    if (_serviceTypes != null) {
-      final idx = _serviceTypes!.indexWhere((s) => s.id == id);
-      if (idx != -1) _serviceTypes![idx] = updatedSt;
-    }
-    notifyListeners();
-    return updatedSt;
-  }
-
-  Future<void> deleteServiceType(int id) async {
-    await supabase.from('service_types').delete().eq('id', id);
-    _serviceTypes?.removeWhere((s) => s.id == id);
-    notifyListeners();
-  }
-
-  // ── Service Type Costs ────────────────────────────────────────────────────
-
-  Future<ServiceTypeCost> upsertServiceTypeCost(
-      int serviceTypeId, Map<String, dynamic> costData) async {
-    final existing = await supabase
-        .from('service_type_costs')
-        .select()
-        .eq('service_type_id', serviceTypeId)
-        .order('last_updated', ascending: false)
-        .limit(1)
-        .maybeSingle();
-
-    Map<String, dynamic> result;
-    if (existing != null) {
-      result = await supabase
-          .from('service_type_costs')
-          .update({
-            ...costData,
-            'last_updated': DateTime.now().toIso8601String(),
-          })
-          .eq('id', existing['id'] as int)
-          .select()
-          .single();
-    } else {
-      result = await supabase
-          .from('service_type_costs')
-          .insert({...costData, 'service_type_id': serviceTypeId})
-          .select()
-          .single();
-    }
-    _serviceTypes = null;
-    notifyListeners();
-    return ServiceTypeCost.fromJson(result);
   }
 
   // ── Service Supplies ──────────────────────────────────────────────────────

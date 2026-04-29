@@ -42,7 +42,7 @@ class InventoryProvider extends ChangeNotifier {
   Future<InventoryItem> stockIn({
     required int productId,
     required double quantity,
-    required double retailPrice,
+    required double purchasePrice,
     DateTime? expiryDate,
   }) async {
     final now = DateTime.now();
@@ -63,7 +63,7 @@ class InventoryProvider extends ChangeNotifier {
         .insert({
           'product_id': productId,
           'user_id': profileId,
-          'purchase_price': retailPrice,
+          'purchase_price': purchasePrice,
           'quantity_added': quantity,
           if (expiryDate != null)
             'expiry_date': expiryDate.toIso8601String().substring(0, 10),
@@ -88,14 +88,14 @@ class InventoryProvider extends ChangeNotifier {
 
     InventoryItem newItem;
     if (existing != null) {
-      // 4. Update: add stock, refresh retail price and stock_in_id
+      // 4. Update: add stock, refresh purchase price and stock_in_id
       final existingId = existing['id'] as int;
       final currentStock = (existing['stock'] as num).toDouble();
       final updated = await supabase
           .from('inventory_items')
           .update({
             'stock': currentStock + quantity,
-            'retail_price': retailPrice,
+            'purchase_price': purchasePrice,
             'last_restocked': now.toIso8601String(),
             'stock_in_id': stockInId,
           })
@@ -115,7 +115,7 @@ class InventoryProvider extends ChangeNotifier {
           .insert({
             'product_id': productId,
             'stock': quantity,
-            'retail_price': retailPrice,
+            'purchase_price': purchasePrice,
             'last_restocked': now.toIso8601String(),
             'stock_in_id': stockInId,
             if (expiryDate != null)
@@ -208,7 +208,7 @@ class InventoryProvider extends ChangeNotifier {
         .maybeSingle();
     if (categoryRow != null) {
       final categoryId = categoryRow['id'] as int;
-      final amount = item.retailPrice * quantity;
+      final amount = item.purchasePrice * quantity;
       final desc = notes?.isNotEmpty == true ? notes! : 'Manual stock-out adjustment';
       await supabase.from('expenses').insert({
         'description': desc,
@@ -337,7 +337,7 @@ class InventoryProvider extends ChangeNotifier {
           .from('inventory_items')
           .update({
             'stock': currentStock + quantity,
-            'retail_price': purchasePrice,
+            'purchase_price': purchasePrice,
             'last_restocked': now.toIso8601String(),
             'stock_in_id': stockInId,
           })
@@ -354,7 +354,7 @@ class InventoryProvider extends ChangeNotifier {
           .insert({
             'service_supply_id': serviceSupplyId,
             'stock': quantity,
-            'retail_price': purchasePrice,
+            'purchase_price': purchasePrice,
             'last_restocked': now.toIso8601String(),
             'stock_in_id': stockInId,
           })

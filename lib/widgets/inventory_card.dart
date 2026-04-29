@@ -35,7 +35,7 @@ class InventoryCard extends StatelessWidget {
         item.reorderLevel != null &&
         item.stock <= item.reorderLevel!;
     final String stockLevel = item.stock.toStringAsFixed(0);
-    final String price = '₱${item.retailPrice.toStringAsFixed(2)}';
+    final String price = '₱${item.purchasePrice.toStringAsFixed(2)}';
     final expiryDate = item.expiryDate;
     final String expiry = expiryDate != null
         ? DateFormat('MMM d, yyyy').format(expiryDate)

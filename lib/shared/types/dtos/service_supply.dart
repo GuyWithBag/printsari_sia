@@ -4,6 +4,7 @@ class ServiceSupply {
   final String supplyType;
   final String? paperSize;
   final double purchasePrice;
+  final double sellingPrice;
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -13,6 +14,7 @@ class ServiceSupply {
     required this.supplyType,
     this.paperSize,
     required this.purchasePrice,
+    this.sellingPrice = 0,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -24,6 +26,7 @@ class ServiceSupply {
       supplyType: json['supply_type'] as String,
       paperSize: json['paper_size'] as String?,
       purchasePrice: (json['purchase_price'] as num).toDouble(),
+      sellingPrice: (json['selling_price'] as num? ?? 0).toDouble(),
       createdAt: DateTime.parse(json['created_at'] as String),
       updatedAt: DateTime.parse(json['updated_at'] as String),
     );
@@ -36,6 +39,7 @@ class ServiceSupply {
       'supply_type': supplyType,
       'paper_size': paperSize,
       'purchase_price': purchasePrice,
+      'selling_price': sellingPrice,
       'created_at': createdAt.toIso8601String(),
       'updated_at': updatedAt.toIso8601String(),
     };
@@ -47,6 +51,7 @@ class ServiceSupply {
       'supply_type': supplyType,
       if (paperSize != null) 'paper_size': paperSize,
       'purchase_price': purchasePrice,
+      'selling_price': sellingPrice,
     };
   }
 }

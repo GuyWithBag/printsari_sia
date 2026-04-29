@@ -4,13 +4,13 @@ import 'package:printsari_sia/shared/themes/colors.dart';
 import 'package:printsari_sia/shared/types/types.dart';
 
 class PrintServiceCard extends StatelessWidget {
-  final Service service;
-  final double? minPrice;
+  final ServiceSupply supply;
 
-  const PrintServiceCard({required this.service, this.minPrice});
+  const PrintServiceCard({required this.supply});
 
   @override
   Widget build(BuildContext context) {
+    final price = supply.sellingPrice;
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
@@ -35,7 +35,7 @@ class PrintServiceCard extends StatelessWidget {
               borderRadius: BorderRadius.circular(8),
             ),
             child: Text(
-              'Printing',
+              supply.supplyType,
               style: GoogleFonts.outfit(
                 color: Colors.blue.shade700,
                 fontSize: 10,
@@ -45,7 +45,7 @@ class PrintServiceCard extends StatelessWidget {
           ),
           const SizedBox(height: 6),
           Text(
-            service.name,
+            supply.name,
             style: GoogleFonts.outfit(
               color: posTextMain,
               fontSize: 13,
@@ -54,13 +54,23 @@ class PrintServiceCard extends StatelessWidget {
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
           ),
+          if (supply.paperSize != null) ...[
+            const SizedBox(height: 2),
+            Text(
+              supply.paperSize!,
+              style: GoogleFonts.outfit(
+                color: warmGray,
+                fontSize: 11,
+              ),
+            ),
+          ],
           const Spacer(),
           Text(
-            minPrice != null
-                ? 'from P${minPrice!.toStringAsFixed(2)} / page'
+            price > 0
+                ? 'P${price.toStringAsFixed(2)} / page'
                 : 'No price set',
             style: GoogleFonts.outfit(
-              color: minPrice != null ? posPrimary : warmGray,
+              color: price > 0 ? posPrimary : warmGray,
               fontSize: 17,
               fontWeight: FontWeight.w700,
             ),

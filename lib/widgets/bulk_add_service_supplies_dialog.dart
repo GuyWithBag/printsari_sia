@@ -18,9 +18,9 @@ Future<void> showBulkAddServiceSuppliesDialog(
   final activityLogRef =
       Provider.of<ActivityLogProvider>(context, listen: false);
 
-  // Each row: {name, supplyType, paperSize, purchasePrice}
+  // Each row: {name, supplyType, paperSize, purchasePrice, sellingPrice}
   final rows = <Map<String, dynamic>>[
-    {'name': '', 'supplyType': 'paper', 'paperSize': '', 'purchasePrice': ''},
+    {'name': '', 'supplyType': 'paper', 'paperSize': '', 'purchasePrice': '', 'sellingPrice': ''},
   ];
 
   await showDialog(
@@ -30,7 +30,7 @@ Future<void> showBulkAddServiceSuppliesDialog(
         bool isSaving = false;
 
         void addRow() => setDialogState(() => rows.add(
-            {'name': '', 'supplyType': 'paper', 'paperSize': '', 'purchasePrice': ''}));
+            {'name': '', 'supplyType': 'paper', 'paperSize': '', 'purchasePrice': '', 'sellingPrice': ''}));
         void removeRow(int i) => setDialogState(() => rows.removeAt(i));
 
         return AlertDialog(
@@ -69,6 +69,8 @@ Future<void> showBulkAddServiceSuppliesDialog(
                         Expanded(flex: 2, child: Text('Paper Size', style: GoogleFonts.outfit(color: posTextMuted, fontSize: 12))),
                         const SizedBox(width: 8),
                         Expanded(flex: 2, child: Text('Purchase Price', style: GoogleFonts.outfit(color: posTextMuted, fontSize: 12))),
+                        const SizedBox(width: 8),
+                        Expanded(flex: 2, child: Text('Selling Price', style: GoogleFonts.outfit(color: posTextMuted, fontSize: 12))),
                         const SizedBox(width: 36),
                       ],
                     ),
@@ -135,6 +137,16 @@ Future<void> showBulkAddServiceSuppliesDialog(
                               onChanged: (v) => row['purchasePrice'] = v,
                             ),
                           ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            flex: 2,
+                            child: bulkTextField(
+                              hint: '0.00',
+                              initialValue: row['sellingPrice'] as String,
+                              numeric: true,
+                              onChanged: (v) => row['sellingPrice'] = v,
+                            ),
+                          ),
                           IconButton(
                             icon: const Icon(Icons.remove_circle_outline,
                                 color: Color(0xFFEF4444), size: 18),
@@ -186,6 +198,9 @@ Future<void> showBulkAddServiceSuppliesDialog(
                               paperSize: paperSize,
                               purchasePrice: double.tryParse(
                                       row['purchasePrice'] as String) ??
+                                  0,
+                              sellingPrice: double.tryParse(
+                                      row['sellingPrice'] as String) ??
                                   0,
                               createdAt: now,
                               updatedAt: now,

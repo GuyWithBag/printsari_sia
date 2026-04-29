@@ -25,12 +25,12 @@ Future<void> showBulkStockInDialog(
 
   final initial = preselected ?? products.first;
 
-  // Each row: {product, quantity, retailPrice, expiryDate}
+  // Each row: {product, quantity, purchasePrice, expiryDate}
   final rows = <Map<String, dynamic>>[
     {
       'product': initial,
       'quantity': '',
-      'retailPrice': initial.purchasePrice.toStringAsFixed(2),
+      'purchasePrice': initial.purchasePrice.toStringAsFixed(2),
       'expiryDate': null,
     },
   ];
@@ -45,7 +45,7 @@ Future<void> showBulkStockInDialog(
           () => rows.add({
             'product': products.first,
             'quantity': '',
-            'retailPrice': products.first.purchasePrice.toStringAsFixed(2),
+            'purchasePrice': products.first.purchasePrice.toStringAsFixed(2),
             'expiryDate': null,
           }),
         );
@@ -171,7 +171,7 @@ Future<void> showBulkStockInDialog(
                                       .toList(),
                                   onChanged: (p) => setDialogState(() {
                                     row['product'] = p;
-                                    row['retailPrice'] = (p?.purchasePrice ?? 0)
+                                    row['purchasePrice'] = (p?.purchasePrice ?? 0)
                                         .toStringAsFixed(2);
                                   }),
                                 ),
@@ -193,9 +193,9 @@ Future<void> showBulkStockInDialog(
                             flex: 2,
                             child: bulkTextField(
                               hint: '0.00',
-                              initialValue: row['retailPrice'] as String,
+                              initialValue: row['purchasePrice'] as String,
                               numeric: true,
-                              onChanged: (v) => row['retailPrice'] = v,
+                              onChanged: (v) => row['purchasePrice'] = v,
                             ),
                           ),
                           const SizedBox(width: 8),
@@ -313,12 +313,12 @@ Future<void> showBulkStockInDialog(
                           final qty =
                               double.tryParse(row['quantity'] as String) ?? 0;
                           final price =
-                              double.tryParse(row['retailPrice'] as String) ??
+                              double.tryParse(row['purchasePrice'] as String) ??
                               0;
                           await inventoryProvider.stockIn(
                             productId: product.id,
                             quantity: qty,
-                            retailPrice: price > 0
+                            purchasePrice: price > 0
                                 ? price
                                 : product.purchasePrice,
                             expiryDate: row['expiryDate'] as DateTime?,
