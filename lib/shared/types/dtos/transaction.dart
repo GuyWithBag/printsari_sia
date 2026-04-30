@@ -1,4 +1,5 @@
 import 'package:printsari_sia/shared/types/types.dart';
+import 'payment_method.dart';
 
 class Transaction {
   final int id;

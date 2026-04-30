@@ -1,5 +1,3 @@
-import 'package:printsari_sia/shared/types/types.dart';
-
 class PaymentMethod {
   final int id;
   final String methodName;
@@ -10,8 +8,6 @@ class PaymentMethod {
     required this.methodName,
     required this.createdAt,
   });
-
-  PaymentMethodType? get methodType => PaymentMethodType.fromString(methodName);
 
   factory PaymentMethod.fromJson(Map<String, dynamic> json) {
     return PaymentMethod(

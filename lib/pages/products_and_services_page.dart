@@ -25,7 +25,7 @@ class ProductsAndServicesPage extends HookWidget {
 
   @override
   Widget build(BuildContext context) {
-    final tabController = useTabController(initialLength: 4);
+    final tabController = useTabController(initialLength: 5);
     final currentIndex = useState(0);
     final refreshKey = useState(0);
 
@@ -115,6 +115,13 @@ class ProductsAndServicesPage extends HookWidget {
                   icon: Icons.store_outlined,
                   indexState: currentIndex,
                 ),
+                CircularTab(
+                  tabController: tabController,
+                  index: 4,
+                  label: 'Expense Categories',
+                  icon: Icons.category_outlined,
+                  indexState: currentIndex,
+                ),
               ],
             ),
             const SizedBox(height: 24),
@@ -138,6 +145,11 @@ class ProductsAndServicesPage extends HookWidget {
                     isReadOnly: isReadOnly,
                   ),
                   _VendorsTab(
+                    refreshKey: refreshKey.value,
+                    onRefresh: () => refreshKey.value++,
+                    isReadOnly: isReadOnly,
+                  ),
+                  _ExpenseCategoriesTab(
                     refreshKey: refreshKey.value,
                     onRefresh: () => refreshKey.value++,
                     isReadOnly: isReadOnly,
@@ -2034,6 +2046,323 @@ class _VendorsTab extends HookWidget {
       ],
     );
   }
+}
+
+class _ExpenseCategoriesTab extends HookWidget {
+  final int refreshKey;
+  final VoidCallback onRefresh;
+  final bool isReadOnly;
+
+  const _ExpenseCategoriesTab({
+    required this.refreshKey,
+    required this.onRefresh,
+    this.isReadOnly = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final categoriesFuture = useMemoized(
+      () => Supabase.instance.client
+          .from('expense_categories')
+          .select()
+          .order('created_at', ascending: false)
+          .then((value) => (value as List)
+              .map((e) => ExpenseCategory.fromJson(e as Map<String, dynamic>))
+              .toList()),
+      [refreshKey],
+    );
+    final snapshot = useFuture(categoriesFuture);
+    final categories = snapshot.data ?? <ExpenseCategory>[];
+
+    return Skeletonizer(
+      enabled: !snapshot.hasData,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'Expense Categories',
+                  style: GoogleFonts.outfit(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+              if (!isReadOnly)
+                FilledButton.icon(
+                  onPressed: () => _showExpenseCategoryDialog(
+                    context,
+                    null,
+                    onRefresh,
+                  ),
+                  icon: const Icon(Icons.add, size: 18),
+                  label: Text('Add Category', style: GoogleFonts.outfit()),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: posPrimary,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 20,
+                      vertical: 14,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          if (!snapshot.hasData)
+            Expanded(
+              child: Center(
+                child: CircularProgressIndicator(color: posPrimary),
+              ),
+            )
+          else if (categories.isEmpty)
+            Expanded(
+              child: Center(
+                child: Text(
+                  'No expense categories yet',
+                  style: GoogleFonts.outfit(color: posTextMuted),
+                ),
+              ),
+            )
+          else
+            Expanded(
+              child: ListView.separated(
+                itemCount: categories.length,
+                separatorBuilder: (_, __) => const SizedBox(height: 10),
+                itemBuilder: (context, index) {
+                  final category = categories[index];
+                  return Container(
+                    decoration: BoxDecoration(
+                      color: posSurface,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: posSurfaceLight),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 14,
+                      ),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              category.categoryName,
+                              style: GoogleFonts.outfit(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
+                          Text(
+                            DateFormat('MMM dd, yyyy')
+                                .format(category.createdAt),
+                            style: GoogleFonts.outfit(
+                              fontSize: 12,
+                              color: posTextMuted,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          if (!isReadOnly) ...[
+                            IconButton(
+                              icon: const Icon(
+                                Icons.edit_outlined,
+                                size: 18,
+                                color: posAccent,
+                              ),
+                              tooltip: 'Edit category',
+                              onPressed: () => _showExpenseCategoryDialog(
+                                context,
+                                category,
+                                onRefresh,
+                              ),
+                              visualDensity: VisualDensity.compact,
+                            ),
+                            IconButton(
+                              icon: const Icon(
+                                Icons.delete_outline,
+                                size: 18,
+                                color: Color(0xFFEF4444),
+                              ),
+                              tooltip: 'Delete category',
+                              onPressed: () => _showDeleteExpenseCategoryDialog(
+                                context,
+                                category,
+                                onRefresh,
+                              ),
+                              visualDensity: VisualDensity.compact,
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+Future<void> _showExpenseCategoryDialog(
+  BuildContext context,
+  ExpenseCategory? category,
+  VoidCallback onRefresh,
+) async {
+  final isEditing = category != null;
+  final nameController = TextEditingController(
+    text: category?.categoryName ?? '',
+  );
+
+  await showDialog(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      backgroundColor: posSurface,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      title: Text(
+        isEditing ? 'Edit Category' : 'Add Category',
+        style: GoogleFonts.outfit(
+          color: Colors.white,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+      content: TextField(
+        controller: nameController,
+        style: GoogleFonts.outfit(color: Colors.white),
+        decoration: InputDecoration(
+          labelText: 'Category name',
+          labelStyle: GoogleFonts.outfit(color: posTextMuted),
+          filled: true,
+          fillColor: posSurfaceLight,
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(10),
+            borderSide: BorderSide.none,
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(10),
+            borderSide: const BorderSide(color: posPrimary, width: 1.5),
+          ),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 14,
+            vertical: 12,
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(ctx),
+          child: Text('Cancel', style: GoogleFonts.outfit(color: posTextMuted)),
+        ),
+        FilledButton(
+          onPressed: () async {
+            final name = nameController.text.trim();
+            if (name.isEmpty) {
+              if (ctx.mounted) {
+                ScaffoldMessenger.of(ctx).showSnackBar(
+                  const SnackBar(content: Text('Category name cannot be empty')),
+                );
+              }
+              return;
+            }
+
+            try {
+              final client = Supabase.instance.client;
+              if (isEditing) {
+                await client
+                    .from('expense_categories')
+                    .update({'category_name': name})
+                    .eq('id', category.id);
+              } else {
+                await client.from('expense_categories').insert({
+                  'category_name': name,
+                });
+              }
+              if (ctx.mounted) Navigator.pop(ctx);
+              onRefresh();
+            } catch (e) {
+              debugPrint('Error saving category: $e');
+              if (ctx.mounted) {
+                ScaffoldMessenger.of(ctx).showSnackBar(
+                  SnackBar(content: Text('Error saving category: $e')),
+                );
+              }
+            }
+          },
+          style: FilledButton.styleFrom(
+            backgroundColor: posPrimary,
+            foregroundColor: Colors.white,
+          ),
+          child: Text(
+            isEditing ? 'Update' : 'Create',
+            style: GoogleFonts.outfit(),
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+Future<void> _showDeleteExpenseCategoryDialog(
+  BuildContext context,
+  ExpenseCategory category,
+  VoidCallback onRefresh,
+) async {
+  await showDialog(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      backgroundColor: posSurface,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      title: Text(
+        'Delete Category',
+        style: GoogleFonts.outfit(
+          color: Colors.white,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+      content: Text(
+        'Remove the category "${category.categoryName}"? Existing expenses will remain uncategorized.',
+        style: GoogleFonts.outfit(color: posTextMuted),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(ctx),
+          child: Text('Cancel', style: GoogleFonts.outfit(color: posTextMuted)),
+        ),
+        FilledButton(
+          onPressed: () async {
+            try {
+              await Supabase.instance.client
+                  .from('expense_categories')
+                  .delete()
+                  .eq('id', category.id);
+              if (ctx.mounted) Navigator.pop(ctx);
+              onRefresh();
+            } catch (e) {
+              debugPrint('Error deleting category: $e');
+              if (ctx.mounted) {
+                ScaffoldMessenger.of(ctx).showSnackBar(
+                  SnackBar(content: Text('Error deleting category: $e')),
+                );
+              }
+            }
+          },
+          style: FilledButton.styleFrom(
+            backgroundColor: const Color(0xFFEF4444),
+            foregroundColor: Colors.white,
+          ),
+          child: Text('Delete', style: GoogleFonts.outfit()),
+        ),
+      ],
+    ),
+  );
 }
 
 Future<void> _showVendorDialog(

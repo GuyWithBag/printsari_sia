@@ -15,7 +15,7 @@ import 'package:skeletonizer/skeletonizer.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class BusinessExpensesPage extends HookWidget {
-  const BusinessExpensesPage({Key? key}) : super(key: key);
+  const BusinessExpensesPage({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -28,11 +28,26 @@ class BusinessExpensesPage extends HookWidget {
     final selectionMode = useState(false);
     final selectedExpenseIds = useState(<int>{});
 
-    final expensesFuture = useMemoized(
-      () => expenseProvider.getExpenses(),
-      [refreshKey.value, completedTxCount],
-    );
+    final expensesFuture = useMemoized(() => expenseProvider.getExpenses(), [
+      refreshKey.value,
+      completedTxCount,
+    ]);
     final snapshot = useFuture(expensesFuture);
+
+    final categoriesFuture = useMemoized(
+      () => Supabase.instance.client
+          .from('expense_categories')
+          .select()
+          .order('created_at', ascending: false)
+          .then(
+            (data) => (data as List)
+                .map((e) => ExpenseCategory.fromJson(e as Map<String, dynamic>))
+                .toList(),
+          ),
+      [refreshKey.value],
+    );
+    final categoriesSnapshot = useFuture(categoriesFuture);
+    final categories = categoriesSnapshot.data ?? [];
 
     void refresh() => refreshKey.value++;
     void hardRefresh() => refreshKey.value++;
@@ -41,17 +56,31 @@ class BusinessExpensesPage extends HookWidget {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
 
-    final todayExpenses =
-        expenses.where((e) => e.date.isAfter(today.subtract(const Duration(seconds: 1))) && e.date.isBefore(today.add(const Duration(days: 1)))).toList();
-    final thisMonthExpenses =
-        expenses.where((e) => e.date.year == now.year && e.date.month == now.month).toList();
+    final todayExpenses = expenses
+        .where(
+          (e) =>
+              e.date.isAfter(today.subtract(const Duration(seconds: 1))) &&
+              e.date.isBefore(today.add(const Duration(days: 1))),
+        )
+        .toList();
+    final thisMonthExpenses = expenses
+        .where((e) => e.date.year == now.year && e.date.month == now.month)
+        .toList();
 
-    final todayTotal = todayExpenses.fold<double>(0, (sum, e) => sum + e.amount);
-    final monthTotal = thisMonthExpenses.fold<double>(0, (sum, e) => sum + e.amount);
+    final todayTotal = todayExpenses.fold<double>(
+      0,
+      (sum, e) => sum + e.amount,
+    );
+    final monthTotal = thisMonthExpenses.fold<double>(
+      0,
+      (sum, e) => sum + e.amount,
+    );
     final allTotal = expenses.fold<double>(0, (sum, e) => sum + e.amount);
 
-    final currencyFormat =
-        NumberFormat.currency(symbol: '\u20B1', decimalDigits: 2);
+    final currencyFormat = NumberFormat.currency(
+      symbol: '\u20B1',
+      decimalDigits: 2,
+    );
     final dateFormat = DateFormat('MMM dd, yyyy');
 
     // Group expenses by category
@@ -113,9 +142,13 @@ class BusinessExpensesPage extends HookWidget {
                       IconButton(
                         icon: Icon(
                           Icons.checklist_rounded,
-                          color: selectionMode.value ? posPrimary : Colors.white,
+                          color: selectionMode.value
+                              ? posPrimary
+                              : Colors.white,
                         ),
-                        tooltip: selectionMode.value ? 'Exit selection mode' : 'Select expenses to delete',
+                        tooltip: selectionMode.value
+                            ? 'Exit selection mode'
+                            : 'Select expenses to delete',
                         onPressed: () {
                           selectionMode.value = !selectionMode.value;
                           if (!selectionMode.value) {
@@ -128,13 +161,19 @@ class BusinessExpensesPage extends HookWidget {
                         onPressed: () =>
                             _showExpenseDialog(context, null, refresh),
                         icon: const Icon(Icons.add, size: 18),
-                        label: Text('Record Expense',
-                            style: GoogleFonts.outfit(fontWeight: FontWeight.w500)),
+                        label: Text(
+                          'Record Expense',
+                          style: GoogleFonts.outfit(
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
                         style: FilledButton.styleFrom(
                           backgroundColor: posPrimary,
                           foregroundColor: Colors.white,
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 20, vertical: 14),
+                            horizontal: 20,
+                            vertical: 14,
+                          ),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12),
                           ),
@@ -214,7 +253,9 @@ class BusinessExpensesPage extends HookWidget {
                     return _GlassPanel(
                       child: Padding(
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 20, vertical: 16),
+                          horizontal: 20,
+                          vertical: 16,
+                        ),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
@@ -291,13 +332,17 @@ class BusinessExpensesPage extends HookWidget {
               else
                 ...expenses.map((expense) {
                   final isManual = expense.sourceId == 1;
-                  final isSelected = selectedExpenseIds.value.contains(expense.id);
+                  final isSelected = selectedExpenseIds.value.contains(
+                    expense.id,
+                  );
                   return Padding(
                     padding: const EdgeInsets.only(bottom: 10),
                     child: _GlassPanel(
                       child: Padding(
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 16, vertical: 14),
+                          horizontal: 16,
+                          vertical: 14,
+                        ),
                         child: Row(
                           children: [
                             // Checkbox in selection mode (manual expenses only)
@@ -307,8 +352,12 @@ class BusinessExpensesPage extends HookWidget {
                                 activeColor: posPrimary,
                                 checkColor: Colors.white,
                                 onChanged: (v) {
-                                  final s = Set<int>.from(selectedExpenseIds.value);
-                                  v == true ? s.add(expense.id) : s.remove(expense.id);
+                                  final s = Set<int>.from(
+                                    selectedExpenseIds.value,
+                                  );
+                                  v == true
+                                      ? s.add(expense.id)
+                                      : s.remove(expense.id);
                                   selectedExpenseIds.value = s;
                                 },
                               ),
@@ -335,12 +384,16 @@ class BusinessExpensesPage extends HookWidget {
                                     children: [
                                       Container(
                                         padding: const EdgeInsets.symmetric(
-                                            horizontal: 10, vertical: 4),
+                                          horizontal: 10,
+                                          vertical: 4,
+                                        ),
                                         decoration: BoxDecoration(
-                                          color:
-                                              posPrimary.withValues(alpha: 0.15),
-                                          borderRadius:
-                                              BorderRadius.circular(8),
+                                          color: posPrimary.withValues(
+                                            alpha: 0.15,
+                                          ),
+                                          borderRadius: BorderRadius.circular(
+                                            8,
+                                          ),
                                         ),
                                         child: Text(
                                           expense.category?.categoryName ??
@@ -412,6 +465,134 @@ class BusinessExpensesPage extends HookWidget {
                   );
                 }),
               const SizedBox(height: 24),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Expense Categories',
+                    style: GoogleFonts.outfit(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white,
+                    ),
+                  ),
+                  FilledButton.icon(
+                    onPressed: () =>
+                        _showExpenseCategoryDialog(context, null, refresh),
+                    icon: const Icon(Icons.add, size: 18),
+                    label: Text(
+                      'Add Category',
+                      style: GoogleFonts.outfit(fontWeight: FontWeight.w500),
+                    ),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: posPrimary,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 20,
+                        vertical: 14,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              if (!categoriesSnapshot.hasData)
+                _GlassPanel(
+                  child: Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Center(
+                      child: Text(
+                        'Loading categories...',
+                        style: GoogleFonts.outfit(color: posTextMuted),
+                      ),
+                    ),
+                  ),
+                )
+              else if (categories.isEmpty)
+                _GlassPanel(
+                  child: Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Center(
+                      child: Text(
+                        'No expense categories yet',
+                        style: GoogleFonts.outfit(color: posTextMuted),
+                      ),
+                    ),
+                  ),
+                )
+              else
+                Column(
+                  children: categories.map((category) {
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: _GlassPanel(
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 14,
+                          ),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  category.categoryName,
+                                  style: GoogleFonts.outfit(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ),
+                              Text(
+                                DateFormat(
+                                  'MMM dd, yyyy',
+                                ).format(category.createdAt),
+                                style: GoogleFonts.outfit(
+                                  fontSize: 12,
+                                  color: posTextMuted,
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              IconButton(
+                                icon: const Icon(
+                                  Icons.edit_outlined,
+                                  size: 18,
+                                  color: posAccent,
+                                ),
+                                tooltip: 'Edit category',
+                                onPressed: () => _showExpenseCategoryDialog(
+                                  context,
+                                  category,
+                                  refresh,
+                                ),
+                                visualDensity: VisualDensity.compact,
+                              ),
+                              IconButton(
+                                icon: const Icon(
+                                  Icons.delete_outline,
+                                  size: 18,
+                                  color: Color(0xFFEF4444),
+                                ),
+                                tooltip: 'Delete category',
+                                onPressed: () =>
+                                    _showDeleteExpenseCategoryDialog(
+                                      context,
+                                      category,
+                                      refresh,
+                                    ),
+                                visualDensity: VisualDensity.compact,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                ),
+              const SizedBox(height: 24),
             ],
           ),
         ),
@@ -480,10 +661,7 @@ class _SummaryCard extends StatelessWidget {
             const SizedBox(height: 4),
             Text(
               subtitle,
-              style: GoogleFonts.outfit(
-                fontSize: 12,
-                color: posTextMuted,
-              ),
+              style: GoogleFonts.outfit(fontSize: 12, color: posTextMuted),
             ),
           ],
         ),
@@ -520,15 +698,17 @@ Future<void> _showExpenseDialog(
   VoidCallback onRefresh,
 ) async {
   final isEditing = expense != null;
-  final descController =
-      TextEditingController(text: expense?.description ?? '');
-  final amountController =
-      TextEditingController(text: expense?.amount.toString() ?? '');
+  final descController = TextEditingController(
+    text: expense?.description ?? '',
+  );
+  final amountController = TextEditingController(
+    text: expense?.amount.toString() ?? '',
+  );
   int selectedCategoryId = expense?.categoryId ?? 1;
-  final receiptController =
-      TextEditingController(text: expense?.receiptNumber ?? '');
-  final notesController =
-      TextEditingController(text: expense?.notes ?? '');
+  final receiptController = TextEditingController(
+    text: expense?.receiptNumber ?? '',
+  );
+  final notesController = TextEditingController(text: expense?.notes ?? '');
 
   // Capture providers before showDialog
   final expenseProvider = context.read<ExpenseProvider>();
@@ -543,8 +723,7 @@ Future<void> _showExpenseDialog(
     builder: (ctx) => StatefulBuilder(
       builder: (ctx, setState) => AlertDialog(
         backgroundColor: posSurface,
-        shape:
-            RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: Text(
           isEditing ? 'Edit Expense' : 'Add Expense',
           style: GoogleFonts.outfit(
@@ -559,8 +738,11 @@ Future<void> _showExpenseDialog(
               mainAxisSize: MainAxisSize.min,
               children: [
                 _expenseField('Description', descController),
-                _expenseField('Amount', amountController,
-                    keyboardType: TextInputType.number),
+                _expenseField(
+                  'Amount',
+                  amountController,
+                  keyboardType: TextInputType.number,
+                ),
                 // Category dropdown
                 Padding(
                   padding: const EdgeInsets.only(bottom: 12),
@@ -568,24 +750,29 @@ Future<void> _showExpenseDialog(
                     future: Supabase.instance.client
                         .from('expense_categories')
                         .select()
-                        .then((data) => (data as List)
-                            .map((e) => ExpenseCategory.fromJson(
-                                e as Map<String, dynamic>))
-                            .toList()),
+                        .then(
+                          (data) => (data as List)
+                              .map(
+                                (e) => ExpenseCategory.fromJson(
+                                  e as Map<String, dynamic>,
+                                ),
+                              )
+                              .toList(),
+                        ),
                     builder: (context, snap) {
                       final categories = snap.data ?? [];
                       return DropdownButtonFormField<int>(
-                        value: categories.any((c) => c.id == selectedCategoryId)
+                        initialValue:
+                            categories.any((c) => c.id == selectedCategoryId)
                             ? selectedCategoryId
                             : (categories.isNotEmpty
-                                ? categories.first.id
-                                : null),
+                                  ? categories.first.id
+                                  : null),
                         dropdownColor: posSurfaceLight,
                         style: GoogleFonts.outfit(color: Colors.white),
                         decoration: InputDecoration(
                           labelText: 'Category',
-                          labelStyle:
-                              GoogleFonts.outfit(color: posTextMuted),
+                          labelStyle: GoogleFonts.outfit(color: posTextMuted),
                           filled: true,
                           fillColor: posSurfaceLight,
                           border: OutlineInputBorder(
@@ -595,16 +782,22 @@ Future<void> _showExpenseDialog(
                           focusedBorder: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(10),
                             borderSide: const BorderSide(
-                                color: posPrimary, width: 1.5),
+                              color: posPrimary,
+                              width: 1.5,
+                            ),
                           ),
                           contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 14, vertical: 12),
+                            horizontal: 14,
+                            vertical: 12,
+                          ),
                         ),
                         items: categories
-                            .map((c) => DropdownMenuItem(
-                                  value: c.id,
-                                  child: Text(c.categoryName),
-                                ))
+                            .map(
+                              (c) => DropdownMenuItem(
+                                value: c.id,
+                                child: Text(c.categoryName),
+                              ),
+                            )
                             .toList(),
                         onChanged: (val) {
                           if (val != null) {
@@ -620,7 +813,7 @@ Future<void> _showExpenseDialog(
                   padding: const EdgeInsets.only(bottom: 12),
                   child: ValueListenableBuilder<DateTime>(
                     valueListenable: selectedDate,
-                    builder: (_, date, __) => InkWell(
+                    builder: (context, date, child) => InkWell(
                       onTap: () async {
                         final picked = await showDatePicker(
                           context: ctx,
@@ -651,8 +844,11 @@ Future<void> _showExpenseDialog(
                         ),
                         child: Row(
                           children: [
-                            const Icon(Icons.calendar_today,
-                                size: 18, color: posTextMuted),
+                            const Icon(
+                              Icons.calendar_today,
+                              size: 18,
+                              color: posTextMuted,
+                            ),
                             const SizedBox(width: 10),
                             Text(
                               DateFormat('MMM dd, yyyy').format(date),
@@ -682,11 +878,12 @@ Future<void> _showExpenseDialog(
                           selectedVendorId = defaultVendor.id;
                         }
                       }
-                      final effectiveValue = vendors.any((v) => v.id == selectedVendorId)
+                      final effectiveValue =
+                          vendors.any((v) => v.id == selectedVendorId)
                           ? selectedVendorId
                           : (vendors.isNotEmpty ? vendors.first.id : null);
                       return DropdownButtonFormField<int>(
-                        value: effectiveValue,
+                        initialValue: effectiveValue,
                         dropdownColor: posSurfaceLight,
                         style: GoogleFonts.outfit(color: Colors.white),
                         decoration: InputDecoration(
@@ -700,15 +897,27 @@ Future<void> _showExpenseDialog(
                           ),
                           focusedBorder: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(10),
-                            borderSide: const BorderSide(color: posPrimary, width: 1.5),
+                            borderSide: const BorderSide(
+                              color: posPrimary,
+                              width: 1.5,
+                            ),
                           ),
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 12,
+                          ),
                         ),
                         items: vendors
-                            .map((v) => DropdownMenuItem(value: v.id, child: Text(v.name)))
+                            .map(
+                              (v) => DropdownMenuItem(
+                                value: v.id,
+                                child: Text(v.name),
+                              ),
+                            )
                             .toList(),
                         onChanged: (val) {
-                          if (val != null) setState(() => selectedVendorId = val);
+                          if (val != null)
+                            setState(() => selectedVendorId = val);
                         },
                       );
                     },
@@ -741,8 +950,10 @@ Future<void> _showExpenseDialog(
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child:
-                Text('Cancel', style: GoogleFonts.outfit(color: posTextMuted)),
+            child: Text(
+              'Cancel',
+              style: GoogleFonts.outfit(color: posTextMuted),
+            ),
           ),
           FilledButton(
             onPressed: () async {
@@ -751,8 +962,7 @@ Future<void> _showExpenseDialog(
                 if (isEditing) {
                   await provider.updateExpense(expense.id, {
                     'description': descController.text,
-                    'amount':
-                        double.tryParse(amountController.text) ?? 0,
+                    'amount': double.tryParse(amountController.text) ?? 0,
                     'category_id': selectedCategoryId,
                     'date': selectedDate.value.toIso8601String(),
                     'vendor_id': selectedVendorId,
@@ -765,32 +975,34 @@ Future<void> _showExpenseDialog(
                   });
                 } else {
                   final now = DateTime.now();
-                  await provider.createExpense(Expense(
-                    id: 0,
-                    description: descController.text,
-                    amount: double.tryParse(amountController.text) ?? 0,
-                    categoryId: selectedCategoryId,
-                    date: selectedDate.value,
-                    receiptNumber: receiptController.text.isEmpty
-                        ? null
-                        : receiptController.text,
-                    vendorId: selectedVendorId,
-                    notes: notesController.text.isEmpty
-                        ? null
-                        : notesController.text,
-                    sourceId: 1, // manual
-                    createdAt: now,
-                    updatedAt: now,
-                  ));
+                  await provider.createExpense(
+                    Expense(
+                      id: 0,
+                      description: descController.text,
+                      amount: double.tryParse(amountController.text) ?? 0,
+                      categoryId: selectedCategoryId,
+                      date: selectedDate.value,
+                      receiptNumber: receiptController.text.isEmpty
+                          ? null
+                          : receiptController.text,
+                      vendorId: selectedVendorId,
+                      notes: notesController.text.isEmpty
+                          ? null
+                          : notesController.text,
+                      sourceId: 1, // manual
+                      createdAt: now,
+                      updatedAt: now,
+                    ),
+                  );
                 }
                 if (ctx.mounted) Navigator.pop(ctx);
                 onRefresh();
               } catch (e) {
                 debugPrint('Error: $e');
                 if (ctx.mounted) {
-                  ScaffoldMessenger.of(ctx).showSnackBar(
-                    SnackBar(content: Text('Error: $e')),
-                  );
+                  ScaffoldMessenger.of(
+                    ctx,
+                  ).showSnackBar(SnackBar(content: Text('Error: $e')));
                 }
               }
             },
@@ -834,8 +1046,7 @@ Future<void> _showDeleteExpenseDialog(
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(ctx),
-          child:
-              Text('Cancel', style: GoogleFonts.outfit(color: posTextMuted)),
+          child: Text('Cancel', style: GoogleFonts.outfit(color: posTextMuted)),
         ),
         FilledButton(
           onPressed: () async {
@@ -846,8 +1057,161 @@ Future<void> _showDeleteExpenseDialog(
             } catch (e) {
               debugPrint('Error: $e');
               if (ctx.mounted) {
+                ScaffoldMessenger.of(
+                  ctx,
+                ).showSnackBar(SnackBar(content: Text('Error: $e')));
+              }
+            }
+          },
+          style: FilledButton.styleFrom(
+            backgroundColor: const Color(0xFFEF4444),
+            foregroundColor: Colors.white,
+          ),
+          child: Text('Delete', style: GoogleFonts.outfit()),
+        ),
+      ],
+    ),
+  );
+}
+
+Future<void> _showExpenseCategoryDialog(
+  BuildContext context,
+  ExpenseCategory? category,
+  VoidCallback onRefresh,
+) async {
+  final isEditing = category != null;
+  final nameController = TextEditingController(
+    text: category?.categoryName ?? '',
+  );
+
+  await showDialog(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      backgroundColor: posSurface,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      title: Text(
+        isEditing ? 'Edit Category' : 'Add Category',
+        style: GoogleFonts.outfit(
+          color: Colors.white,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+      content: TextField(
+        controller: nameController,
+        style: GoogleFonts.outfit(color: Colors.white),
+        decoration: InputDecoration(
+          labelText: 'Category name',
+          labelStyle: GoogleFonts.outfit(color: posTextMuted),
+          filled: true,
+          fillColor: posSurfaceLight,
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(10),
+            borderSide: BorderSide.none,
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(10),
+            borderSide: const BorderSide(color: posPrimary, width: 1.5),
+          ),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 14,
+            vertical: 12,
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(ctx),
+          child: Text('Cancel', style: GoogleFonts.outfit(color: posTextMuted)),
+        ),
+        FilledButton(
+          onPressed: () async {
+            final name = nameController.text.trim();
+            if (name.isEmpty) {
+              if (ctx.mounted) {
                 ScaffoldMessenger.of(ctx).showSnackBar(
-                  SnackBar(content: Text('Error: $e')),
+                  SnackBar(content: Text('Category name cannot be empty')),
+                );
+              }
+              return;
+            }
+
+            try {
+              final client = Supabase.instance.client;
+              if (isEditing) {
+                await client
+                    .from('expense_categories')
+                    .update({'category_name': name})
+                    .eq('id', category.id);
+              } else {
+                await client.from('expense_categories').insert({
+                  'category_name': name,
+                });
+              }
+              if (ctx.mounted) Navigator.pop(ctx);
+              onRefresh();
+            } catch (e) {
+              debugPrint('Error saving category: $e');
+              if (ctx.mounted) {
+                ScaffoldMessenger.of(ctx).showSnackBar(
+                  SnackBar(content: Text('Error saving category: $e')),
+                );
+              }
+            }
+          },
+          style: FilledButton.styleFrom(
+            backgroundColor: posPrimary,
+            foregroundColor: Colors.white,
+          ),
+          child: Text(
+            isEditing ? 'Update' : 'Create',
+            style: GoogleFonts.outfit(),
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+Future<void> _showDeleteExpenseCategoryDialog(
+  BuildContext context,
+  ExpenseCategory category,
+  VoidCallback onRefresh,
+) async {
+  await showDialog(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      backgroundColor: posSurface,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      title: Text(
+        'Delete Category',
+        style: GoogleFonts.outfit(
+          color: Colors.white,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+      content: Text(
+        'Remove the category "${category.categoryName}"? Existing expenses will remain uncategorized.',
+        style: GoogleFonts.outfit(color: posTextMuted),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(ctx),
+          child: Text('Cancel', style: GoogleFonts.outfit(color: posTextMuted)),
+        ),
+        FilledButton(
+          onPressed: () async {
+            try {
+              await Supabase.instance.client
+                  .from('expense_categories')
+                  .delete()
+                  .eq('id', category.id);
+              if (ctx.mounted) Navigator.pop(ctx);
+              onRefresh();
+            } catch (e) {
+              debugPrint('Error deleting category: $e');
+              if (ctx.mounted) {
+                ScaffoldMessenger.of(ctx).showSnackBar(
+                  SnackBar(content: Text('Error deleting category: $e')),
                 );
               }
             }
@@ -887,8 +1251,10 @@ Widget _expenseField(
           borderRadius: BorderRadius.circular(10),
           borderSide: const BorderSide(color: posPrimary, width: 1.5),
         ),
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 14,
+          vertical: 12,
+        ),
       ),
     ),
   );

@@ -1,5 +1,3 @@
-import 'package:printsari_sia/shared/types/types.dart';
-
 class ExpenseCategory {
   final int id;
   final String categoryName;
@@ -10,10 +8,6 @@ class ExpenseCategory {
     required this.categoryName,
     required this.createdAt,
   });
-
-  // Convenience getter to get enum (if it exists)
-  ExpenseCategoryType? get categoryType =>
-      ExpenseCategoryType.fromString(categoryName);
 
   factory ExpenseCategory.fromJson(Map<String, dynamic> json) {
     return ExpenseCategory(
@@ -31,16 +25,4 @@ class ExpenseCategory {
     };
   }
 
-  // Helper to create from enum
-  static ExpenseCategory fromEnum({
-    required int id,
-    required ExpenseCategoryType type,
-    required DateTime createdAt,
-  }) {
-    return ExpenseCategory(
-      id: id,
-      categoryName: type.value,
-      createdAt: createdAt,
-    );
-  }
 }

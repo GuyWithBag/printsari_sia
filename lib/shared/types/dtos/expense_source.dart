@@ -1,5 +1,3 @@
-import 'package:printsari_sia/shared/types/types.dart';
-
 class ExpenseSource {
   final int id;
   final String sourceName;
@@ -10,8 +8,6 @@ class ExpenseSource {
     required this.sourceName,
     required this.createdAt,
   });
-
-  ExpenseSourceType? get sourceType => ExpenseSourceType.fromString(sourceName);
 
   factory ExpenseSource.fromJson(Map<String, dynamic> json) {
     return ExpenseSource(

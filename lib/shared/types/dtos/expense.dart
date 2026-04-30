@@ -18,9 +18,7 @@ class Expense {
 
   // Optional joined data
   final ExpenseCategory? category;
-  final PaymentMethod? paymentMethod;
   final Transaction? linkedTransaction;
-  final ExpenseSource? source;
   final Vendor? vendorData;
 
   Expense({
@@ -39,9 +37,7 @@ class Expense {
     required this.createdAt,
     required this.updatedAt,
     this.category,
-    this.paymentMethod,
     this.linkedTransaction,
-    this.source,
     this.vendorData,
   });
 
@@ -66,18 +62,8 @@ class Expense {
               json['expense_categories'] as Map<String, dynamic>,
             )
           : null,
-      paymentMethod: json['payment_methods'] != null
-          ? PaymentMethod.fromJson(
-              json['payment_methods'] as Map<String, dynamic>,
-            )
-          : null,
       linkedTransaction: json['transactions'] != null
           ? Transaction.fromJson(json['transactions'] as Map<String, dynamic>)
-          : null,
-      source: json['expense_sources'] != null
-          ? ExpenseSource.fromJson(
-              json['expense_sources'] as Map<String, dynamic>,
-            )
           : null,
       vendorData: json['vendors'] != null
           ? Vendor.fromJson(json['vendors'] as Map<String, dynamic>)

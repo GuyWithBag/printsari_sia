@@ -19,7 +19,6 @@ class TransactionItem {
   // Optional joined data
   final InventoryItem? inventoryItem;
   final Product? product;
-  final ProductCategory? category;
   final PrintOrder? printOrder;
 
   TransactionItem({
@@ -39,7 +38,6 @@ class TransactionItem {
     required this.updatedAt,
     this.inventoryItem,
     this.product,
-    this.category,
     this.printOrder,
   });
 
@@ -70,11 +68,6 @@ class TransactionItem {
           : null,
       product: json['products'] != null
           ? Product.fromJson(json['products'] as Map<String, dynamic>)
-          : null,
-      category: json['product_categories'] != null
-          ? ProductCategory.fromJson(
-              json['product_categories'] as Map<String, dynamic>,
-            )
           : null,
       printOrder: json['print_orders'] != null
           ? PrintOrder.fromJson(json['print_orders'] as Map<String, dynamic>)

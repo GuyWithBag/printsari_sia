@@ -199,7 +199,8 @@ class CartPanel extends HookWidget {
                         final totalInCart = cart
                             .where((c) => c.inventoryId == item.inventoryId)
                             .fold(0.0, (sum, c) => sum + c.quantity);
-                        final available = (invItem?.stock ?? 0) - totalInCart + item.quantity;
+                        final available =
+                            (invItem?.stock ?? 0) - totalInCart + item.quantity;
                         if (item.quantity < available) {
                           increaseCallback = () => transactionProvider
                               .updateCartItemQuantity(index, item.quantity + 1);
@@ -318,12 +319,21 @@ class CartPanel extends HookWidget {
                 padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
                 child: TextField(
                   controller: cashTenderedController,
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
                   style: GoogleFonts.outfit(color: posTextMain, fontSize: 14),
                   decoration: InputDecoration(
                     labelText: 'Cash Tendered (₱)',
-                    labelStyle: GoogleFonts.outfit(color: posTextMuted, fontSize: 13),
-                    prefixIcon: const Icon(Icons.money_rounded, color: posTextMuted, size: 18),
+                    labelStyle: GoogleFonts.outfit(
+                      color: posTextMuted,
+                      fontSize: 13,
+                    ),
+                    prefixIcon: const Icon(
+                      Icons.money_rounded,
+                      color: posTextMuted,
+                      size: 18,
+                    ),
                     filled: true,
                     fillColor: Colors.black.withValues(alpha: 0.05),
                     border: OutlineInputBorder(
@@ -332,9 +342,15 @@ class CartPanel extends HookWidget {
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: posPrimary, width: 1.5),
+                      borderSide: const BorderSide(
+                        color: posPrimary,
+                        width: 1.5,
+                      ),
                     ),
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 10,
+                    ),
                   ),
                 ),
               ),
@@ -395,6 +411,7 @@ class CartPanel extends HookWidget {
 
         if (!context.mounted) return;
 
+        final customerProvider = context.read<CustomerProvider>();
         await showDialog(
           context: context,
           barrierDismissible: false,
@@ -406,6 +423,7 @@ class CartPanel extends HookWidget {
             printingRevenue: printingRevenue,
             isCash: isCash,
             cashTendered: cashTendered,
+            customerProvider: customerProvider,
           ),
         );
       } else {
@@ -417,7 +435,9 @@ class CartPanel extends HookWidget {
             ),
             backgroundColor: Colors.red.shade700,
             behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
           ),
         );
       }
@@ -446,6 +466,7 @@ class _ReceiptDialog extends StatelessWidget {
   final double printingRevenue;
   final bool isCash;
   final double cashTendered;
+  final CustomerProvider customerProvider;
 
   const _ReceiptDialog({
     required this.transaction,
@@ -455,9 +476,11 @@ class _ReceiptDialog extends StatelessWidget {
     required this.printingRevenue,
     required this.isCash,
     required this.cashTendered,
+    required this.customerProvider,
   });
 
-  double get change => isCash ? (cashTendered - total).clamp(0, double.infinity) : 0;
+  double get change =>
+      isCash ? (cashTendered - total).clamp(0, double.infinity) : 0;
 
   @override
   Widget build(BuildContext context) {
@@ -480,20 +503,33 @@ class _ReceiptDialog extends StatelessWidget {
               padding: const EdgeInsets.symmetric(vertical: 20),
               decoration: BoxDecoration(
                 color: posPrimary,
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(20),
+                ),
               ),
               child: Column(
                 children: [
-                  const Icon(Icons.check_circle_rounded, color: Colors.white, size: 36),
+                  const Icon(
+                    Icons.check_circle_rounded,
+                    color: Colors.white,
+                    size: 36,
+                  ),
                   const SizedBox(height: 6),
                   Text(
                     'Order Complete',
-                    style: GoogleFonts.outfit(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w700),
+                    style: GoogleFonts.outfit(
+                      color: Colors.white,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                   const SizedBox(height: 2),
                   Text(
                     transaction.transactionNumber,
-                    style: GoogleFonts.outfit(color: Colors.white70, fontSize: 13),
+                    style: GoogleFonts.outfit(
+                      color: Colors.white70,
+                      fontSize: 13,
+                    ),
                   ),
                 ],
               ),
@@ -510,11 +546,28 @@ class _ReceiptDialog extends StatelessWidget {
                     Center(
                       child: Column(
                         children: [
-                          Text('PrintSari Corner',
-                              style: GoogleFonts.outfit(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 15)),
-                          Text('Magpet, North Cotabato',
-                              style: GoogleFonts.outfit(color: posTextMuted, fontSize: 12)),
-                          Text(dateStr, style: GoogleFonts.outfit(color: posTextMuted, fontSize: 12)),
+                          Text(
+                            'PrintSari Corner',
+                            style: GoogleFonts.outfit(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w700,
+                              fontSize: 15,
+                            ),
+                          ),
+                          Text(
+                            'Magpet, North Cotabato',
+                            style: GoogleFonts.outfit(
+                              color: posTextMuted,
+                              fontSize: 12,
+                            ),
+                          ),
+                          Text(
+                            dateStr,
+                            style: GoogleFonts.outfit(
+                              color: posTextMuted,
+                              fontSize: 12,
+                            ),
+                          ),
                         ],
                       ),
                     ),
@@ -522,33 +575,53 @@ class _ReceiptDialog extends StatelessWidget {
                     const Divider(color: Color(0xFF334155)),
 
                     // Items
-                    ...cartItems.map((item) => Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 5),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(item.productName,
-                                    style: GoogleFonts.outfit(color: Colors.white, fontSize: 13)),
-                                Text('×${item.quantity.toStringAsFixed(item.quantity % 1 == 0 ? 0 : 1)}  @  ₱${item.unitPrice.toStringAsFixed(2)}',
-                                    style: GoogleFonts.outfit(color: posTextMuted, fontSize: 11)),
-                              ],
+                    ...cartItems.map(
+                      (item) => Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 5),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    item.productName,
+                                    style: GoogleFonts.outfit(
+                                      color: Colors.white,
+                                      fontSize: 13,
+                                    ),
+                                  ),
+                                  Text(
+                                    '×${item.quantity.toStringAsFixed(item.quantity % 1 == 0 ? 0 : 1)}  @  ₱${item.unitPrice.toStringAsFixed(2)}',
+                                    style: GoogleFonts.outfit(
+                                      color: posTextMuted,
+                                      fontSize: 11,
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
-                          ),
-                          Text('₱${item.subtotal.toStringAsFixed(2)}',
-                              style: GoogleFonts.outfit(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600)),
-                        ],
+                            Text(
+                              '₱${item.subtotal.toStringAsFixed(2)}',
+                              style: GoogleFonts.outfit(
+                                color: Colors.white,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-                    )),
+                    ),
 
                     const Divider(color: Color(0xFF334155)),
 
                     // Subtotals
-                    if (storeRevenue > 0) _receiptRow('Store', storeRevenue, muted: true),
-                    if (printingRevenue > 0) _receiptRow('Printing', printingRevenue, muted: true),
+                    if (storeRevenue > 0)
+                      _receiptRow('Store', storeRevenue, muted: true),
+                    if (printingRevenue > 0)
+                      _receiptRow('Printing', printingRevenue, muted: true),
                     const SizedBox(height: 4),
                     _receiptRow('TOTAL', total, bold: true, large: true),
 
@@ -562,11 +635,17 @@ class _ReceiptDialog extends StatelessWidget {
                     Center(
                       child: Text(
                         'Thank you for your purchase!',
-                        style: GoogleFonts.outfit(color: posTextMuted, fontSize: 12),
+                        style: GoogleFonts.outfit(
+                          color: posTextMuted,
+                          fontSize: 12,
+                        ),
                       ),
                     ),
                     const SizedBox(height: 12),
-                    _TagCustomerSection(transactionId: transaction.id),
+                    _TagCustomerSection(
+                      transactionId: transaction.id,
+                      customerProvider: customerProvider,
+                    ),
                   ],
                 ),
               ),
@@ -583,7 +662,9 @@ class _ReceiptDialog extends StatelessWidget {
                       style: OutlinedButton.styleFrom(
                         foregroundColor: posTextMuted,
                         side: const BorderSide(color: Color(0xFF334155)),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                         padding: const EdgeInsets.symmetric(vertical: 12),
                       ),
                       child: Text('Close', style: GoogleFonts.outfit()),
@@ -598,7 +679,9 @@ class _ReceiptDialog extends StatelessWidget {
                       style: FilledButton.styleFrom(
                         backgroundColor: posPrimary,
                         foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                         padding: const EdgeInsets.symmetric(vertical: 12),
                       ),
                     ),
@@ -612,7 +695,13 @@ class _ReceiptDialog extends StatelessWidget {
     );
   }
 
-  Widget _receiptRow(String label, double value, {bool muted = false, bool bold = false, bool large = false}) {
+  Widget _receiptRow(
+    String label,
+    double value, {
+    bool muted = false,
+    bool bold = false,
+    bool large = false,
+  }) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 2),
       child: Row(
@@ -650,45 +739,91 @@ class _ReceiptDialog extends StatelessWidget {
           pw.TextStyle(font: isBold ? bold : regular, fontSize: size);
 
       final doc = pw.Document();
-      doc.addPage(pw.Page(
-        pageFormat: const PdfPageFormat(
-            80 * PdfPageFormat.mm, double.infinity,
-            marginAll: 8 * PdfPageFormat.mm),
-        build: (pw.Context ctx) {
-          return pw.Column(
-            crossAxisAlignment: pw.CrossAxisAlignment.start,
-            children: [
-              pw.Center(child: pw.Text('PrintSari Corner', style: style(14, isBold: true))),
-              pw.Center(child: pw.Text('Magpet, North Cotabato', style: style(10))),
-              pw.Center(child: pw.Text(dateStr, style: style(10))),
-              pw.SizedBox(height: 6),
-              pw.Center(child: pw.Text(transaction.transactionNumber, style: style(11, isBold: true))),
-              pw.Divider(),
-              ...cartItems.map((item) => pw.Row(
-                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-                children: [
-                  pw.Expanded(child: pw.Text(
-                    '${item.productName}\n  \u00d7${item.quantity.toStringAsFixed(item.quantity % 1 == 0 ? 0 : 1)} @ \u20b1${item.unitPrice.toStringAsFixed(2)}',
-                    style: style(10),
-                  )),
-                  pw.Text('\u20b1${item.subtotal.toStringAsFixed(2)}', style: style(10)),
+      doc.addPage(
+        pw.Page(
+          pageFormat: const PdfPageFormat(
+            80 * PdfPageFormat.mm,
+            double.infinity,
+            marginAll: 8 * PdfPageFormat.mm,
+          ),
+          build: (pw.Context ctx) {
+            return pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                pw.Center(
+                  child: pw.Text(
+                    'PrintSari Corner',
+                    style: style(14, isBold: true),
+                  ),
+                ),
+                pw.Center(
+                  child: pw.Text('Magpet, North Cotabato', style: style(10)),
+                ),
+                pw.Center(child: pw.Text(dateStr, style: style(10))),
+                pw.SizedBox(height: 6),
+                pw.Center(
+                  child: pw.Text(
+                    transaction.transactionNumber,
+                    style: style(11, isBold: true),
+                  ),
+                ),
+                pw.Divider(),
+                ...cartItems.map(
+                  (item) => pw.Row(
+                    mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                    children: [
+                      pw.Expanded(
+                        child: pw.Text(
+                          '${item.productName}\n  \u00d7${item.quantity.toStringAsFixed(item.quantity % 1 == 0 ? 0 : 1)} @ \u20b1${item.unitPrice.toStringAsFixed(2)}',
+                          style: style(10),
+                        ),
+                      ),
+                      pw.Text(
+                        '\u20b1${item.subtotal.toStringAsFixed(2)}',
+                        style: style(10),
+                      ),
+                    ],
+                  ),
+                ),
+                pw.Divider(),
+                if (storeRevenue > 0)
+                  _pdfRow(
+                    'Store Subtotal',
+                    storeRevenue,
+                    regular: regular,
+                    bold: bold,
+                  ),
+                if (printingRevenue > 0)
+                  _pdfRow(
+                    'Printing Subtotal',
+                    printingRevenue,
+                    regular: regular,
+                    bold: bold,
+                  ),
+                pw.SizedBox(height: 4),
+                _pdfRow(
+                  'TOTAL',
+                  total,
+                  isBold: true,
+                  regular: regular,
+                  bold: bold,
+                ),
+                if (isCash) ...[
+                  _pdfRow(
+                    'Cash Tendered',
+                    cashTendered,
+                    regular: regular,
+                    bold: bold,
+                  ),
+                  _pdfRow('Change', change, regular: regular, bold: bold),
                 ],
-              )),
-              pw.Divider(),
-              if (storeRevenue > 0) _pdfRow('Store Subtotal', storeRevenue, regular: regular, bold: bold),
-              if (printingRevenue > 0) _pdfRow('Printing Subtotal', printingRevenue, regular: regular, bold: bold),
-              pw.SizedBox(height: 4),
-              _pdfRow('TOTAL', total, isBold: true, regular: regular, bold: bold),
-              if (isCash) ...[
-                _pdfRow('Cash Tendered', cashTendered, regular: regular, bold: bold),
-                _pdfRow('Change', change, regular: regular, bold: bold),
+                pw.SizedBox(height: 8),
+                pw.Center(child: pw.Text('Thank you!', style: style(11))),
               ],
-              pw.SizedBox(height: 8),
-              pw.Center(child: pw.Text('Thank you!', style: style(11))),
-            ],
-          );
-        },
-      ));
+            );
+          },
+        ),
+      );
       return doc;
     }
 
@@ -708,9 +843,14 @@ class _ReceiptDialog extends StatelessWidget {
                 padding: const EdgeInsets.fromLTRB(20, 16, 8, 8),
                 child: Row(
                   children: [
-                    Text('Print Preview',
-                        style: GoogleFonts.outfit(
-                            color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+                    Text(
+                      'Print Preview',
+                      style: GoogleFonts.outfit(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
+                    ),
                     const Spacer(),
                     IconButton(
                       icon: const Icon(Icons.close, color: posTextMuted),
@@ -730,8 +870,10 @@ class _ReceiptDialog extends StatelessWidget {
                   allowPrinting: true,
                   allowSharing: true,
                   initialPageFormat: const PdfPageFormat(
-                      80 * PdfPageFormat.mm, double.infinity,
-                      marginAll: 8 * PdfPageFormat.mm),
+                    80 * PdfPageFormat.mm,
+                    double.infinity,
+                    marginAll: 8 * PdfPageFormat.mm,
+                  ),
                 ),
               ),
             ],
@@ -748,7 +890,10 @@ class _ReceiptDialog extends StatelessWidget {
     required pw.Font regular,
     required pw.Font bold,
   }) {
-    final style = pw.TextStyle(font: isBold ? bold : regular, fontSize: isBold ? 11 : 10);
+    final style = pw.TextStyle(
+      font: isBold ? bold : regular,
+      fontSize: isBold ? 11 : 10,
+    );
     return pw.Row(
       mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
       children: [
@@ -763,7 +908,12 @@ class _ReceiptDialog extends StatelessWidget {
 
 class _TagCustomerSection extends StatefulWidget {
   final int transactionId;
-  const _TagCustomerSection({required this.transactionId});
+  final CustomerProvider customerProvider;
+
+  const _TagCustomerSection({
+    required this.transactionId,
+    required this.customerProvider,
+  });
 
   @override
   State<_TagCustomerSection> createState() => _TagCustomerSectionState();
@@ -774,7 +924,7 @@ class _TagCustomerSectionState extends State<_TagCustomerSection> {
   bool _isTagging = false;
 
   Future<void> _tag() async {
-    final customerProvider = context.read<CustomerProvider>();
+    final customerProvider = widget.customerProvider;
     setState(() => _isTagging = true);
     List<Customer> customers;
     try {
@@ -799,7 +949,10 @@ class _TagCustomerSectionState extends State<_TagCustomerSection> {
     );
 
     if (selected == null || !mounted) return;
-    await customerProvider.tagTransactionCustomer(widget.transactionId, selected.id);
+    await customerProvider.tagTransactionCustomer(
+      widget.transactionId,
+      selected.id,
+    );
     if (!mounted) return;
     setState(() => _taggedCustomer = selected);
   }
@@ -831,7 +984,11 @@ class _TagCustomerSectionState extends State<_TagCustomerSection> {
     return Center(
       child: TextButton.icon(
         onPressed: _tag,
-        icon: const Icon(Icons.person_add_rounded, size: 14, color: posTextMuted),
+        icon: const Icon(
+          Icons.person_add_rounded,
+          size: 14,
+          color: posTextMuted,
+        ),
         label: Text(
           'Tag Customer',
           style: GoogleFonts.outfit(color: posTextMuted, fontSize: 12),
@@ -888,16 +1045,25 @@ class _CustomerPickerDialogState extends State<_CustomerPickerDialog> {
               style: GoogleFonts.outfit(color: Colors.white, fontSize: 14),
               decoration: InputDecoration(
                 hintText: 'Search by name, email, or phone...',
-                hintStyle: GoogleFonts.outfit(color: posTextMuted, fontSize: 13),
-                prefixIcon: const Icon(Icons.search, color: posTextMuted, size: 18),
+                hintStyle: GoogleFonts.outfit(
+                  color: posTextMuted,
+                  fontSize: 13,
+                ),
+                prefixIcon: const Icon(
+                  Icons.search,
+                  color: posTextMuted,
+                  size: 18,
+                ),
                 filled: true,
                 fillColor: posSurfaceLight,
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                   borderSide: BorderSide.none,
                 ),
-                contentPadding:
-                    const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 10,
+                ),
               ),
             ),
             const SizedBox(height: 8),
@@ -921,7 +1087,9 @@ class _CustomerPickerDialogState extends State<_CustomerPickerDialog> {
                           borderRadius: BorderRadius.circular(10),
                           child: Container(
                             padding: const EdgeInsets.symmetric(
-                                horizontal: 14, vertical: 10),
+                              horizontal: 14,
+                              vertical: 10,
+                            ),
                             margin: const EdgeInsets.only(bottom: 4),
                             decoration: BoxDecoration(
                               color: posSurfaceLight,

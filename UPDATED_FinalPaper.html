@@ -1,0 +1,1569 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>PrintSari Corner System Design – Updated</title>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Times New Roman',Times,serif;font-size:12pt;line-height:1.6;color:#000;background:#e8e8e8}
+.page{width:210mm;min-height:297mm;background:#fff;margin:10px auto;padding:25mm 22mm 20mm 25mm}
+@media print{
+  body{background:#fff}
+  .page{margin:0;padding:25mm 22mm 20mm 25mm;page-break-after:always;width:210mm;min-height:297mm}
+  @page{size:A4;margin:0}
+}
+h1{font-size:14pt;font-weight:bold;text-align:center;margin-bottom:10px}
+h2{font-size:13pt;font-weight:bold;margin:14px 0 8px}
+h3{font-size:12pt;font-weight:bold;margin:12px 0 6px}
+p{text-align:justify;margin-bottom:10px}
+.center{text-align:center}
+.cover{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:247mm;text-align:center;gap:6px}
+.cover-title{font-size:15pt;font-weight:bold;margin:20px 0 10px}
+.cover-name{font-size:13pt;margin:4px 0}
+.cover-label{font-size:13pt;font-weight:bold;margin-top:20px}
+.cover-info{font-size:13pt;margin:4px 0}
+.cover-date{font-size:13pt;font-weight:bold;margin-top:30px}
+.pnum{text-align:right;font-size:10pt;margin-top:auto;padding-top:10px}
+table{width:100%;border-collapse:collapse;margin:12px 0;font-size:11pt}
+th{background:#000;color:#fff;font-weight:bold;padding:7px 9px;border:1px solid #000;text-align:left}
+td{padding:6px 9px;border:1px solid #000;vertical-align:top}
+.mermaid{margin:15px auto;text-align:center}
+.diag-box{border:1px solid #999;border-radius:4px;padding:12px;margin:12px 0;overflow-x:auto}
+.diag-title{font-weight:bold;text-align:center;margin-bottom:8px;font-size:11pt}
+ul,ol{padding-left:30px;margin-bottom:10px}
+li{margin:6px 0;text-align:justify}
+.new-tag{display:inline-block;background:#1F4E79;color:#fff;font-size:8pt;padding:1px 5px;border-radius:3px;margin-left:6px;vertical-align:middle}
+.screen-ph{border:2px dashed #aaa;background:#f5f5f5;padding:15px;text-align:center;color:#555;font-style:italic;margin:10px 0;min-height:160px;display:flex;align-items:center;justify-content:center;border-radius:4px}
+.toc-row{display:flex;justify-content:space-between;margin:4px 0}
+.toc-sub{margin-left:20px}
+.toc-sub2{margin-left:40px}
+.italic{font-style:italic}
+.bold{font-weight:bold}
+.uc-table td:first-child{font-weight:bold;width:30%}
+</style>
+</head>
+<body>
+<script>
+mermaid.initialize({startOnLoad:true,theme:'base',themeVariables:{primaryColor:'#4472C4',primaryTextColor:'#fff',primaryBorderColor:'#2a52be',lineColor:'#333',secondaryColor:'#D5E8FC',nodeBorder:'#2a52be',clusterBkg:'#EEF4FB'},flowchart:{useMaxWidth:true,htmlLabels:true},classDiagram:{useMaxWidth:true}});
+</script>
+
+<!-- ========== COVER PAGE ========== -->
+<div class="page">
+<div class="cover">
+  <img src="https://upload.wikimedia.org/wikipedia/en/thumb/e/e7/Ateneo_de_Davao_University_logo.svg/200px-Ateneo_de_Davao_University_logo.svg.png" width="110" alt="Ateneo de Davao Seal" onerror="this.style.display='none'">
+  <div class="cover-title">PrintSari Corner System Design</div>
+  <div style="margin-top:30px">
+    <div class="cover-name">Dulaugon, Loejee Miguel,</div>
+    <div class="cover-name">Lupase, Daniel David M.,</div>
+    <div class="cover-name">Pacanza, Bernard Louie</div>
+  </div>
+  <div>
+    <div class="cover-label">Adviser:</div>
+    <div class="cover-info">Mr. Rodwell Matchon</div>
+  </div>
+  <div>
+    <div class="cover-label">Panelists:</div>
+    <div class="cover-info">Mr. Dwight Ian De Jesus</div>
+    <div class="cover-info">Mr. Antonio Bulao II</div>
+  </div>
+  <div class="cover-date">November 2025 (Revised April 2026)</div>
+</div>
+<div class="pnum">1</div>
+</div>
+
+<!-- ========== TABLE OF CONTENTS ========== -->
+<div class="page">
+<h1>Table of Contents</h1>
+<div style="margin-top:20px">
+  <div class="toc-row"><span>1. Preliminary Investigation Report</span><span>3</span></div>
+  <div class="toc-row toc-sub"><span>1.1 Organization Details</span><span>3</span></div>
+  <div class="toc-row toc-sub"><span>1.2 Organization Brief History</span><span>4</span></div>
+  <div class="toc-row toc-sub"><span>1.3 Business Process</span><span>5</span></div>
+  <div class="toc-row toc-sub"><span>1.4 Identified Problems</span><span>6</span></div>
+  <div class="toc-row" style="margin-top:8px"><span>2. Events Table, Use Case List and Diagram</span><span>7</span></div>
+  <div class="toc-row toc-sub"><span>2.1 Events Table</span><span>7</span></div>
+  <div class="toc-row toc-sub"><span>2.2 Use Case List</span><span>20</span></div>
+  <div class="toc-row toc-sub"><span>2.3 Use Case Diagram</span><span>29</span></div>
+  <div class="toc-row" style="margin-top:8px"><span>3. Use Case Description</span><span>42</span></div>
+  <div class="toc-row" style="margin-top:8px"><span>4. Domain Class Diagram</span><span>55</span></div>
+  <div class="toc-row" style="margin-top:8px"><span>5. Design Class Diagram</span><span>56</span></div>
+  <div class="toc-row toc-sub"><span>5.1 User Management</span><span>56</span></div>
+  <div class="toc-row toc-sub"><span>5.2 Product Management</span><span>57</span></div>
+  <div class="toc-row toc-sub"><span>5.3 Inventory Management</span><span>58</span></div>
+  <div class="toc-row toc-sub"><span>5.4 Transaction Sales</span><span>59</span></div>
+  <div class="toc-row toc-sub"><span>5.5 Business Expense</span><span>60</span></div>
+  <div class="toc-row toc-sub"><span>5.6 Financial Report</span><span>61</span></div>
+  <div class="toc-row toc-sub"><span>5.7 Customer Management <span class="new-tag">NEW</span></span><span>62</span></div>
+  <div class="toc-row toc-sub"><span>5.8 Vendor Management <span class="new-tag">NEW</span></span><span>63</span></div>
+  <div class="toc-row toc-sub"><span>5.9 Activity Log <span class="new-tag">NEW</span></span><span>64</span></div>
+  <div class="toc-row" style="margin-top:8px"><span>6. UI/UX Design</span><span>65</span></div>
+  <div class="toc-row toc-sub"><span>6.1 Login Page</span><span>65</span></div>
+  <div class="toc-row toc-sub"><span>6.2 Owner Dashboard</span><span>65</span></div>
+  <div class="toc-row toc-sub"><span>6.3 Cashier Dashboard</span><span>68</span></div>
+  <div class="toc-row toc-sub"><span>6.4 Archives Page <span class="new-tag">NEW</span></span><span>70</span></div>
+  <div class="toc-row toc-sub"><span>6.5 Activity Log Page <span class="new-tag">NEW</span></span><span>71</span></div>
+  <div class="toc-row toc-sub"><span>6.6 Customer Management Page <span class="new-tag">NEW</span></span><span>72</span></div>
+</div>
+<div class="pnum">2</div>
+</div>
+
+<!-- ========== SECTION 1: PRELIMINARY INVESTIGATION ========== -->
+<div class="page">
+<h1>Preliminary Investigation Report</h1>
+<h2>Organization Details:</h2>
+<p><span class="bold">Organization Name:</span> PrintSari Corner</p>
+<p><span class="bold">Industry Type:</span> Retail &amp; Print Services</p>
+<p><span class="bold">Organization Address:</span> Purok 5 RVM, Poblacion, Magpet, North Cotabato</p>
+<p><span class="bold">Organization's Contact/Representative:</span></p>
+<p style="margin-left:30px"><span class="bold">Contact Person:</span> Dennis A. Lupase</p>
+<p style="margin-left:30px"><span class="bold">Phone Number:</span> 09124372005</p>
+<p style="margin-left:30px"><span class="bold">Email:</span> dennislupase@gmail.com</p>
+<p><span class="bold">Organizational Chart/Structure:</span></p>
+<p style="margin-left:30px"><span class="bold">Owners:</span> Dennis A. Lupase, Charita Lupase</p>
+<p style="margin-left:30px"><span class="bold">Worker:</span> Zimon Catipay</p>
+<p style="margin-left:30px"><span class="bold">Worker:</span> Desiree Jane Lupase</p>
+<p style="margin-left:30px"><span class="bold">Worker:</span> Monique Anguit</p>
+<p style="margin-left:30px"><span class="bold">Stock Person/Supplier:</span> Ellaine Lupase</p>
+<div class="pnum">3</div>
+</div>
+
+<div class="page">
+<h2>Organization's Brief History:</h2>
+<p>PrintSari Corner was started in 2023 by my family because of the good business location in front of the municipal hall. I saw that many people come to this area every day for government transactions, and I thought this would be a good place to start a business. I noticed that people always needed to photocopy their documents like birth certificates and IDs when they apply for senior citizen cards or other government requirements. Since our shop is the nearest printing service to the municipal hall, customers naturally come to us for their xerox and printing needs.</p>
+<p>The location also has a gymnasium nearby where basketball leagues, festivals, and concerts happen regularly. During these events, many people need snacks and drinks, and we are the closest store they can buy from. This made me realize we could serve both printing services and sell food items to the community.</p>
+<p>When the business started growing, two of my siblings wanted to help by investing money in the business. They also help with operations whenever needed. My mother also wanted to be part of the business, so she became a co-owner as well.</p>
+<p>Now, my mother and I check on the business every week to make sure everything is running well. We look at the sales, check if we have enough supplies, and see if our customers are happy with our services.</p>
+<p>The business works well because of our location. We serve people who need government document services and people who want to buy snacks and drinks during community events. This makes PrintSari Corner an important part of the community.</p>
+<div class="pnum">4</div>
+</div>
+
+<div class="page">
+<h2>Business Process:</h2>
+<h3>Customer Purchase Process (Sari-Sari Store):</h3>
+<p>The customer selects snacks, drinks, or other items from the store shelves. The cashier manually checks the item price and calculates the total amount using a calculator or mental math. The customer pays cash, and the cashier gives change if needed. The cashier writes down what was sold on a bond paper list. No receipt is given to the customer.</p>
+<p class="italic">Objects: Customer, Items, Cashier, Bond Paper, Calculator, Cash</p>
+<p class="italic">Actions: selects, checks, calculates, pays, writes down</p>
+
+<h3>Printing Service Process:</h3>
+<p>The customer requests printing services (xerox, colored printing, lamination). The printing clerk asks for specifications like paper size, number of copies, and type of service. The printing clerk manually calculates the total cost based on memorized prices. The customer pays, and the printing job is completed. The cashier writes the service details and payment on bond paper.</p>
+<p class="italic">Objects: Customer, Documents, Cashier, Printer, Lamination Machine, Bond Paper</p>
+<p class="italic">Actions: requests, asks, calculates, pays, completes, writes</p>
+
+<h3>End-of-Day Process:</h3>
+<p>At closing time, the owner counts all cash in the container. The owner reads through the handwritten bond paper to see what items were sold during the day. The owner tries to estimate remaining stock by physically counting items on shelves. No proper record of daily sales, expenses, or profit is maintained.</p>
+<p class="italic">Objects: Owner, Cash Container, Bond Paper, Items, Shelves</p>
+<p class="italic">Actions: counts, reads, estimates, physical counting</p>
+<div class="pnum">5</div>
+</div>
+
+<div class="page">
+<h2>Identified Problems:</h2>
+<ol>
+  <li><span class="bold">No Sales Tracking System:</span> Everything is written manually on bond paper, making it difficult to track daily, weekly, or monthly sales accurately.</li>
+  <li><span class="bold">Inventory Management Issues:</span> The owner has no clear record of how many items are left in stock, leading to unexpected stockouts or overstocking.</li>
+  <li><span class="bold">Manual Calculation Errors:</span> All pricing and change calculations are done manually, increasing the risk of human errors and potential revenue loss.</li>
+  <li><span class="bold">Financial Record Keeping Problems:</span> At the end of each day, consolidating handwritten notes with actual cash is time-consuming and often inaccurate, making it hard to determine actual profit or loss.</li>
+  <li><span class="bold">Mixed Business Tracking:</span> It's difficult to determine which part of the business (sari-sari store vs printing services) is more profitable since all sales are recorded together on the same bond paper.</li>
+</ol>
+<div class="pnum">6</div>
+</div>
+
+<!-- ========== SECTION 2.1: EVENTS TABLE ========== -->
+<div class="page">
+<h1>Events Table, Use Case List and Diagram</h1>
+<h2>2.1 Events Table</h2>
+<h3>Product Management</h3>
+<table>
+<tr><th>Event</th><th>Trigger</th><th>Source</th><th>Use Case</th><th>Response</th><th>Destination</th></tr>
+<tr><td>View Store Products</td><td>Owner clicks "View Products"</td><td>Owner</td><td>View Product Catalog</td><td>Display all products with categories, prices, and stock info</td><td>Product Interface</td></tr>
+<tr><td>Add New Product</td><td>Owner clicks "Add Product"</td><td>Owner</td><td>Manage Store Products</td><td>New product record created with productID, name, category, type, purchase/selling price</td><td>Product Table</td></tr>
+<tr><td>Update Product Details</td><td>Owner modifies product information</td><td>Owner</td><td>Manage Store Products</td><td>Product name, category, type, purchase price, selling price, profit margin updated</td><td>Product Table</td></tr>
+<tr><td>Archive Product</td><td>Owner clicks "Archive Product"</td><td>Owner</td><td>Manage Store Products</td><td>Product is_archived set to true; hidden from active catalog but preserved in archives</td><td>Product Table</td></tr>
+</table>
+<div class="pnum">7</div>
+</div>
+
+<div class="page">
+<h3>Service Management</h3>
+<table>
+<tr><th>Event</th><th>Trigger</th><th>Source</th><th>Use Case</th><th>Response</th><th>Destination</th></tr>
+<tr><td>View Services</td><td>Owner clicks "View Services"</td><td>Owner</td><td>View Service Catalog</td><td>Display all services with associated service types</td><td>Service Interface</td></tr>
+<tr><td>Add New Service</td><td>Owner clicks "Add Service"</td><td>Owner</td><td>Manage Printing Services</td><td>New service record created with serviceID and serviceName</td><td>Service Table</td></tr>
+<tr><td>Add Service Type</td><td>Owner clicks "Add Service Type"</td><td>Owner</td><td>Manage Service Types</td><td>New service type created linking service, supply, machine with specifications</td><td>Service_Type Table</td></tr>
+<tr><td>Update Service Type Cost</td><td>Owner modifies cost components</td><td>Owner</td><td>Manage Service Pricing</td><td>Supply cost, ink cost, electricity cost, labor cost, total cost, selling price updated</td><td>Service_Type_Cost Table</td></tr>
+<tr><td>Assign Machine to Service</td><td>Owner links machine to service</td><td>Owner</td><td>Manage Machines</td><td>Machine assigned to service type with active status</td><td>Machine Table</td></tr>
+<tr><td>Archive Machine</td><td>Owner archives a machine</td><td>Owner</td><td>Manage Machines</td><td>Machine is_archived set to true; removed from active list but restorable</td><td>Machine Table</td></tr>
+</table>
+
+<h3>Service Supply Management</h3>
+<table>
+<tr><th>Event</th><th>Trigger</th><th>Source</th><th>Use Case</th><th>Response</th><th>Destination</th></tr>
+<tr><td>View Service Supplies</td><td>Owner clicks "View Supplies"</td><td>Owner</td><td>View Supply Inventory</td><td>Display all printing supplies with type, paper size, purchase price</td><td>Service Supply Interface</td></tr>
+<tr><td>Add New Supply</td><td>Owner clicks "Add Supply"</td><td>Owner</td><td>Manage Printing Inventory</td><td>New supply record created with serviceSupplyID, name, type, paper size, unit, purchase price</td><td>Service_Supply Table</td></tr>
+<tr><td>Update Supply Details</td><td>Owner modifies supply information</td><td>Owner</td><td>Manage Printing Inventory</td><td>Supply name, type, paper size, unit, purchase price updated</td><td>Service_Supply Table</td></tr>
+<tr><td>Archive Service Supply</td><td>Owner archives a supply</td><td>Owner</td><td>Manage Printing Inventory</td><td>Service supply is_archived set to true; removed from active list</td><td>Service_Supply Table</td></tr>
+</table>
+<div class="pnum">8</div>
+</div>
+
+<div class="page">
+<h3>Sales Transactions</h3>
+<table>
+<tr><th>Event</th><th>Trigger</th><th>Source</th><th>Use Case</th><th>Response</th><th>Destination</th></tr>
+<tr><td>Create New Transaction</td><td>Cashier clicks "New Transaction"</td><td>Cashier</td><td>Process Customer Transaction</td><td>New transaction record created with transactionNumber, cashierID, customerID, timestamp</td><td>Transaction Table</td></tr>
+<tr><td>Add Product to Transaction</td><td>Cashier scans/selects product</td><td>Cashier</td><td>Process Customer Transaction</td><td>Transaction item created with productID, purchase/selling price, quantity, subtotal, itemCost</td><td>Transaction_Item Table</td></tr>
+<tr><td>Add Service to Transaction</td><td>Cashier selects service type</td><td>Cashier</td><td>Process Customer Transaction</td><td>Transaction item created via PrintOrder with serviceTypeID, cost details, selling price, quantity, subtotal, profit</td><td>Transaction_Item Table, Print_Order Table</td></tr>
+<tr><td>Calculate Transaction Total</td><td>Cashier finalizes items</td><td>System</td><td>Calculate Transaction Totals</td><td>Total computed; storeRevenue and printingRevenue split calculated; grossProfit computed</td><td>Transaction Table</td></tr>
+<tr><td>Process Payment</td><td>Cashier enters cash received</td><td>Cashier</td><td>Process Customer Transaction</td><td>Cash received and change calculated and recorded; paymentMethodID saved</td><td>Transaction Table</td></tr>
+<tr><td>Complete Transaction</td><td>Transaction finalized</td><td>System</td><td>Record Transaction</td><td>Transaction saved with complete details, transactionNumber, timestamp recorded</td><td>Transaction Table</td></tr>
+<tr><td>Generate Receipt</td><td>Customer requests receipt</td><td>Cashier</td><td>Generate Customer Receipt</td><td>Receipt generated with transaction details, items, prices, totals</td><td>Customer</td></tr>
+<tr><td>Auto-Deduct Inventory</td><td>Transaction completed</td><td>System</td><td>Auto-Update Inventory</td><td>Stock_Out record created for each item; quantities reduced in Inventory_Item</td><td>Stock_Out Table, Inventory_Item Table</td></tr>
+</table>
+<div class="pnum">9</div>
+</div>
+
+<div class="page">
+<h3>Product Inventory Management</h3>
+<table>
+<tr><th>Event</th><th>Trigger</th><th>Source</th><th>Use Case</th><th>Response</th><th>Destination</th></tr>
+<tr><td>Product Stock In</td><td>Owner receives new stock</td><td>Owner</td><td>Update Store Inventory</td><td>Stock_In record created with productID, userID, quantity, purchase price, expiry date, stockInDate</td><td>Stock_In Table</td></tr>
+<tr><td>Link Stock to Expense</td><td>Owner records purchase expense</td><td>Owner</td><td>Track Business Expenses</td><td>Stock_In linked to expense record via expenseID</td><td>Stock_In Table</td></tr>
+<tr><td>Create Inventory Item</td><td>Stock In processed</td><td>System</td><td>Update Inventory Items</td><td>Inventory_Item created/updated with productID, stockInID, current quantity, reorder level, expiry date</td><td>Inventory_Item Table</td></tr>
+<tr><td>View Product Inventory</td><td>Owner/Cashier views stock</td><td>Owner/Cashier</td><td>View Current Inventory</td><td>Display all inventory items with current quantities, expiry dates per product</td><td>Inventory Interface</td></tr>
+<tr><td>Adjust Product Quantity</td><td>Owner manually adjusts stock</td><td>Owner</td><td>Update Store Inventory</td><td>Stock_In or Stock_Out record created for adjustment; Inventory_Item quantity updated</td><td>Stock_In/Out Table, Inventory_Item</td></tr>
+<tr><td>Track Product Expiry</td><td>System checks expiry dates</td><td>System</td><td>Monitor Product Expiration</td><td>Alert generated for products approaching expiry date</td><td>User Interface</td></tr>
+</table>
+
+<h3>Service Supply Inventory Management</h3>
+<table>
+<tr><th>Event</th><th>Trigger</th><th>Source</th><th>Use Case</th><th>Response</th><th>Destination</th></tr>
+<tr><td>Service Supply Stock In</td><td>Owner receives supplies</td><td>Owner</td><td>Update Printing Inventory</td><td>Stock_In record created with serviceSupplyID, userID, quantity, purchase price, stockInDate</td><td>Stock_In Table</td></tr>
+<tr><td>Link Service Supply to Expense</td><td>Owner records purchase expense</td><td>Owner</td><td>Track Business Expenses</td><td>Stock_In linked to expense record via expenseID</td><td>Stock_In Table</td></tr>
+<tr><td>Create Service Supply Inventory Item</td><td>Stock In processed</td><td>System</td><td>Update Inventory Items</td><td>Inventory_Item created/updated with serviceSupplyID, stockInID, current quantity</td><td>Inventory_Item Table</td></tr>
+<tr><td>View Service Supply Inventory</td><td>Owner/Cashier views supplies</td><td>Owner/Cashier</td><td>View Current Inventory</td><td>Display all supply inventory items with current quantities</td><td>Inventory Interface</td></tr>
+<tr><td>Adjust Service Supply Quantity</td><td>Owner manually adjusts supplies</td><td>Owner</td><td>Update Printing Inventory</td><td>Stock_In or Stock_Out record created; Inventory_Item quantity updated</td><td>Stock_In/Out Table, Inventory_Item</td></tr>
+<tr><td>Deduct Service Supply on Service</td><td>Service transaction completed</td><td>System</td><td>Auto-Deduct Inventory</td><td>Stock_Out record created with serviceSupplyID, transactionItemID, quantity removed, stockOutType</td><td>Stock_Out Table</td></tr>
+</table>
+<div class="pnum">10</div>
+</div>
+
+<div class="page">
+<h3>Financial Reporting</h3>
+<table>
+<tr><th>Event</th><th>Trigger</th><th>Source</th><th>Use Case</th><th>Response</th><th>Destination</th></tr>
+<tr><td>View Daily Report</td><td>Owner selects "Daily" tab</td><td>Owner</td><td>Display Daily Reports</td><td>Display daily report with revenue breakdown (store/printing), expenses, profit analysis</td><td>Owner Interface</td></tr>
+<tr><td>View Weekly Report</td><td>Owner selects "Weekly" tab</td><td>Owner</td><td>Display Weekly Reports</td><td>Display weekly performance comparing store and printing revenues</td><td>Owner Interface</td></tr>
+<tr><td>View Monthly Report</td><td>Owner selects "Monthly" tab</td><td>Owner</td><td>Display Monthly Reports</td><td>Display monthly performance with revenue, profit, and expense breakdown</td><td>Owner Interface</td></tr>
+<tr><td>Export Report</td><td>Owner clicks export button</td><td>Owner</td><td>Generate Report File</td><td>PDF file generated from selected report data and period</td><td>Owner Device</td></tr>
+</table>
+
+<h3>Expense Management</h3>
+<table>
+<tr><th>Event</th><th>Trigger</th><th>Source</th><th>Use Case</th><th>Response</th><th>Destination</th></tr>
+<tr><td>Record Business Expense</td><td>Owner enters expense data</td><td>Owner</td><td>Track Business Expenses</td><td>Expense record created with expenseID, userID, categoryID, sourceID, description, amount, date, receiptNumber, notes</td><td>Expense Table</td></tr>
+<tr><td>Link Expense to Stock In</td><td>Owner records inventory purchase</td><td>Owner</td><td>Record Purchase Expense</td><td>Expense linked to Stock_In record for inventory cost tracking</td><td>Expense Table, Stock_In Table</td></tr>
+<tr><td>Link Expense to Vendor</td><td>Owner assigns vendor to expense</td><td>Owner</td><td>Track Business Expenses</td><td>Expense linked to vendor record via vendorID</td><td>Expense Table, Vendor Table</td></tr>
+<tr><td>View Expense History</td><td>Owner views expenses</td><td>Owner</td><td>View Expense Records</td><td>Display all expenses by category, source, vendor, date, amount</td><td>Expense Interface</td></tr>
+<tr><td>Categorize Expense</td><td>Owner assigns expense category</td><td>Owner</td><td>Track Business Expenses</td><td>Expense category assigned (utilities, supplies, maintenance, salaries, etc.)</td><td>Expense Table</td></tr>
+</table>
+<div class="pnum">11</div>
+</div>
+
+<div class="page">
+<h3>User Management</h3>
+<table>
+<tr><th>Event</th><th>Trigger</th><th>Source</th><th>Use Case</th><th>Response</th><th>Destination</th></tr>
+<tr><td>Create User Account</td><td>Owner adds new user</td><td>Owner</td><td>Manage User Accounts</td><td>User record created with userID, username, password, personal info, roleID, isActive status</td><td>Profile Table</td></tr>
+<tr><td>Assign User Role</td><td>Owner sets user role</td><td>Owner</td><td>Manage User Permissions</td><td>User role assigned (Owner/Cashier) determining system access level</td><td>Profile Table</td></tr>
+<tr><td>Update User Information</td><td>Owner modifies user details</td><td>Owner</td><td>Manage User Accounts</td><td>User credentials, personal info, contact details, profile picture, address updated</td><td>Profile Table</td></tr>
+<tr><td>Deactivate User Account</td><td>Owner deactivates user</td><td>Owner</td><td>Manage User Accounts</td><td>User isActive status set to false, account access revoked</td><td>Profile Table</td></tr>
+<tr><td>View User Accounts</td><td>Owner views user list</td><td>Owner</td><td>View User Accounts</td><td>Display all users with roles, status, creation info</td><td>User Interface</td></tr>
+<tr><td>User Login</td><td>User enters credentials</td><td>User</td><td>Authenticate User</td><td>Login_History record created with loginID, userID, username, loginTime</td><td>Login_History Table</td></tr>
+<tr><td>User Logout</td><td>User clicks logout</td><td>User</td><td>End User Session</td><td>Login_History record updated with logOutTime</td><td>Login_History Table</td></tr>
+<tr><td>Track Login History</td><td>System logs user sessions</td><td>System</td><td>Monitor User Activity</td><td>All login/logout events recorded with timestamps</td><td>Login_History Table</td></tr>
+</table>
+<div class="pnum">12</div>
+</div>
+
+<div class="page">
+<h3>Customer Management <span class="new-tag">NEW</span></h3>
+<table>
+<tr><th>Event</th><th>Trigger</th><th>Source</th><th>Use Case</th><th>Response</th><th>Destination</th></tr>
+<tr><td>View Customers</td><td>Owner clicks "View Customers"</td><td>Owner</td><td>View Customer Records</td><td>Display all active customers with name, email, phone, registered date</td><td>Customer Interface</td></tr>
+<tr><td>Add New Customer</td><td>Owner adds customer record</td><td>Owner</td><td>Manage Customer Records</td><td>New customer record created with customerID, name, email, phone, address, notes, registeredDate</td><td>Customer Table</td></tr>
+<tr><td>Update Customer Details</td><td>Owner modifies customer info</td><td>Owner</td><td>Manage Customer Records</td><td>Customer contact details and notes updated</td><td>Customer Table</td></tr>
+<tr><td>Archive Customer</td><td>Owner removes customer</td><td>Owner</td><td>Manage Customer Records</td><td>Customer is_archived set to true; hidden from active list but transaction history preserved</td><td>Customer Table</td></tr>
+<tr><td>Link Customer to Transaction</td><td>Cashier selects customer at POS</td><td>Cashier</td><td>Process Customer Transaction</td><td>Transaction linked to customer record via customerID</td><td>Transaction Table, Customer Table</td></tr>
+</table>
+
+<h3>Vendor Management <span class="new-tag">NEW</span></h3>
+<table>
+<tr><th>Event</th><th>Trigger</th><th>Source</th><th>Use Case</th><th>Response</th><th>Destination</th></tr>
+<tr><td>View Vendors</td><td>Owner views vendor list</td><td>Owner</td><td>View Vendor Records</td><td>Display all active vendors with contact details</td><td>Vendor Interface</td></tr>
+<tr><td>Add New Vendor</td><td>Owner clicks "Add Vendor"</td><td>Owner</td><td>Manage Vendors</td><td>New vendor record created with vendorID, name, contactNumber, email, address</td><td>Vendor Table</td></tr>
+<tr><td>Update Vendor Details</td><td>Owner modifies vendor info</td><td>Owner</td><td>Manage Vendors</td><td>Vendor name, contact, email, address updated</td><td>Vendor Table</td></tr>
+<tr><td>Archive Vendor</td><td>Owner removes vendor</td><td>Owner</td><td>Manage Vendors</td><td>Vendor is_archived set to true; removed from active list</td><td>Vendor Table</td></tr>
+<tr><td>Link Vendor to Expense</td><td>Owner records expense with vendor</td><td>Owner</td><td>Track Business Expenses</td><td>Expense linked to vendor record via vendorID for cost tracking</td><td>Expense Table, Vendor Table</td></tr>
+</table>
+<div class="pnum">13</div>
+</div>
+
+<div class="page">
+<h3>Archive Management <span class="new-tag">NEW</span></h3>
+<table>
+<tr><th>Event</th><th>Trigger</th><th>Source</th><th>Use Case</th><th>Response</th><th>Destination</th></tr>
+<tr><td>View Archives</td><td>Owner opens Archives page</td><td>Owner</td><td>View Archived Records</td><td>Display all archived records across products, machines, service supplies, vendors, customers in tabbed interface</td><td>Archive Interface</td></tr>
+<tr><td>Restore Product</td><td>Owner clicks "Restore" on product</td><td>Owner</td><td>Restore Archived Record</td><td>Product is_archived set to false; product returns to active catalog</td><td>Product Table</td></tr>
+<tr><td>Restore Machine</td><td>Owner restores machine</td><td>Owner</td><td>Restore Archived Record</td><td>Machine is_archived set to false; machine available again for service assignment</td><td>Machine Table</td></tr>
+<tr><td>Restore Service Supply</td><td>Owner restores supply</td><td>Owner</td><td>Restore Archived Record</td><td>Service supply is_archived set to false; supply available for inventory management</td><td>Service_Supply Table</td></tr>
+<tr><td>Restore Vendor</td><td>Owner restores vendor</td><td>Owner</td><td>Restore Archived Record</td><td>Vendor is_archived set to false; vendor appears in active vendor list</td><td>Vendor Table</td></tr>
+<tr><td>Restore Customer</td><td>Owner restores customer</td><td>Owner</td><td>Restore Archived Record</td><td>Customer is_archived set to false; customer returns to active customer list</td><td>Customer Table</td></tr>
+</table>
+
+<h3>Activity Log <span class="new-tag">NEW</span></h3>
+<table>
+<tr><th>Event</th><th>Trigger</th><th>Source</th><th>Use Case</th><th>Response</th><th>Destination</th></tr>
+<tr><td>Log User Action</td><td>System detects any user action</td><td>System</td><td>Monitor User Activity</td><td>Activity_Log record created with actionID, description, timestamp, performedBy, performedByID, metadata</td><td>Activity_Log Table</td></tr>
+<tr><td>View Activity Log</td><td>Owner opens Activity Log page</td><td>Owner</td><td>View Audit Trail</td><td>Display all activity log entries with action type, description, performer, and timestamp</td><td>Activity Log Interface</td></tr>
+<tr><td>Filter by Action Type</td><td>Owner selects action category filter</td><td>Owner</td><td>View Audit Trail</td><td>Filtered list of activity records by category (transactions, inventory, products, users, expenses, login)</td><td>Activity Log Interface</td></tr>
+<tr><td>Filter by Date</td><td>Owner selects date range filter</td><td>Owner</td><td>View Audit Trail</td><td>Activity records filtered by selected date range (Today, Last 7 Days, Last 30 Days)</td><td>Activity Log Interface</td></tr>
+</table>
+<div class="pnum">14</div>
+</div>
+
+<!-- ========== SECTION 2.2: USE CASE LIST ========== -->
+<div class="page">
+<h2>2.2 Use Case List</h2>
+<h3>Sales Transaction System</h3>
+<p>A unified transaction system that processes both sari-sari store items and printing services in a single integrated interface. The system handles combined purchases where customers can buy store products and request printing services simultaneously. Each transaction is linked to a customer record and tracks detailed item information including purchase prices, selling prices, and profit margins. The system automatically updates inventory through Stock_Out records upon transaction completion.</p>
+<p class="bold">Use Cases:</p>
+<ul>
+  <li><span class="bold">Process Customer Transaction:</span> Handle combined purchases of store items and/or printing services, creating transaction records with customer linkage</li>
+  <li><span class="bold">Add Product to Transaction:</span> Add product items to transaction with quantity, purchase price, selling price, subtotal, and profit calculation</li>
+  <li><span class="bold">Add Service to Transaction:</span> Add printing service types to transaction via PrintOrder with cost breakdown (supply cost, ink cost, electricity cost, labor cost) and selling price</li>
+  <li><span class="bold">Calculate Transaction Totals:</span> Automatically compute total amount from all transaction items, split store revenue and printing revenue, and calculate gross profit</li>
+  <li><span class="bold">Process Payment:</span> Record cash received and payment method, calculate change for customer</li>
+  <li><span class="bold">Generate Customer Receipt:</span> Create and print optional receipt with complete transaction details including itemized list</li>
+  <li><span class="bold">Track Transaction Items:</span> Record individual items in Transaction_Item table with detailed pricing and profit information</li>
+  <li><span class="bold">Auto-Deduct Inventory:</span> Automatically create Stock_Out records and reduce inventory quantities when transaction is completed</li>
+</ul>
+<div class="pnum">15</div>
+</div>
+
+<div class="page">
+<h3>Dual Inventory Management System</h3>
+<p>A comprehensive real-time inventory tracking system that monitors stock levels for both sari-sari store products and printing supplies through Inventory_Item records. The system tracks stock movements via Stock_In and Stock_Out records, linking purchases to expense records for accurate cost tracking. Inventory items maintain current quantities, reorder levels, and expiry dates, with automatic deductions triggered by sales transactions. The owner manages stock additions and adjustments, while cashiers have view-only access to monitor current levels.</p>
+<p class="bold">Use Cases:</p>
+<ul>
+  <li><span class="bold">Record Product Stock In:</span> Create Stock_In records when receiving new product inventory with quantity, purchase price, expiry date, and link to expense</li>
+  <li><span class="bold">Record Supply Stock In:</span> Create Stock_In records when receiving printing supplies with quantity and purchase price</li>
+  <li><span class="bold">Create Inventory Items:</span> Generate or update Inventory_Item records linking to Stock_In with current quantities, reorder level, and expiry tracking</li>
+  <li><span class="bold">View Current Inventory:</span> Display real-time stock levels for all products and supplies from Inventory_Item table (Owner and Cashier)</li>
+  <li><span class="bold">Adjust Product Quantity:</span> Manually create Stock_In or Stock_Out records for inventory adjustments (Owner only)</li>
+  <li><span class="bold">Adjust Supply Quantity:</span> Manually adjust printing supply quantities through Stock_In/Out records (Owner only)</li>
+  <li><span class="bold">Monitor Product Expiration:</span> Track expiry dates in Inventory_Item and generate alerts for perishable products</li>
+  <li><span class="bold">Auto-Deduct on Sale:</span> Automatically create Stock_Out records linked to transactions when items are sold</li>
+  <li><span class="bold">Link Purchases to Expenses:</span> Connect Stock_In records to Expense records for financial tracking</li>
+</ul>
+<div class="pnum">16</div>
+</div>
+
+<div class="page">
+<h3>Financial Report</h3>
+<p>An automated financial tracking and reporting system that computes business performance from transaction and expense data. The system provides Daily, Weekly, and Monthly views with revenue split between store and printing segments, expenses, transaction profit, and net profit after expenses. Reports include transaction counts, averages, and revenue breakdowns. Accessible only to the owner for business analysis and decision-making. Reports can be exported as PDF files.</p>
+<p class="bold">Use Cases:</p>
+<ul>
+  <li><span class="bold">View Daily Performance:</span> Display daily sales summaries with revenue and expense breakdown by date</li>
+  <li><span class="bold">View Weekly Performance:</span> Show weekly business performance comparing store and printing revenues</li>
+  <li><span class="bold">View Monthly Performance:</span> Display monthly business performance with trend analysis</li>
+  <li><span class="bold">Export Reports:</span> Generate PDF files from Daily, Weekly, or Monthly reports for external use</li>
+  <li><span class="bold">Record Business Expenses:</span> Enter and track business costs with category, source, description, amount, vendor, and date</li>
+  <li><span class="bold">Link Expenses to Purchases:</span> Connect expense records to Stock_In records and vendors for inventory cost tracking</li>
+  <li><span class="bold">Calculate Net Profit:</span> Compute net profit by subtracting total expenses from transaction profit</li>
+  <li><span class="bold">Track Expense Categories:</span> Categorize expenses (utilities, supplies, maintenance, salaries, etc.) for detailed analysis</li>
+</ul>
+
+<h3>Product and Service Management System</h3>
+<p>A comprehensive management system for maintaining product catalog and service offerings. The Product module handles store items with categories, types, purchase prices, selling prices, and profit margins. The Service module manages printing services through a three-tier structure: Service (base service), Service_Type (specific variants with paper size and color mode linked to Service_Supply and Machine), and Service_Type_Cost (detailed cost breakdown). Soft-delete archiving preserves historical data while keeping active lists clean. Changes reflect immediately in the POS system.</p>
+<p class="bold">Use Cases:</p>
+<ul>
+  <li><span class="bold">Manage Store Products:</span> Add, update, or archive products with category, type, purchase price, selling price, and profit calculation</li>
+  <li><span class="bold">View Product Catalog:</span> Display all active products with detailed information and current inventory status</li>
+  <li><span class="bold">Manage Services:</span> Create and configure base printing services (xerox, printing, lamination)</li>
+  <li><span class="bold">Manage Service Types:</span> Define service variants linking Service, Service_Supply, Machine with specifications (paper size, color mode)</li>
+  <li><span class="bold">Manage Service Type Costs:</span> Configure detailed cost components (supply, ink, electricity, labor) and set selling prices</li>
+  <li><span class="bold">Configure Service Supplies:</span> Add and manage printing supplies (paper types, toner, lamination film) with purchase prices and units</li>
+  <li><span class="bold">Assign Machines to Services:</span> Link machines to service types and manage active/inactive/archived status</li>
+  <li><span class="bold">Archive Products/Services/Machines/Supplies:</span> Soft-delete records while preserving historical data; restorable from Archives page</li>
+</ul>
+<div class="pnum">17</div>
+</div>
+
+<div class="page">
+<h3>User Management System</h3>
+<p>A role-based access control system that manages user authentication, permissions, and activity tracking. The system supports two primary user roles: Owner (full access to all features) and Cashier (restricted access to POS and view-only inventory). User records include personal information, contact details, address fields, profile pictures, and account status (isActive). The Login_History table tracks all user sessions with login and logout timestamps. Users are linked to their actions throughout the system via userID foreign keys.</p>
+<p class="bold">Use Cases:</p>
+<ul>
+  <li><span class="bold">Create User Account:</span> Add new user with username, password, personal info, role assignment, and address details</li>
+  <li><span class="bold">Assign User Role:</span> Set role-based access levels (Owner vs. Cashier) determining system permissions</li>
+  <li><span class="bold">Update User Information:</span> Modify user credentials, personal details, contact info, address, and profile picture</li>
+  <li><span class="bold">Activate/Deactivate User:</span> Set user isActive status to enable or disable account access</li>
+  <li><span class="bold">View User Accounts:</span> Display all system users with roles, status, creation info, and contact details</li>
+  <li><span class="bold">Authenticate User:</span> Validate login credentials via Supabase Auth and create Login_History record with login timestamp</li>
+  <li><span class="bold">Track User Sessions:</span> Record all login and logout events with timestamps in Login_History table</li>
+  <li><span class="bold">End User Session:</span> Process logout and update Login_History with logout timestamp</li>
+  <li><span class="bold">Track User Actions:</span> Link user activities (transactions, stock movements, expense records) to userID</li>
+</ul>
+<div class="pnum">18</div>
+</div>
+
+<div class="page">
+<h3>Customer Management System <span class="new-tag">NEW</span></h3>
+<p>A customer record management system that maintains a registry of customers linked to sales transactions. Customers can be added manually at the POS or through the customer management interface. The system supports full contact information storage and links customers to their transaction history. Soft-delete archiving preserves customer records and their transaction associations while removing them from the active list.</p>
+<p class="bold">Use Cases:</p>
+<ul>
+  <li><span class="bold">Manage Customer Records:</span> Add, update, or archive customer records with name, email, phone, address, and notes</li>
+  <li><span class="bold">View Customer Records:</span> Display all active customers with registration dates and contact information</li>
+  <li><span class="bold">Link Customer to Transaction:</span> Associate a customer record with a sales transaction at POS via customerID</li>
+  <li><span class="bold">Archive Customer:</span> Soft-delete customer records while preserving transaction history linkage</li>
+</ul>
+
+<h3>Vendor Management System <span class="new-tag">NEW</span></h3>
+<p>A vendor directory system that maintains records of suppliers and service providers. Vendors are linked to expense records, enabling accurate tracking of which supplier an expense was paid to. This allows the owner to analyze spending per vendor and manage supplier relationships. Soft-delete archiving removes vendors from the active list while preserving their linkage in historical expense records.</p>
+<p class="bold">Use Cases:</p>
+<ul>
+  <li><span class="bold">Manage Vendors:</span> Add, update, or archive vendor records with name, contact number, email, and address</li>
+  <li><span class="bold">View Vendor Records:</span> Display all active vendors with contact details</li>
+  <li><span class="bold">Link Vendor to Expense:</span> Connect expense records to specific vendors for cost tracking and supplier analysis</li>
+  <li><span class="bold">Archive Vendor:</span> Soft-delete vendor records while preserving links in historical expense records</li>
+</ul>
+
+<h3>Archive Management System <span class="new-tag">NEW</span></h3>
+<p>A centralized archive management interface that provides the owner with a view of all soft-deleted records across five entity types: Products, Machines, Service Supplies, Vendors, and Customers. Instead of permanent deletion, records are marked as archived (is_archived = true), preserving data integrity and historical references. The owner can restore any archived record back to active status at any time.</p>
+<p class="bold">Use Cases:</p>
+<ul>
+  <li><span class="bold">View Archived Records:</span> Browse all archived items across five tabs (Products, Machines, Service Supplies, Vendors, Customers)</li>
+  <li><span class="bold">Restore Archived Record:</span> Reactivate any archived record (set is_archived = false) returning it to the active list</li>
+</ul>
+
+<h3>Activity Log System <span class="new-tag">NEW</span></h3>
+<p>An automated audit trail system that logs all significant user actions across the application. Every operation — from creating transactions and updating inventory to recording expenses and managing users — generates a corresponding Activity_Log entry with the action type, description, performer identity, timestamp, and optional metadata. The owner can view and filter the complete audit history by action category (Transactions, Inventory, Products, Users, Expenses, Login) and by date range.</p>
+<p class="bold">Use Cases:</p>
+<ul>
+  <li><span class="bold">Monitor User Activity:</span> Automatically log all system actions with actor, timestamp, action category, and metadata</li>
+  <li><span class="bold">View Audit Trail:</span> Display complete activity history with action type and date filtering</li>
+  <li><span class="bold">Track Action Categories:</span> Organize activity by category: transactions, inventory, products, users, expenses, login</li>
+  <li><span class="bold">Filter Activity Log:</span> Filter log entries by action type (Today, Last 7 Days, Last 30 Days) and search by performer or description</li>
+</ul>
+<div class="pnum">19</div>
+</div>
+
+<!-- ========== SECTION 2.3: USE CASE DIAGRAMS ========== -->
+<div class="page">
+<h2>2.3 Use Case Diagram</h2>
+<h3>A. Sales Transaction</h3>
+<div class="diag-box">
+<div class="mermaid">
+graph LR
+    A(["👤 Cashier/Owner"])
+    subgraph ST["Sales Transaction"]
+        UC1(["Add New Transaction"])
+        UC2(["Edit Transaction Items"])
+        UC3(["Process Transaction"])
+        UC4(["Calculate Transaction Total"])
+        UC5(["Generate Receipt"])
+        UC6(["View Transaction History"])
+        UC7(["Record Transaction"])
+        UC8(["Deduct Inventory Stock"])
+    end
+    A --- UC1
+    A --- UC3
+    A --- UC5
+    A --- UC6
+    UC1 -->|"«include»"| UC3
+    UC3 -->|"«include»"| UC4
+    UC3 -->|"«include»"| UC5
+    UC3 -->|"«include»"| UC7
+    UC4 -->|"«include»"| UC8
+    UC7 -.->|"«include»"| UC8
+    UC2 -.->|"«extend»"| UC3
+</div>
+</div>
+<div class="pnum">20</div>
+</div>
+
+<div class="page">
+<h3>B. Product and Service Management</h3>
+<div class="diag-box">
+<div class="mermaid">
+graph LR
+    A(["👤 Owner"])
+    subgraph PM["Product & Service Management"]
+        UC1(["View Products & Services"])
+        UC2(["Add Product/Service"])
+        UC3(["Input Product/Service Details"])
+        UC4(["Update Product/Service Details"])
+        UC5(["Archive Product/Service"])
+        UC6(["Manage Service Types & Costs"])
+        UC7(["Assign Machine to Service"])
+    end
+    A --- UC1
+    A --- UC2
+    A --- UC4
+    A --- UC5
+    A --- UC6
+    A --- UC7
+    UC2 -->|"«include»"| UC3
+    UC4 -->|"«include»"| UC3
+    UC3 -.->|"«extend»"| UC1
+    UC5 -.->|"«extend»"| UC1
+    UC6 -.->|"«extend»"| UC2
+</div>
+</div>
+
+<h3>C. User Management</h3>
+<div class="diag-box">
+<div class="mermaid">
+graph LR
+    A(["👤 Owner"])
+    subgraph UM["User Management"]
+        UC1(["Create User Account"])
+        UC2(["Assign User Role"])
+        UC3(["Input User Information"])
+        UC4(["Update User Information"])
+        UC5(["Deactivate User Account"])
+        UC6(["View User Accounts"])
+        UC7(["Login"])
+        UC8(["Logout"])
+        UC9(["View Login History"])
+    end
+    A --- UC1
+    A --- UC4
+    A --- UC5
+    A --- UC6
+    A --- UC7
+    A --- UC8
+    A --- UC9
+    UC1 -->|"«include»"| UC2
+    UC1 -->|"«include»"| UC3
+    UC4 -->|"«include»"| UC3
+    UC4 -.->|"«extend»"| UC5
+    UC6 -.->|"«extend»"| UC9
+</div>
+</div>
+<div class="pnum">21</div>
+</div>
+
+<div class="page">
+<h3>D. Financial Reporting</h3>
+<div class="diag-box">
+<div class="mermaid">
+graph LR
+    A(["👤 Owner"])
+    subgraph FR["Financial Reporting"]
+        UC1(["View Daily Report"])
+        UC2(["View Weekly Report"])
+        UC3(["View Monthly Report"])
+        UC4(["Export Report"])
+        UC5(["Record Business Expense"])
+        UC6(["Edit Business Expense"])
+        UC7(["Delete Business Expense"])
+    end
+    A --- UC1
+    A --- UC2
+    A --- UC3
+    A --- UC4
+    A --- UC5
+    UC1 -.->|"«extend»"| UC4
+    UC2 -.->|"«extend»"| UC4
+    UC3 -.->|"«extend»"| UC4
+    UC5 -.->|"«extend»"| UC6
+    UC5 -.->|"«extend»"| UC7
+</div>
+</div>
+
+<h3>E. Service Supply Inventory Management</h3>
+<div class="diag-box">
+<div class="mermaid">
+graph LR
+    A(["👤 Owner"])
+    S(["⚙️ System"])
+    subgraph SSIM["Service Supply Inventory Management"]
+        UC1(["Service Supply Stock In"])
+        UC2(["Create Service Supply Inventory Item"])
+        UC3(["Link Service Supply to Expense"])
+        UC4(["View Service Supply Inventory"])
+        UC5(["Adjust Service Supply Quantity"])
+        UC6(["Deduct Service Supply on Service"])
+    end
+    A --- UC1
+    A --- UC3
+    A --- UC4
+    A --- UC5
+    S --- UC6
+    UC1 -->|"«include»"| UC2
+    UC4 -.->|"«extend»"| UC5
+    UC6 -.->|"«include»"| UC2
+</div>
+</div>
+<div class="pnum">22</div>
+</div>
+
+<div class="page">
+<h3>F. Product Inventory Management</h3>
+<div class="diag-box">
+<div class="mermaid">
+graph LR
+    A(["👤 Owner"])
+    S(["⚙️ System"])
+    subgraph PIM["Product Inventory Management"]
+        UC1(["Product Stock In"])
+        UC2(["Create Inventory Item"])
+        UC3(["Link Stock to Expense"])
+        UC4(["View Product Inventory"])
+        UC5(["Adjust Product Quantity"])
+        UC6(["Deduct Product Inventory on Sale"])
+        UC7(["Track Product Expiry"])
+    end
+    A --- UC1
+    A --- UC3
+    A --- UC4
+    A --- UC5
+    S --- UC6
+    UC1 -->|"«include»"| UC2
+    UC4 -.->|"«extend»"| UC5
+    UC4 -.->|"«extend»"| UC7
+    UC6 -.->|"«include»"| UC2
+</div>
+</div>
+
+<h3>G. Service Supply Management</h3>
+<div class="diag-box">
+<div class="mermaid">
+graph LR
+    A(["👤 Owner"])
+    subgraph SSM["Service Supply Management"]
+        UC1(["View Service Supplies"])
+        UC2(["Add New Supply"])
+        UC3(["Update Supply Details"])
+        UC4(["Archive Service Supply"])
+    end
+    A --- UC1
+    A --- UC2
+    A --- UC3
+    A --- UC4
+    UC2 -.->|"«extend»"| UC1
+    UC3 -.->|"«extend»"| UC1
+    UC4 -.->|"«extend»"| UC1
+</div>
+</div>
+<div class="pnum">23</div>
+</div>
+
+<div class="page">
+<h3>H. Expense Management</h3>
+<div class="diag-box">
+<div class="mermaid">
+graph LR
+    A(["👤 Owner"])
+    subgraph EM["Expense Management"]
+        UC1(["Record Business Expense"])
+        UC2(["Categorize Expense"])
+        UC3(["Link Expense to Stock In"])
+        UC4(["View Expense History"])
+        UC5(["Link Expense to Vendor"])
+        UC6(["Select Payment Method"])
+    end
+    A --- UC1
+    A --- UC3
+    A --- UC4
+    UC1 -->|"«include»"| UC2
+    UC1 -.->|"«extend»"| UC3
+    UC1 -.->|"«extend»"| UC5
+    UC1 -.->|"«extend»"| UC6
+</div>
+</div>
+
+<h3>I. Customer Management <span class="new-tag">NEW</span></h3>
+<div class="diag-box">
+<div class="mermaid">
+graph LR
+    A(["👤 Owner"])
+    subgraph CM["Customer Management"]
+        UC1(["View Customer Records"])
+        UC2(["Add New Customer"])
+        UC3(["Update Customer Details"])
+        UC4(["Archive Customer"])
+        UC5(["Link Customer to Transaction"])
+    end
+    A --- UC1
+    A --- UC2
+    A --- UC3
+    A --- UC4
+    A --- UC5
+    UC2 -.->|"«extend»"| UC1
+    UC3 -.->|"«extend»"| UC1
+    UC4 -.->|"«extend»"| UC1
+</div>
+</div>
+<div class="pnum">24</div>
+</div>
+
+<div class="page">
+<h3>J. Vendor Management <span class="new-tag">NEW</span></h3>
+<div class="diag-box">
+<div class="mermaid">
+graph LR
+    A(["👤 Owner"])
+    subgraph VM["Vendor Management"]
+        UC1(["View Vendor Records"])
+        UC2(["Add New Vendor"])
+        UC3(["Update Vendor Details"])
+        UC4(["Archive Vendor"])
+        UC5(["Link Vendor to Expense"])
+    end
+    A --- UC1
+    A --- UC2
+    A --- UC3
+    A --- UC4
+    UC2 -.->|"«extend»"| UC1
+    UC3 -.->|"«extend»"| UC1
+    UC4 -.->|"«extend»"| UC1
+    UC1 -.->|"«extend»"| UC5
+</div>
+</div>
+
+<h3>K. Archive Management <span class="new-tag">NEW</span></h3>
+<div class="diag-box">
+<div class="mermaid">
+graph LR
+    A(["👤 Owner"])
+    subgraph AM["Archive Management"]
+        UC1(["View Archived Products"])
+        UC2(["View Archived Machines"])
+        UC3(["View Archived Service Supplies"])
+        UC4(["View Archived Vendors"])
+        UC5(["View Archived Customers"])
+        UC6(["Restore Archived Record"])
+    end
+    A --- UC1
+    A --- UC2
+    A --- UC3
+    A --- UC4
+    A --- UC5
+    UC1 -.->|"«extend»"| UC6
+    UC2 -.->|"«extend»"| UC6
+    UC3 -.->|"«extend»"| UC6
+    UC4 -.->|"«extend»"| UC6
+    UC5 -.->|"«extend»"| UC6
+</div>
+</div>
+<div class="pnum">25</div>
+</div>
+
+<div class="page">
+<h3>L. Activity Log <span class="new-tag">NEW</span></h3>
+<div class="diag-box">
+<div class="mermaid">
+graph LR
+    A(["👤 Owner"])
+    S(["⚙️ System"])
+    subgraph AL["Activity Log"]
+        UC1(["View Activity Log"])
+        UC2(["Filter by Action Type"])
+        UC3(["Filter by Date Range"])
+        UC4(["Log User Action"])
+    end
+    A --- UC1
+    S --- UC4
+    UC1 -.->|"«extend»"| UC2
+    UC1 -.->|"«extend»"| UC3
+    UC4 -->|"«include»"| UC1
+</div>
+</div>
+<div class="pnum">26</div>
+</div>
+
+<!-- ========== SECTION 3: USE CASE DESCRIPTIONS ========== -->
+<div class="page">
+<h1>Use Case Description</h1>
+
+<h2>3.1 Sales Transaction</h2>
+<table class="uc-table">
+<tr><td>Use Case Name</td><td>Process Sales Transaction</td></tr>
+<tr><td>Scenario</td><td>Cashier records the customer's order and processes the payment</td></tr>
+<tr><td>Triggering Event</td><td>Cashier inputs orders in the POS</td></tr>
+<tr><td>Brief Description</td><td>Cashier lists ordered products/services in the POS. The system computes the total, splits store and printing revenue, and records the transaction.</td></tr>
+<tr><td>Actors</td><td>Cashier, Customer</td></tr>
+<tr><td>Related Use Case</td><td>Product Inventory Management, Service Supply Inventory Management, Customer Management</td></tr>
+<tr><td>Preconditions</td><td>Products and services must exist in the system; inventory must have sufficient stock</td></tr>
+<tr><td>Postconditions</td><td>Transaction details are saved; inventory is updated; stock_out records created</td></tr>
+<tr><td>Flow of Activities</td><td><span class="bold">Actor:</span><br>1. Cashier selects customer (optional) and lists orders in the POS.<br>2. Cashier confirms order, enters payment method, and cash received.<br><br><span class="bold">System:</span><br>1.1 System checks stock availability for each item.<br>1.2 System computes subtotal, store revenue, printing revenue, and gross profit.<br>1.3 System records the payment and calculates change.<br>1.4 System saves transaction and creates stock_out records to deduct inventory.</td></tr>
+<tr><td>Exception Conditions</td><td>If the stock is unavailable, the system notifies the cashier to remove or replace the item.</td></tr>
+</table>
+<div class="pnum">27</div>
+</div>
+
+<div class="page">
+<h2>3.2 Product and Service Management</h2>
+<table class="uc-table">
+<tr><td>Use Case Name</td><td>Manage Products and Services</td></tr>
+<tr><td>Scenario</td><td>Owner updates product or service details</td></tr>
+<tr><td>Triggering Event</td><td>Owner edits data in the management panel</td></tr>
+<tr><td>Brief Description</td><td>The owner can add, update, or archive product and service records. Changes reflect immediately in the POS system.</td></tr>
+<tr><td>Actors</td><td>Owner</td></tr>
+<tr><td>Related Use Case</td><td>Product Inventory Management, Service Supply Management, Archive Management</td></tr>
+<tr><td>Preconditions</td><td>The system must contain product and service tables</td></tr>
+<tr><td>Postconditions</td><td>Product and service lists are updated; archived records moved to Archives</td></tr>
+<tr><td>Flow of Activities</td><td><span class="bold">Actor:</span><br>1. Owner selects product/service to add, edit, or archive.<br>2. Owner saves changes.<br><br><span class="bold">System:</span><br>1.1 Updates the database record.<br>1.2 If archiving, sets is_archived = true and removes from active list.<br>1.3 Displays confirmation.</td></tr>
+<tr><td>Exception Conditions</td><td>If a duplicate product/service name is detected, the system prompts an error.</td></tr>
+</table>
+
+<h2>3.3 User Management</h2>
+<table class="uc-table">
+<tr><td>Use Case Name</td><td>Manage User Accounts</td></tr>
+<tr><td>Scenario</td><td>The owner adds or modifies user access</td></tr>
+<tr><td>Triggering Event</td><td>The owner creates or updates the user record</td></tr>
+<tr><td>Brief Description</td><td>The owner can add, edit, or deactivate user accounts. Users are never permanently deleted; isActive flag controls access.</td></tr>
+<tr><td>Actors</td><td>Owner</td></tr>
+<tr><td>Related Use Case</td><td>Login History, Activity Log</td></tr>
+<tr><td>Preconditions</td><td>Profile table exists</td></tr>
+<tr><td>Postconditions</td><td>User information and access are updated</td></tr>
+<tr><td>Flow of Activities</td><td><span class="bold">Actor:</span><br>1. Owner inputs user details and assigns role.<br>2. Saves the user record.<br><br><span class="bold">System:</span><br>1.1 Creates Supabase Auth account and profile record.<br>1.2 Saves role assignment and address details.<br>1.3 Confirms update.</td></tr>
+<tr><td>Exception Conditions</td><td>If the username already exists, the system prompts an error.</td></tr>
+</table>
+<div class="pnum">28</div>
+</div>
+
+<div class="page">
+<h2>3.4 Financial Reporting</h2>
+<table class="uc-table">
+<tr><td>Use Case Name</td><td>Generate Financial Report</td></tr>
+<tr><td>Scenario</td><td>The owner generates sales and expense reports</td></tr>
+<tr><td>Triggering Event</td><td>The owner selects the report option</td></tr>
+<tr><td>Brief Description</td><td>System compiles transaction and expense data and generates summary reports with store/printing revenue split, expense breakdown, and net profit.</td></tr>
+<tr><td>Actors</td><td>Owner</td></tr>
+<tr><td>Related Use Case</td><td>Sales Transaction, Expense Management</td></tr>
+<tr><td>Preconditions</td><td>Transaction and expense data must exist</td></tr>
+<tr><td>Postconditions</td><td>The report is generated and optionally exported as PDF</td></tr>
+<tr><td>Flow of Activities</td><td><span class="bold">Actor:</span><br>1. Owner selects report period (Daily/Weekly/Monthly).<br>2. Owner optionally exports report to PDF.<br><br><span class="bold">System:</span><br>1.1 Collects relevant transaction and expense data for period.<br>1.2 Calculates store revenue, printing revenue, gross profit, total expenses, net profit.<br>1.3 Displays or exports the report.</td></tr>
+<tr><td>Exception Conditions</td><td>If no data is found, the system displays "No Records Found."</td></tr>
+</table>
+
+<h2>3.5 Service Supply Inventory Management</h2>
+<table class="uc-table">
+<tr><td>Use Case Name</td><td>Manage Service Supply Stock</td></tr>
+<tr><td>Scenario</td><td>Owner records new or used supplies</td></tr>
+<tr><td>Triggering Event</td><td>Owner inputs stock changes</td></tr>
+<tr><td>Brief Description</td><td>System tracks service supply stock in/out movements and updates Inventory_Item quantities accordingly.</td></tr>
+<tr><td>Actors</td><td>Owner</td></tr>
+<tr><td>Related Use Case</td><td>Service Supply Management, Expense Management</td></tr>
+<tr><td>Preconditions</td><td>Service supply items exist in the system</td></tr>
+<tr><td>Postconditions</td><td>Stock levels updated; Stock_In or Stock_Out records created</td></tr>
+<tr><td>Flow of Activities</td><td><span class="bold">Actor:</span><br>1. Owner inputs supply data (quantity, purchase price).<br>2. Submits stock update.<br><br><span class="bold">System:</span><br>1.1 Creates Stock_In record.<br>1.2 Updates Inventory_Item quantity.<br>1.3 Logs stock transaction.</td></tr>
+<tr><td>Exception Conditions</td><td>If a negative quantity is entered, the system displays an error.</td></tr>
+</table>
+<div class="pnum">29</div>
+</div>
+
+<div class="page">
+<h2>3.6 Product Inventory Management</h2>
+<table class="uc-table">
+<tr><td>Use Case Name</td><td>Manage Product Inventory</td></tr>
+<tr><td>Scenario</td><td>Owner updates product stock</td></tr>
+<tr><td>Triggering Event</td><td>The owner records stock in or out</td></tr>
+<tr><td>Brief Description</td><td>Tracks product stock movement and availability. Stock_In and Stock_Out records are created to maintain a complete audit trail.</td></tr>
+<tr><td>Actors</td><td>Owner</td></tr>
+<tr><td>Related Use Case</td><td>Sales Transaction, Expense Management</td></tr>
+<tr><td>Preconditions</td><td>Product records exist</td></tr>
+<tr><td>Postconditions</td><td>Inventory count updated; Stock_In/Out records saved</td></tr>
+<tr><td>Flow of Activities</td><td><span class="bold">Actor:</span><br>1. Owner inputs stock details (product, quantity, purchase price, expiry date).<br>2. Confirms changes.<br><br><span class="bold">System:</span><br>1.1 Creates Stock_In record with all details.<br>1.2 Updates or creates Inventory_Item with new stock level.<br>1.3 Optionally links to expense record.</td></tr>
+<tr><td>Exception Conditions</td><td>If invalid data is entered, the system prompts the user to correct it.</td></tr>
+</table>
+
+<h2>3.7 Service Supply Management</h2>
+<table class="uc-table">
+<tr><td>Use Case Name</td><td>Manage Service Supplies</td></tr>
+<tr><td>Scenario</td><td>Owner adds or updates supply info</td></tr>
+<tr><td>Triggering Event</td><td>Owner updates supply details</td></tr>
+<tr><td>Brief Description</td><td>Manages list of supplies used in printing services. Supports add, update, and archive operations.</td></tr>
+<tr><td>Actors</td><td>Owner</td></tr>
+<tr><td>Related Use Case</td><td>Service Supply Inventory Management, Archive Management</td></tr>
+<tr><td>Preconditions</td><td>Supply table exists</td></tr>
+<tr><td>Postconditions</td><td>Supply info updated or archived</td></tr>
+<tr><td>Flow of Activities</td><td><span class="bold">Actor:</span><br>1. Owner selects supply to add, edit, or archive.<br>2. Edits and saves details.<br><br><span class="bold">System:</span><br>1.1 Updates record or sets is_archived = true.<br>1.2 Confirms change.</td></tr>
+<tr><td>Exception Conditions</td><td>If a duplicate name is found, the system prompts the user.</td></tr>
+</table>
+<div class="pnum">30</div>
+</div>
+
+<div class="page">
+<h2>3.8 Expense Management</h2>
+<table class="uc-table">
+<tr><td>Use Case Name</td><td>Manage Expenses</td></tr>
+<tr><td>Scenario</td><td>Owner records expenses</td></tr>
+<tr><td>Triggering Event</td><td>Owner inputs expense data</td></tr>
+<tr><td>Brief Description</td><td>Records and tracks business expenses with category, source, vendor, payment method, receipt number, and date. Expenses can be linked to Stock_In records for inventory cost tracking.</td></tr>
+<tr><td>Actors</td><td>Owner</td></tr>
+<tr><td>Related Use Case</td><td>Financial Reporting, Vendor Management, Product Inventory Management</td></tr>
+<tr><td>Preconditions</td><td>The expense table must exist</td></tr>
+<tr><td>Postconditions</td><td>Expense recorded; optionally linked to Stock_In and/or vendor</td></tr>
+<tr><td>Flow of Activities</td><td><span class="bold">Actor:</span><br>1. Owner enters expense info (description, amount, category, source, vendor, payment method, receipt number, notes).<br>2. Saves record.<br><br><span class="bold">System:</span><br>1.1 Validates and saves expense data.<br>1.2 Links to vendor and/or Stock_In if provided.<br>1.3 Confirms success.</td></tr>
+<tr><td>Exception Conditions</td><td>If the amount is blank or invalid, the system shows an error.</td></tr>
+</table>
+
+<h2>3.9 Customer Management <span class="new-tag">NEW</span></h2>
+<table class="uc-table">
+<tr><td>Use Case Name</td><td>Manage Customer Records</td></tr>
+<tr><td>Scenario</td><td>Owner adds or modifies customer records</td></tr>
+<tr><td>Triggering Event</td><td>Owner accesses the Customer Management section</td></tr>
+<tr><td>Brief Description</td><td>The owner can add, edit, or archive customer records. Customers can be linked to transactions at POS. Archiving preserves transaction history.</td></tr>
+<tr><td>Actors</td><td>Owner, Cashier</td></tr>
+<tr><td>Related Use Case</td><td>Sales Transaction, Archive Management</td></tr>
+<tr><td>Preconditions</td><td>Customer table exists</td></tr>
+<tr><td>Postconditions</td><td>Customer record created, updated, or archived</td></tr>
+<tr><td>Flow of Activities</td><td><span class="bold">Actor:</span><br>1. Owner inputs customer details (name, email, phone, address, notes).<br>2. Saves record.<br><br><span class="bold">System:</span><br>1.1 Validates and saves customer data with registered date.<br>1.2 Confirms success and displays updated customer list.</td></tr>
+<tr><td>Exception Conditions</td><td>If required fields are missing, the system displays a validation error.</td></tr>
+</table>
+<div class="pnum">31</div>
+</div>
+
+<div class="page">
+<h2>3.10 Vendor Management <span class="new-tag">NEW</span></h2>
+<table class="uc-table">
+<tr><td>Use Case Name</td><td>Manage Vendors</td></tr>
+<tr><td>Scenario</td><td>Owner manages supplier records linked to expenses</td></tr>
+<tr><td>Triggering Event</td><td>Owner accesses the Vendor Management section</td></tr>
+<tr><td>Brief Description</td><td>The owner can add, update, or archive vendor records. Vendors are linked to expense records to track spending per supplier.</td></tr>
+<tr><td>Actors</td><td>Owner</td></tr>
+<tr><td>Related Use Case</td><td>Expense Management, Archive Management</td></tr>
+<tr><td>Preconditions</td><td>Vendor table exists</td></tr>
+<tr><td>Postconditions</td><td>Vendor record created, updated, or archived; expense linkage preserved</td></tr>
+<tr><td>Flow of Activities</td><td><span class="bold">Actor:</span><br>1. Owner inputs vendor details (name, contact number, email, address).<br>2. Saves record.<br><br><span class="bold">System:</span><br>1.1 Validates and saves vendor data.<br>1.2 Confirms success and displays updated vendor list.</td></tr>
+<tr><td>Exception Conditions</td><td>If a duplicate vendor name is detected, the system prompts an error.</td></tr>
+</table>
+
+<h2>3.11 Archive Management <span class="new-tag">NEW</span></h2>
+<table class="uc-table">
+<tr><td>Use Case Name</td><td>Manage Archived Records</td></tr>
+<tr><td>Scenario</td><td>Owner views and restores archived items</td></tr>
+<tr><td>Triggering Event</td><td>Owner opens the Archives page</td></tr>
+<tr><td>Brief Description</td><td>The Archives page provides a 5-tab interface showing all soft-deleted records. The owner can restore any archived record to return it to the active list without data loss.</td></tr>
+<tr><td>Actors</td><td>Owner</td></tr>
+<tr><td>Related Use Case</td><td>Product Management, Service Supply Management, Vendor Management, Customer Management</td></tr>
+<tr><td>Preconditions</td><td>At least one archived record exists (is_archived = true)</td></tr>
+<tr><td>Postconditions</td><td>Record restored (is_archived = false) and returned to active list</td></tr>
+<tr><td>Flow of Activities</td><td><span class="bold">Actor:</span><br>1. Owner opens Archives page and selects tab (Products, Machines, Supplies, Vendors, Customers).<br>2. Owner clicks Restore on desired record.<br><br><span class="bold">System:</span><br>1.1 Sets is_archived = false for the record.<br>1.2 Record appears back in its respective active management page.</td></tr>
+<tr><td>Exception Conditions</td><td>If no archived records exist for a tab, the system displays an empty state message.</td></tr>
+</table>
+<div class="pnum">32</div>
+</div>
+
+<div class="page">
+<h2>3.12 Activity Log <span class="new-tag">NEW</span></h2>
+<table class="uc-table">
+<tr><td>Use Case Name</td><td>View Audit Trail</td></tr>
+<tr><td>Scenario</td><td>Owner reviews all system actions taken by users</td></tr>
+<tr><td>Triggering Event</td><td>Owner opens the Activity Log page</td></tr>
+<tr><td>Brief Description</td><td>The system automatically logs all significant user actions. The owner can view, filter, and search the complete activity history to monitor operations and detect issues.</td></tr>
+<tr><td>Actors</td><td>Owner, System</td></tr>
+<tr><td>Related Use Case</td><td>User Management, Sales Transaction, Expense Management, Inventory Management</td></tr>
+<tr><td>Preconditions</td><td>Activity_Log table exists; at least one action has been performed</td></tr>
+<tr><td>Postconditions</td><td>Filtered activity log displayed to owner</td></tr>
+<tr><td>Flow of Activities</td><td><span class="bold">Actor:</span><br>1. Owner opens Activity Log page.<br>2. Owner applies filters (action category: Transactions, Inventory, Products, Users, Expenses, Login) and/or date range (Today, Last 7 Days, Last 30 Days).<br><br><span class="bold">System:</span><br>1.1 Queries activity_log table with filters applied.<br>1.2 Displays matching records with action name, description, performer, and timestamp.<br><br><span class="bold">System (Background):</span><br>2.1 On every significant action, system inserts Activity_Log record with actionID, description, performedBy, performedByID, timestamp, and optional metadata.</td></tr>
+<tr><td>Exception Conditions</td><td>If no records match the filter criteria, the system displays an empty state message.</td></tr>
+</table>
+<div class="pnum">33</div>
+</div>
+
+<!-- ========== SECTION 4: DOMAIN CLASS DIAGRAM ========== -->
+<div class="page">
+<h1>Domain Class Diagram</h1>
+<div class="diag-box">
+<div class="mermaid">
+classDiagram
+    Profile "0..*" --> "1" Role
+    Profile "1" --> "0..*" LoginHistory
+    Profile "1" --> "0..*" ActivityLog
+    ActivityLog "0..*" --> "1" ActivityAction
+    Transaction "0..*" --> "1" Profile
+    Transaction "0..*" --> "0..1" Customer
+    Transaction "1" --> "0..*" TransactionItem
+    Transaction "0..*" --> "1" PaymentMethod
+    Transaction "0..*" --> "1" TransactionStatus
+    TransactionItem "0..1" --> "0..1" PrintOrder
+    TransactionItem "0..*" --> "0..1" Product
+    TransactionItem "0..*" --> "0..1" InventoryItem
+    PrintOrder "0..*" --> "1" ServiceType
+    ServiceType "0..*" --> "1" Service
+    ServiceType "0..*" --> "1" ServiceSupply
+    ServiceType "0..*" --> "1" Machine
+    ServiceType "1" --> "0..*" ServiceTypeCost
+    InventoryItem "0..*" --> "0..1" Product
+    InventoryItem "0..*" --> "0..1" ServiceSupply
+    InventoryItem "0..*" --> "1" StockIn
+    StockIn "0..*" --> "0..1" Product
+    StockIn "0..*" --> "0..1" ServiceSupply
+    StockIn "0..*" --> "0..1" Expense
+    StockOut "0..*" --> "0..1" Transaction
+    StockOut "0..*" --> "0..1" InventoryItem
+    Expense "0..*" --> "1" ExpenseCategory
+    Expense "0..*" --> "1" ExpenseSource
+    Expense "0..*" --> "0..1" Vendor
+    Expense "0..*" --> "0..1" PaymentMethod
+</div>
+</div>
+<div class="pnum">34</div>
+</div>
+
+<!-- ========== SECTION 5: DESIGN CLASS DIAGRAMS ========== -->
+<div class="page">
+<h1>Design Class Diagram</h1>
+<h2>5.1 User Management</h2>
+<div class="diag-box">
+<div class="mermaid">
+classDiagram
+    class Profile {
+        +int id PK
+        +String userId
+        +String username
+        +int roleId FK
+        +String name
+        +String phone
+        +String profilePicture
+        +String addressStreet
+        +String addressBarangay
+        +String addressCity
+        +String addressProvince
+        +String addressRegion
+        +String addressPostalCode
+        +String addressCountry
+        +boolean isActive
+        +DateTime createdAt
+        +DateTime updatedAt
+    }
+    class Role {
+        +int id PK
+        +String roleName
+        +DateTime createdAt
+    }
+    class LoginHistory {
+        +int id PK
+        +int profileId FK
+        +String username
+        +DateTime loginTime
+        +DateTime logoutTime
+        +DateTime createdAt
+    }
+    Profile "0..*" --> "1" Role
+    Profile "1" --> "0..*" LoginHistory
+</div>
+</div>
+<div class="pnum">35</div>
+</div>
+
+<div class="page">
+<h2>5.2 Product Management</h2>
+<div class="diag-box">
+<div class="mermaid">
+classDiagram
+    class Product {
+        +int id PK
+        +String name
+        +String productCategory
+        +String productType
+        +double purchasePrice
+        +double sellingPrice
+        +double productProfit
+        +DateTime expiryDate
+        +boolean isArchived
+        +DateTime createdAt
+        +DateTime updatedAt
+    }
+    class Service {
+        +int id PK
+        +String name
+        +DateTime createdAt
+        +DateTime updatedAt
+    }
+    class ServiceType {
+        +int id PK
+        +int serviceId FK
+        +int serviceSupplyId FK
+        +int machineId FK
+        +String name
+        +String paperSize
+        +String colorMode
+        +DateTime createdAt
+        +DateTime updatedAt
+    }
+    class ServiceTypeCost {
+        +int id PK
+        +int serviceTypeId FK
+        +double serviceSupplyCost
+        +double inkCost
+        +double electricityCost
+        +double laborCost
+        +double serviceTotalCost
+        +double serviceSellingPrice
+        +DateTime lastUpdated
+    }
+    class ServiceSupply {
+        +int id PK
+        +String name
+        +String supplyType
+        +String paperSize
+        +double purchasePrice
+        +double sellingPrice
+        +String unit
+        +boolean isArchived
+        +DateTime createdAt
+        +DateTime updatedAt
+    }
+    class Machine {
+        +int id PK
+        +String name
+        +boolean isActive
+        +boolean isArchived
+        +DateTime createdAt
+        +DateTime updatedAt
+    }
+    Service "1" --> "0..*" ServiceType
+    ServiceSupply "1" --> "0..*" ServiceType
+    Machine "1" --> "0..*" ServiceType
+    ServiceType "1" --> "0..*" ServiceTypeCost
+</div>
+</div>
+<div class="pnum">36</div>
+</div>
+
+<div class="page">
+<h2>5.3 Inventory Management</h2>
+<div class="diag-box">
+<div class="mermaid">
+classDiagram
+    class StockIn {
+        +int id PK
+        +int productId FK
+        +int serviceSupplyId FK
+        +int userId FK
+        +int expenseId FK
+        +double purchasePrice
+        +double quantityAdded
+        +DateTime expiryDate
+        +DateTime stockInDate
+        +DateTime createdAt
+    }
+    class InventoryItem {
+        +int id PK
+        +int productId FK
+        +int serviceSupplyId FK
+        +int stockInId FK
+        +double stock
+        +double purchasePrice
+        +double reorderLevel
+        +String location
+        +DateTime lastRestocked
+        +DateTime expiryDate
+        +DateTime createdAt
+        +DateTime updatedAt
+    }
+    class StockOut {
+        +int id PK
+        +int transactionId FK
+        +int transactionItemId FK
+        +int productId FK
+        +int serviceSupplyId FK
+        +int inventoryItemId FK
+        +int userId FK
+        +double quantityRemoved
+        +String stockOutType
+        +DateTime stockOutDate
+        +DateTime createdAt
+    }
+    StockIn "1" --> "0..*" InventoryItem
+    InventoryItem "1" --> "0..*" StockOut
+</div>
+</div>
+<div class="pnum">37</div>
+</div>
+
+<div class="page">
+<h2>5.4 Transaction Sales</h2>
+<div class="diag-box">
+<div class="mermaid">
+classDiagram
+    class Transaction {
+        +int id PK
+        +String transactionNumber
+        +int customerId FK
+        +int cashierId FK
+        +int statusId FK
+        +int paymentMethodId FK
+        +double subtotal
+        +double tax
+        +double discount
+        +double total
+        +double storeRevenue
+        +double printingRevenue
+        +double totalCost
+        +double grossProfit
+        +String notes
+        +DateTime date
+        +DateTime createdAt
+        +DateTime updatedAt
+    }
+    class TransactionItem {
+        +int id PK
+        +int transactionId FK
+        +int inventoryId FK
+        +int productId FK
+        +int printOrderId FK
+        +String productName
+        +double quantity
+        +double unitPrice
+        +double subtotal
+        +int categoryId FK
+        +double discount
+        +double itemCost
+        +DateTime createdAt
+        +DateTime updatedAt
+    }
+    class PrintOrder {
+        +int id PK
+        +int serviceTypeId FK
+        +int quantity
+        +double totalPrice
+        +double totalCost
+        +double profitMargin
+        +DateTime createdAt
+        +DateTime updatedAt
+    }
+    class PaymentMethod {
+        +int id PK
+        +String methodName
+        +DateTime createdAt
+    }
+    class TransactionStatus {
+        +int id PK
+        +String statusName
+        +DateTime createdAt
+    }
+    Transaction "1" --> "0..*" TransactionItem
+    TransactionItem "0..1" --> "0..1" PrintOrder
+    Transaction "0..*" --> "1" PaymentMethod
+    Transaction "0..*" --> "1" TransactionStatus
+</div>
+</div>
+<div class="pnum">38</div>
+</div>
+
+<div class="page">
+<h2>5.5 Business Expense</h2>
+<div class="diag-box">
+<div class="mermaid">
+classDiagram
+    class Expense {
+        +int id PK
+        +String description
+        +double amount
+        +int categoryId FK
+        +int sourceId FK
+        +int vendorId FK
+        +int paymentMethodId FK
+        +int linkedTransactionId FK
+        +String receiptNumber
+        +String notes
+        +DateTime date
+        +DateTime createdAt
+        +DateTime updatedAt
+    }
+    class ExpenseCategory {
+        +int id PK
+        +String categoryName
+        +DateTime createdAt
+    }
+    class ExpenseSource {
+        +int id PK
+        +String sourceName
+        +DateTime createdAt
+    }
+    class Vendor {
+        +int id PK
+        +String name
+        +String contactNumber
+        +String email
+        +String address
+        +boolean isArchived
+        +DateTime createdAt
+        +DateTime updatedAt
+    }
+    class PaymentMethod {
+        +int id PK
+        +String methodName
+        +DateTime createdAt
+    }
+    Expense "0..*" --> "1" ExpenseCategory
+    Expense "0..*" --> "1" ExpenseSource
+    Expense "0..*" --> "0..1" Vendor
+    Expense "0..*" --> "0..1" PaymentMethod
+</div>
+</div>
+<div class="pnum">39</div>
+</div>
+
+<div class="page">
+<h2>5.6 Financial Report</h2>
+<p>Financial reports in the current implementation are computed dynamically from the <code>transactions</code> and <code>expenses</code> tables rather than stored in dedicated report tables. The system aggregates data per period (daily, weekly, monthly) at query time, computing store revenue, printing revenue, total expenses, gross profit, and net profit.</p>
+<div class="diag-box">
+<div class="mermaid">
+classDiagram
+    class Transaction {
+        +int id PK
+        +String transactionNumber
+        +double storeRevenue
+        +double printingRevenue
+        +double totalCost
+        +double grossProfit
+        +double total
+        +DateTime date
+    }
+    class Expense {
+        +int id PK
+        +double amount
+        +int categoryId FK
+        +DateTime date
+    }
+    class FinancialSummary {
+        +double totalRevenue
+        +double storeRevenue
+        +double printingRevenue
+        +double totalExpenses
+        +double grossProfit
+        +double netProfit
+        +int transactionCount
+        +String period
+        +DateTime fromDate
+        +DateTime toDate
+    }
+    Transaction "0..*" ..> FinancialSummary : aggregated into
+    Expense "0..*" ..> FinancialSummary : aggregated into
+</div>
+</div>
+<div class="pnum">40</div>
+</div>
+
+<div class="page">
+<h2>5.7 Customer Management <span class="new-tag">NEW</span></h2>
+<div class="diag-box">
+<div class="mermaid">
+classDiagram
+    class Customer {
+        +int id PK
+        +String name
+        +String email
+        +String phone
+        +String address
+        +String notes
+        +DateTime registeredDate
+        +boolean isArchived
+        +DateTime createdAt
+        +DateTime updatedAt
+    }
+    class Transaction {
+        +int id PK
+        +String transactionNumber
+        +int customerId FK
+        +double total
+        +DateTime date
+    }
+    Customer "1" --> "0..*" Transaction : placed by
+</div>
+</div>
+
+<h2>5.8 Vendor Management <span class="new-tag">NEW</span></h2>
+<div class="diag-box">
+<div class="mermaid">
+classDiagram
+    class Vendor {
+        +int id PK
+        +String name
+        +String contactNumber
+        +String email
+        +String address
+        +boolean isArchived
+        +DateTime createdAt
+        +DateTime updatedAt
+    }
+    class Expense {
+        +int id PK
+        +String description
+        +double amount
+        +int vendorId FK
+        +DateTime date
+    }
+    Vendor "1" --> "0..*" Expense : linked to
+</div>
+</div>
+<div class="pnum">41</div>
+</div>
+
+<div class="page">
+<h2>5.9 Activity Log <span class="new-tag">NEW</span></h2>
+<div class="diag-box">
+<div class="mermaid">
+classDiagram
+    class ActivityLog {
+        +int id PK
+        +int actionId FK
+        +String description
+        +DateTime timestamp
+        +String performedBy
+        +int performedById FK
+        +Map metadata
+        +DateTime createdAt
+    }
+    class ActivityAction {
+        +int id PK
+        +String actionName
+        +String category
+        +DateTime createdAt
+    }
+    class Profile {
+        +int id PK
+        +String username
+        +String name
+    }
+    ActivityLog "0..*" --> "1" ActivityAction
+    ActivityLog "0..*" --> "1" Profile
+</div>
+</div>
+
+<p>Activity actions are organized by category:</p>
+<ul>
+  <li><span class="bold">transaction:</span> transaction_created, transaction_cancelled, transaction_refunded</li>
+  <li><span class="bold">inventory:</span> inventory_added, inventory_updated, inventory_depleted, inventory_expired</li>
+  <li><span class="bold">product:</span> product_created, product_updated, product_deleted</li>
+  <li><span class="bold">user:</span> user_created, user_updated, user_deleted, user_login, user_logout</li>
+  <li><span class="bold">expense:</span> expense_created, expense_updated, expense_deleted</li>
+  <li><span class="bold">customer:</span> customer_created, customer_updated, customer_deleted</li>
+  <li><span class="bold">print_service:</span> print_service_created, print_service_updated, print_service_deleted</li>
+</ul>
+<div class="pnum">42</div>
+</div>
+
+<!-- ========== SECTION 6: UI/UX ========== -->
+<div class="page">
+<h1>UI/UX Design</h1>
+<h2>6.1 Login Page</h2>
+<p>The login page displays the PrintSari Corner branding (store and printer icons) with a centered card containing username and password fields and a Login button. Demo credentials are shown at the bottom for testing purposes.</p>
+<div class="screen-ph">[ Login Page Screenshot — Username/Password form with PrintSari Corner branding ]</div>
+
+<h2>6.2 Owner Dashboard</h2>
+<h3>Dashboard</h3>
+<p>The Owner Dashboard displays a welcome message with the owner's name and a business overview for the day. Four summary cards show: Today's Sales (total), Store Sales, Printing Sales, and Today's Expenses. Below are two panels: Recent Transactions (last 2 transactions with date and total) and Low Stock Alert (items below reorder level).</p>
+<p>The left navigation sidebar contains: Dashboard, Products &amp; Services, Sales Transaction, Inventory, Expenses, Financial Reports, User Management, Archives, Activity Log, and Logout.</p>
+<div class="screen-ph">[ Owner Dashboard Screenshot — Summary cards, recent transactions, low stock alert ]</div>
+<div class="pnum">43</div>
+</div>
+
+<div class="page">
+<h3>Product and Service Management</h3>
+<p>The Products &amp; Services page shows a 4-tab interface: Store Products, Printing Services, Machines, and Service Supplies. Each tab displays items in a grid/list with name, price, and stock information. An "+ Add Product/Service" button opens a dialog to add new records. Each item has edit and archive action buttons. Archived items are removed from this view and appear in the Archives page.</p>
+<div class="screen-ph">[ Products & Services Screenshot — 4-tab interface with Store Products, Printing Services, Machines, Supplies ]</div>
+
+<h3>Sales Transaction</h3>
+<p>The Sales Transaction page allows cashiers to process purchases. The left panel has an "Add Items" search bar where products and services are selected with quantity controls. Below is the cart with items and remove buttons. The right panel shows the Order Summary with item count, total quantity, total amount, and a "Process Transaction" button showing the cashier's name.</p>
+<div class="screen-ph">[ Sales Transaction Screenshot — Cart panel with items, order summary, Process Transaction button ]</div>
+<div class="pnum">44</div>
+</div>
+
+<div class="page">
+<h3>Inventory Management</h3>
+<p>The Inventory Management page shows 4 tabs: All Products, Store Products, Printing Supplies, and Stock History. Items are listed with name, purchase price, and current stock quantity. Two action buttons at the top right allow "Stock In – Store" and "Stock In – Printing" operations, which open dialogs to add stock with quantity, purchase price, and expiry date. Each inventory item has an edit button for manual adjustment.</p>
+<div class="screen-ph">[ Inventory Management Screenshot — Stock list with Store Products and Printing Supplies tabs ]</div>
+
+<h3>Expenses</h3>
+<p>The Expense Management page shows three summary cards at the top: Today's Expenses, This Month, and Total Expenses. Below is the Expense Records list showing each expense with description, date, category, and amount. A "+ Record Expense" button opens a dialog with fields for description, amount, category, source, vendor, payment method, receipt number, and notes. Each expense has a delete button.</p>
+<div class="screen-ph">[ Expenses Screenshot — Summary cards and expense records list ]</div>
+<div class="pnum">45</div>
+</div>
+
+<div class="page">
+<h3>Financial Reports</h3>
+<p>The Financial Reports page provides three views via tabs: Daily, Weekly, and Monthly. Each view shows summary cards for Total Sales, Store Revenue, Printing Revenue, Total Expenses, Net Profit, and Transaction Count. A Revenue Breakdown bar chart shows the proportion of store vs. printing revenue. An "Export Report" button allows PDF export of the current view.</p>
+<div class="screen-ph">[ Financial Reports Screenshot — Daily/Weekly/Monthly tabs with summary cards and revenue breakdown chart ]</div>
+
+<h3>User Management</h3>
+<p>The User Management page shows summary cards for Total Users, Owners, and Cashiers. Two sections display Owner Accounts and Cashier Accounts with name, username, and edit/delete buttons. An Access Permissions section at the bottom shows what each role can access. An "+ Add User" button opens a dialog with full user creation form.</p>
+<div class="screen-ph">[ User Management Screenshot — Owner and Cashier account cards with permissions section ]</div>
+<div class="pnum">46</div>
+</div>
+
+<div class="page">
+<h2>6.3 Cashier Dashboard</h2>
+<h3>Dashboard</h3>
+<p>The Cashier Dashboard has a simplified navigation sidebar showing only: Dashboard, Sales Transaction, and Inventory. The dashboard content mirrors the owner's dashboard with the same summary cards (Today's Sales, Store Sales, Printing Sales, Today's Expenses) and panels (Recent Transactions, Low Stock Alert), providing the cashier with business context for the day.</p>
+<div class="screen-ph">[ Cashier Dashboard Screenshot — Simplified sidebar, same summary cards as owner ]</div>
+
+<h3>Sales Transaction</h3>
+<p>Identical to the owner's Sales Transaction view. The cashier can select products and services, adjust quantities, and process transactions with payment entry. The cashier's name appears in the Order Summary panel.</p>
+<div class="screen-ph">[ Cashier Sales Transaction Screenshot — Cart with Store and Printing items ]</div>
+
+<h3>Inventory View</h3>
+<p>The cashier's Inventory view is read-only. It shows the same 4-tab interface (All Products, Store Products, Printing Supplies, Stock History) but without the Stock In buttons or edit controls. The cashier can view current stock levels but cannot modify them.</p>
+<div class="screen-ph">[ Cashier Inventory View Screenshot — Read-only stock list ]</div>
+<div class="pnum">47</div>
+</div>
+
+<div class="page">
+<h2>6.4 Archives Page <span class="new-tag">NEW</span></h2>
+<p>The Archives page is accessible only to the owner and provides a 5-tab interface for managing soft-deleted records. Each tab displays archived items of a specific type, with a "Restore" button on each item to return it to the active list. No records are permanently deleted from this page — restoration simply sets is_archived = false.</p>
+<p><span class="bold">Tabs:</span></p>
+<ul>
+  <li><span class="bold">Products:</span> Archived store products with name, category, and purchase price</li>
+  <li><span class="bold">Machines:</span> Archived printers/machines with name and last active date</li>
+  <li><span class="bold">Service Supplies:</span> Archived printing supplies with name, type, and unit</li>
+  <li><span class="bold">Vendors:</span> Archived vendor records with name and contact info</li>
+  <li><span class="bold">Customers:</span> Archived customer records with name, email, and registered date</li>
+</ul>
+<div class="screen-ph">[ Archives Page — 5-tab interface (Products, Machines, Supplies, Vendors, Customers) with Restore buttons ]</div>
+
+<h2>6.5 Activity Log Page <span class="new-tag">NEW</span></h2>
+<p>The Activity Log page is accessible only to the owner. It displays a chronological list of all system events, with filtering controls at the top. Each log entry shows the action name, description, performer name and role, and timestamp.</p>
+<p><span class="bold">Filter Options:</span></p>
+<ul>
+  <li><span class="bold">Action Category:</span> All, Transactions, Inventory, Products, Users, Expenses, Login</li>
+  <li><span class="bold">Date Range:</span> Today, Last 7 Days, Last 30 Days</li>
+  <li><span class="bold">Search:</span> Free-text search by performer name or description</li>
+</ul>
+<div class="screen-ph">[ Activity Log Page — Filter bar with category/date selectors, log entries list with action, performer, timestamp ]</div>
+<div class="pnum">48</div>
+</div>
+
+<div class="page">
+<h2>6.6 Customer Management Page <span class="new-tag">NEW</span></h2>
+<p>The Customers page (owner only) displays a searchable list of all active customers. Each customer card shows name, email, phone, and registration date. An "+ Add Customer" button opens a dialog for entering customer details. Each record has edit and archive buttons. Archived customers are removed from this view and appear in the Archives page under the Customers tab.</p>
+<p><span class="bold">Customer Fields:</span> Name, Email (required), Phone, Address, Notes, Registered Date</p>
+<div class="screen-ph">[ Customers Page — Searchable customer list with edit/archive buttons, Add Customer dialog ]</div>
+
+<h2>Summary of New Features Added</h2>
+<table>
+<tr><th>Feature</th><th>Description</th><th>Affects</th></tr>
+<tr><td>Customer Management</td><td>Full customer CRUD with archiving; linked to transactions</td><td>Events, Use Cases, Class Diagrams, UI</td></tr>
+<tr><td>Vendor Management</td><td>Supplier directory linked to expense records; with archiving</td><td>Events, Use Cases, Class Diagrams, UI</td></tr>
+<tr><td>Archive System</td><td>Soft-delete for Products, Machines, Supplies, Vendors, Customers with restore capability</td><td>Events, Use Cases, All Diagrams, UI</td></tr>
+<tr><td>Activity Log</td><td>Automated audit trail for all system actions with category/date filtering</td><td>Events, Use Cases, Class Diagrams, UI</td></tr>
+<tr><td>Updated Transaction Schema</td><td>Added transactionNumber, storeRevenue, printingRevenue, totalCost, grossProfit, paymentMethodId</td><td>Class Diagrams, Events</td></tr>
+<tr><td>Updated Expense Schema</td><td>Added vendorId, paymentMethodId, sourceId, receiptNumber, notes, linkedTransactionId</td><td>Class Diagrams, Events</td></tr>
+<tr><td>Print Orders Table</td><td>New table linking service type to transaction items with cost breakdown</td><td>Class Diagrams</td></tr>
+<tr><td>Service Supply Unit Field</td><td>Added unit field to service_supplies for stock tracking</td><td>Class Diagrams</td></tr>
+<tr><td>Inline Address on Profile</td><td>Address fields moved inline to Profile; no separate Address table</td><td>Class Diagrams (5.1)</td></tr>
+<tr><td>Reorder Level on Inventory</td><td>Added reorderLevel and location fields to Inventory_Item</td><td>Class Diagrams (5.3)</td></tr>
+</table>
+<div class="pnum">49</div>
+</div>
+
+</body>
+</html>

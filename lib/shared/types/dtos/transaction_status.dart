@@ -1,5 +1,3 @@
-import 'package:printsari_sia/shared/types/types.dart';
-
 class TransactionStatus {
   final int id;
   final String statusName;
@@ -10,9 +8,6 @@ class TransactionStatus {
     required this.statusName,
     required this.createdAt,
   });
-
-  TransactionStatusType? get statusType =>
-      TransactionStatusType.fromString(statusName);
 
   factory TransactionStatus.fromJson(Map<String, dynamic> json) {
     return TransactionStatus(

@@ -1,5 +1,3 @@
-import 'package:printsari_sia/shared/types/types.dart';
-
 class ActivityAction {
   final int id;
   final String actionName;
@@ -12,9 +10,6 @@ class ActivityAction {
     required this.category,
     required this.createdAt,
   });
-
-  ActivityActionCategory? get categoryType =>
-      ActivityActionCategory.fromString(category);
 
   factory ActivityAction.fromJson(Map<String, dynamic> json) {
     return ActivityAction(
