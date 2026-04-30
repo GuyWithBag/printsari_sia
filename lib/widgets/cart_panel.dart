@@ -565,6 +565,8 @@ class _ReceiptDialog extends StatelessWidget {
                         style: GoogleFonts.outfit(color: posTextMuted, fontSize: 12),
                       ),
                     ),
+                    const SizedBox(height: 12),
+                    _TagCustomerSection(transactionId: transaction.id),
                   ],
                 ),
               ),
@@ -756,6 +758,215 @@ class _ReceiptDialog extends StatelessWidget {
     );
   }
 }
+
+// ── Tag Customer Section ────────────────────────────────────────────────────
+
+class _TagCustomerSection extends StatefulWidget {
+  final int transactionId;
+  const _TagCustomerSection({required this.transactionId});
+
+  @override
+  State<_TagCustomerSection> createState() => _TagCustomerSectionState();
+}
+
+class _TagCustomerSectionState extends State<_TagCustomerSection> {
+  Customer? _taggedCustomer;
+  bool _isTagging = false;
+
+  Future<void> _tag() async {
+    final customerProvider = context.read<CustomerProvider>();
+    setState(() => _isTagging = true);
+    List<Customer> customers;
+    try {
+      customers = await customerProvider.getCustomers();
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isTagging = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to load customers: $e'),
+          backgroundColor: Colors.red.shade700,
+        ),
+      );
+      return;
+    }
+    if (!mounted) return;
+    setState(() => _isTagging = false);
+
+    final selected = await showDialog<Customer>(
+      context: context,
+      builder: (ctx) => _CustomerPickerDialog(customers: customers),
+    );
+
+    if (selected == null || !mounted) return;
+    await customerProvider.tagTransactionCustomer(widget.transactionId, selected.id);
+    if (!mounted) return;
+    setState(() => _taggedCustomer = selected);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_taggedCustomer != null) {
+      return Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Icon(Icons.person_rounded, size: 14, color: posAccent),
+          const SizedBox(width: 6),
+          Text(
+            _taggedCustomer!.name ?? _taggedCustomer!.email,
+            style: GoogleFonts.outfit(color: posAccent, fontSize: 12),
+          ),
+        ],
+      );
+    }
+    if (_isTagging) {
+      return const Center(
+        child: SizedBox(
+          width: 16,
+          height: 16,
+          child: CircularProgressIndicator(strokeWidth: 2, color: posTextMuted),
+        ),
+      );
+    }
+    return Center(
+      child: TextButton.icon(
+        onPressed: _tag,
+        icon: const Icon(Icons.person_add_rounded, size: 14, color: posTextMuted),
+        label: Text(
+          'Tag Customer',
+          style: GoogleFonts.outfit(color: posTextMuted, fontSize: 12),
+        ),
+      ),
+    );
+  }
+}
+
+// ── Customer Picker Dialog ──────────────────────────────────────────────────
+
+class _CustomerPickerDialog extends StatefulWidget {
+  final List<Customer> customers;
+  const _CustomerPickerDialog({required this.customers});
+
+  @override
+  State<_CustomerPickerDialog> createState() => _CustomerPickerDialogState();
+}
+
+class _CustomerPickerDialogState extends State<_CustomerPickerDialog> {
+  String _query = '';
+
+  @override
+  Widget build(BuildContext context) {
+    final filtered = widget.customers.where((c) {
+      if (_query.isEmpty) return true;
+      final q = _query.toLowerCase();
+      return (c.name?.toLowerCase().contains(q) ?? false) ||
+          c.email.toLowerCase().contains(q) ||
+          (c.phone?.contains(q) ?? false);
+    }).toList();
+
+    return AlertDialog(
+      backgroundColor: posSurface,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(20),
+        side: BorderSide(color: Colors.white.withValues(alpha: 0.08)),
+      ),
+      title: Text(
+        'Select Customer',
+        style: GoogleFonts.outfit(
+          color: Colors.white,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+      content: SizedBox(
+        width: double.maxFinite,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              autofocus: true,
+              onChanged: (v) => setState(() => _query = v),
+              style: GoogleFonts.outfit(color: Colors.white, fontSize: 14),
+              decoration: InputDecoration(
+                hintText: 'Search by name, email, or phone...',
+                hintStyle: GoogleFonts.outfit(color: posTextMuted, fontSize: 13),
+                prefixIcon: const Icon(Icons.search, color: posTextMuted, size: 18),
+                filled: true,
+                fillColor: posSurfaceLight,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide.none,
+                ),
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              ),
+            ),
+            const SizedBox(height: 8),
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxHeight: 280),
+              child: filtered.isEmpty
+                  ? Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 24),
+                      child: Text(
+                        'No customers found',
+                        style: GoogleFonts.outfit(color: posTextMuted),
+                      ),
+                    )
+                  : ListView.builder(
+                      shrinkWrap: true,
+                      itemCount: filtered.length,
+                      itemBuilder: (_, i) {
+                        final c = filtered[i];
+                        return InkWell(
+                          onTap: () => Navigator.of(context).pop(c),
+                          borderRadius: BorderRadius.circular(10),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 14, vertical: 10),
+                            margin: const EdgeInsets.only(bottom: 4),
+                            decoration: BoxDecoration(
+                              color: posSurfaceLight,
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  c.name ?? c.email,
+                                  style: GoogleFonts.outfit(
+                                    color: Colors.white,
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                                if (c.name != null)
+                                  Text(
+                                    c.email,
+                                    style: GoogleFonts.outfit(
+                                      color: posTextMuted,
+                                      fontSize: 11,
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(null),
+          child: Text('Cancel', style: GoogleFonts.outfit(color: posTextMuted)),
+        ),
+      ],
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 class _SummaryRow extends StatelessWidget {
   final String label;

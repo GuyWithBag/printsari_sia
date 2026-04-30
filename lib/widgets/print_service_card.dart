@@ -1,16 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:printsari_sia/shared/themes/colors.dart';
-import 'package:printsari_sia/shared/types/types.dart';
+import 'package:printsari_sia/shared/types/dtos/service.dart';
 
 class PrintServiceCard extends StatelessWidget {
-  final ServiceSupply supply;
+  final Service service;
+  final double? minPrice;
 
-  const PrintServiceCard({required this.supply});
+  const PrintServiceCard({required this.service, this.minPrice});
 
   @override
   Widget build(BuildContext context) {
-    final price = supply.sellingPrice;
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
@@ -35,7 +35,7 @@ class PrintServiceCard extends StatelessWidget {
               borderRadius: BorderRadius.circular(8),
             ),
             child: Text(
-              supply.supplyType,
+              'Print Service',
               style: GoogleFonts.outfit(
                 color: Colors.blue.shade700,
                 fontSize: 10,
@@ -45,7 +45,7 @@ class PrintServiceCard extends StatelessWidget {
           ),
           const SizedBox(height: 6),
           Text(
-            supply.name,
+            service.name,
             style: GoogleFonts.outfit(
               color: posTextMain,
               fontSize: 13,
@@ -54,25 +54,17 @@ class PrintServiceCard extends StatelessWidget {
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
           ),
-          if (supply.paperSize != null) ...[
-            const SizedBox(height: 2),
-            Text(
-              supply.paperSize!,
-              style: GoogleFonts.outfit(
-                color: warmGray,
-                fontSize: 11,
-              ),
-            ),
-          ],
           const Spacer(),
           Text(
-            price > 0
-                ? 'P${price.toStringAsFixed(2)} / page'
-                : 'No price set',
+            minPrice != null && minPrice! > 0
+                ? 'From P${minPrice!.toStringAsFixed(2)} / page'
+                : 'Tap to view types',
             style: GoogleFonts.outfit(
-              color: price > 0 ? posPrimary : warmGray,
-              fontSize: 17,
-              fontWeight: FontWeight.w700,
+              color: minPrice != null && minPrice! > 0 ? posPrimary : warmGray,
+              fontSize: minPrice != null && minPrice! > 0 ? 15 : 12,
+              fontWeight: minPrice != null && minPrice! > 0
+                  ? FontWeight.w700
+                  : FontWeight.w400,
             ),
           ),
         ],

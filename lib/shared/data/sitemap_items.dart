@@ -50,9 +50,21 @@ const siteMapItems = <SiteMapItem>[
     roles: [UserRoleType.owner, UserRoleType.manager],
   ),
   SiteMapItem(
+    title: 'Customers',
+    iconPath: 'assets/users.svg',
+    path: '/customers',
+    roles: [UserRoleType.owner, UserRoleType.manager, UserRoleType.cashier],
+  ),
+  SiteMapItem(
     title: 'User Management',
     iconPath: 'assets/users.svg',
     path: '/users',
+    roles: [UserRoleType.owner],
+  ),
+  SiteMapItem(
+    title: 'Archives',
+    iconPath: 'assets/package.svg',
+    path: '/archives',
     roles: [UserRoleType.owner],
   ),
 ];

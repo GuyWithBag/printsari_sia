@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:printsari_sia/shared/types/dtos/service_supply.dart';
 import 'package:printsari_sia/shared/types/types.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -9,6 +8,8 @@ class ProductProvider extends ChangeNotifier {
   List<Product>? _products;
   List<Machine>? _machines;
   List<ServiceSupply>? _serviceSupplies;
+  List<Service>? _services;
+  List<ServiceType>? _serviceTypes;
   bool _hasPendingChanges = false;
   RealtimeChannel? _channel;
 
@@ -38,11 +39,15 @@ class ProductProvider extends ChangeNotifier {
   void clearProductsCache() => _products = null;
   void clearMachinesCache() => _machines = null;
   void clearServiceSuppliesCache() => _serviceSupplies = null;
+  void clearServicesCache() => _services = null;
+  void clearServiceTypesCache() => _serviceTypes = null;
 
   void clearAllCache() {
     clearProductsCache();
     clearMachinesCache();
     clearServiceSuppliesCache();
+    clearServicesCache();
+    clearServiceTypesCache();
   }
 
   // ── Products ──────────────────────────────────────────────────────────────
@@ -191,6 +196,25 @@ class ProductProvider extends ChangeNotifier {
     await supabase.from('service_supplies').delete().eq('id', id);
     _serviceSupplies?.removeWhere((s) => s.id == id);
     notifyListeners();
+  }
+
+  // ── Services ──────────────────────────────────────────────────────────────
+
+  Future<List<Service>> getServices() async {
+    if (_services != null) return _services!;
+    final query = await supabase.from('services').select().order('name');
+    _services = query.map((r) => Service.fromJson(r)).toList();
+    return _services!;
+  }
+
+  Future<List<ServiceType>> getServiceTypes() async {
+    if (_serviceTypes != null) return _serviceTypes!;
+    final query = await supabase
+        .from('service_types')
+        .select('*, services(*), service_supplies(*), machines(*), service_type_costs(*)')
+        .order('name');
+    _serviceTypes = query.map((r) => ServiceType.fromJson(r)).toList();
+    return _serviceTypes!;
   }
 
   // ── Machines ──────────────────────────────────────────────────────────────

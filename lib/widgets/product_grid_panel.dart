@@ -16,7 +16,8 @@ class ProductGridPanel extends HookWidget {
   final ValueNotifier<String> searchQuery;
   final ValueNotifier<int> tabIndex;
   final AsyncSnapshot<List<Product>> productsSnapshot;
-  final AsyncSnapshot<List<ServiceSupply>> serviceSuppliesSnapshot;
+  final AsyncSnapshot<List<Service>> servicesSnapshot;
+  final AsyncSnapshot<List<ServiceType>> serviceTypesSnapshot;
   final AsyncSnapshot<List<InventoryItem>> inventorySnapshot;
   final TransactionProvider transactionProvider;
 
@@ -25,7 +26,8 @@ class ProductGridPanel extends HookWidget {
     required this.searchQuery,
     required this.tabIndex,
     required this.productsSnapshot,
-    required this.serviceSuppliesSnapshot,
+    required this.servicesSnapshot,
+    required this.serviceTypesSnapshot,
     required this.inventorySnapshot,
     required this.transactionProvider,
   });
@@ -45,7 +47,7 @@ class ProductGridPanel extends HookWidget {
     // Compute filtered items for pagination totals
     final allProducts = productsSnapshot.data ?? [];
     final allInventory = inventorySnapshot.data ?? [];
-    final allSupplies = serviceSuppliesSnapshot.data ?? [];
+    final allServices = servicesSnapshot.data ?? [];
     final query = searchQuery.value.toLowerCase();
 
     final filteredBatches = allInventory.where((inv) {
@@ -58,15 +60,14 @@ class ProductGridPanel extends HookWidget {
           product.productType.toLowerCase().contains(query);
     }).toList();
 
-    final filteredSupplies = allSupplies.where((s) {
+    final filteredServices = allServices.where((s) {
       if (query.isEmpty) return true;
-      return s.name.toLowerCase().contains(query) ||
-          s.supplyType.toLowerCase().contains(query);
+      return s.name.toLowerCase().contains(query);
     }).toList();
 
     final isProductTab = tabIndex.value == 0;
     final filteredCount =
-        isProductTab ? filteredBatches.length : filteredSupplies.length;
+        isProductTab ? filteredBatches.length : filteredServices.length;
     final totalPages = (filteredCount / _pageSize).ceil().clamp(1, 99999);
     final safePage = currentPage.value.clamp(0, totalPages - 1);
 
@@ -166,7 +167,7 @@ class ProductGridPanel extends HookWidget {
                 child: tabIndex.value == 0
                     ? _buildProductGrid(
                         context, filteredBatches, allProducts, safePage)
-                    : _buildServiceGrid(context, filteredSupplies, safePage),
+                    : _buildServiceGrid(context, filteredServices, safePage),
               ),
             ),
           ),
@@ -367,28 +368,31 @@ class ProductGridPanel extends HookWidget {
   // ── Service Grid ──
   Widget _buildServiceGrid(
     BuildContext context,
-    List<ServiceSupply> filteredSupplies,
+    List<Service> filteredServices,
     int page,
   ) {
     final isLoading =
-        serviceSuppliesSnapshot.connectionState == ConnectionState.waiting;
+        servicesSnapshot.connectionState == ConnectionState.waiting ||
+        serviceTypesSnapshot.connectionState == ConnectionState.waiting;
 
     if (isLoading) return _buildSkeletonGrid();
 
-    if (serviceSuppliesSnapshot.hasError) {
+    if (servicesSnapshot.hasError || serviceTypesSnapshot.hasError) {
       return _emptyState(Icons.error_outline, 'Failed to load print services');
     }
 
-    if (filteredSupplies.isEmpty) {
+    if (filteredServices.isEmpty) {
       return _emptyState(Icons.print_disabled, 'No print services found');
     }
 
+    final allServiceTypes = serviceTypesSnapshot.data ?? [];
+
     final start = page * _pageSize;
-    final end = (start + _pageSize).clamp(0, filteredSupplies.length);
-    final pageItems = filteredSupplies.sublist(start, end);
+    final end = (start + _pageSize).clamp(0, filteredServices.length);
+    final pageItems = filteredServices.sublist(start, end);
 
     return GridView.builder(
-      key: ValueKey('supplies-$page'),
+      key: ValueKey('services-$page'),
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 3,
         childAspectRatio: 1.05,
@@ -397,21 +401,164 @@ class ProductGridPanel extends HookWidget {
       ),
       itemCount: pageItems.length,
       itemBuilder: (context, index) {
-        final supply = pageItems[index];
+        final service = pageItems[index];
+        final types = allServiceTypes
+            .where((t) => t.serviceId == service.id)
+            .toList();
+        final prices = types
+            .map((t) => t.cost?.serviceSellingPrice)
+            .whereType<double>()
+            .toList();
+        final minPrice = prices.isEmpty ? null : (prices..sort()).first;
+        final allInventory = inventorySnapshot.data ?? [];
         return _BounceTapCard(
-          child: PrintServiceCard(supply: supply),
-          onTap: () => _showPageCountDialog(context, supply),
+          child: PrintServiceCard(service: service, minPrice: minPrice),
+          onTap: () => _showServiceTypeDialog(context, service, types, allInventory),
         );
       },
     );
   }
 
-  // ── Page count dialog for print services ──
+  // ── Step 1: Select service type ──
+  Future<void> _showServiceTypeDialog(
+    BuildContext context,
+    Service service,
+    List<ServiceType> types,
+    List<InventoryItem> inventory,
+  ) async {
+    if (types.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No types configured for this service')),
+      );
+      return;
+    }
+
+    final selected = await showDialog<ServiceType>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: posSurface,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+          side: BorderSide(color: Colors.white.withValues(alpha: 0.08)),
+        ),
+        title: Text(
+          service.name,
+          style: GoogleFonts.outfit(
+            color: Colors.white,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Select a type:',
+                style: GoogleFonts.outfit(color: posTextMuted, fontSize: 13),
+              ),
+              const SizedBox(height: 12),
+              ...types.map((t) {
+                final price = t.cost?.serviceSellingPrice;
+                final supplyInv = t.serviceSupplyId == null
+                    ? null
+                    : inventory.where((i) => i.serviceSupplyId == t.serviceSupplyId).firstOrNull;
+                final availStock = supplyInv?.stock ?? 0.0;
+                final outOfStock = availStock <= 0;
+                return InkWell(
+                  onTap: outOfStock ? null : () => Navigator.of(ctx).pop(t),
+                  borderRadius: BorderRadius.circular(12),
+                  child: Opacity(
+                    opacity: outOfStock ? 0.45 : 1.0,
+                    child: Container(
+                      width: double.infinity,
+                      margin: const EdgeInsets.only(bottom: 8),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 12),
+                      decoration: BoxDecoration(
+                        color: posSurfaceLight,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                            color: outOfStock
+                                ? Colors.red.withValues(alpha: 0.3)
+                                : Colors.white.withValues(alpha: 0.06)),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                t.name,
+                                style: GoogleFonts.outfit(
+                                  color: Colors.white,
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                              Text(
+                                outOfStock
+                                    ? 'Out of stock'
+                                    : '${availStock.toStringAsFixed(0)} units left',
+                                style: GoogleFonts.outfit(
+                                  color: outOfStock
+                                      ? Colors.red.shade400
+                                      : posTextMuted,
+                                  fontSize: 11,
+                                ),
+                              ),
+                            ],
+                          ),
+                          Text(
+                            price != null && price > 0
+                                ? 'P${price.toStringAsFixed(2)}/page'
+                                : '—',
+                            style: GoogleFonts.outfit(
+                              color: posAccent,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                );
+              }),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(null),
+            child: Text('Cancel', style: GoogleFonts.outfit(color: posTextMuted)),
+          ),
+        ],
+      ),
+    );
+
+    if (selected == null) return;
+    if (!context.mounted) return;
+    final supplyInv = selected.serviceSupplyId == null
+        ? null
+        : inventory
+            .where((i) => i.serviceSupplyId == selected.serviceSupplyId)
+            .firstOrNull;
+    final maxStock = supplyInv == null ? null : supplyInv.stock.toInt();
+    await _showPageCountDialog(context, service, selected, maxStock);
+  }
+
+  // ── Step 2: Enter page count ──
   Future<void> _showPageCountDialog(
     BuildContext context,
-    ServiceSupply supply,
+    Service service,
+    ServiceType serviceType,
+    int? maxStock,
   ) async {
-    final sellingPrice = supply.sellingPrice;
+    final sellingPrice = serviceType.cost?.serviceSellingPrice ?? 0.0;
+    final totalCostPerPage = serviceType.cost?.serviceTotalCost ?? 0.0;
     final pageCountController = TextEditingController(text: '1');
     final result = await showDialog<int>(
       context: context,
@@ -433,7 +580,7 @@ class ProductGridPanel extends HookWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              supply.name,
+              '${service.name} — ${serviceType.name}',
               style: GoogleFonts.outfit(color: posAccent, fontSize: 14),
             ),
             const SizedBox(height: 4),
@@ -443,6 +590,16 @@ class ProductGridPanel extends HookWidget {
                   : 'No price set',
               style: GoogleFonts.outfit(color: posTextMuted, fontSize: 13),
             ),
+            if (maxStock != null) ...[
+              const SizedBox(height: 2),
+              Text(
+                '$maxStock units available',
+                style: GoogleFonts.outfit(
+                  color: maxStock > 0 ? posTextMuted : Colors.red.shade400,
+                  fontSize: 12,
+                ),
+              ),
+            ],
             const SizedBox(height: 16),
             TextField(
               controller: pageCountController,
@@ -450,7 +607,9 @@ class ProductGridPanel extends HookWidget {
               autofocus: true,
               style: GoogleFonts.outfit(color: Colors.white),
               decoration: InputDecoration(
-                labelText: 'Number of pages',
+                labelText: maxStock != null
+                    ? 'Number of pages (max $maxStock)'
+                    : 'Number of pages',
                 labelStyle: GoogleFonts.outfit(color: posTextMuted),
                 enabledBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
@@ -486,7 +645,9 @@ class ProductGridPanel extends HookWidget {
             ),
             onPressed: () {
               final count = int.tryParse(pageCountController.text) ?? 0;
-              if (count > 0) Navigator.of(ctx).pop(count);
+              if (count <= 0) return;
+              if (maxStock != null && count > maxStock) return;
+              Navigator.of(ctx).pop(count);
             },
             child: Text('Add to Cart', style: GoogleFonts.outfit()),
           ),
@@ -500,14 +661,14 @@ class ProductGridPanel extends HookWidget {
     try {
       final pageCount = result;
       final totalPrice = sellingPrice * pageCount;
-      final totalCost = supply.purchasePrice * pageCount;
+      final totalCost = totalCostPerPage * pageCount;
       final profitMargin = totalPrice - totalCost;
 
       final supabase = Supabase.instance.client;
       final insertedOrder = await supabase
           .from('print_orders')
           .insert({
-            'service_supply_id': supply.id,
+            'service_type_id': serviceType.id,
             'quantity': pageCount,
             'total_price': totalPrice,
             'total_cost': totalCost,
@@ -523,7 +684,7 @@ class ProductGridPanel extends HookWidget {
           id: 0,
           transactionId: 0,
           productId: null,
-          productName: supply.name,
+          productName: '${service.name} (${serviceType.name})',
           quantity: pageCount.toDouble(),
           unitPrice: sellingPrice,
           subtotal: totalPrice,

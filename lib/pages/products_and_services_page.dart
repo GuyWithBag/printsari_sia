@@ -25,7 +25,7 @@ class ProductsAndServicesPage extends HookWidget {
 
   @override
   Widget build(BuildContext context) {
-    final tabController = useTabController(initialLength: 8);
+    final tabController = useTabController(initialLength: 4);
     final currentIndex = useState(0);
     final refreshKey = useState(0);
 
@@ -97,50 +97,22 @@ class ProductsAndServicesPage extends HookWidget {
                 CircularTab(
                   tabController: tabController,
                   index: 1,
-                  label: 'Archived',
-                  icon: Icons.archive_outlined,
-                  indexState: currentIndex,
-                ),
-                CircularTab(
-                  tabController: tabController,
-                  index: 2,
                   label: 'Machines',
                   icon: Icons.computer_outlined,
                   indexState: currentIndex,
                 ),
                 CircularTab(
                   tabController: tabController,
-                  index: 3,
-                  label: 'Archived Machines',
-                  icon: Icons.archive_outlined,
-                  indexState: currentIndex,
-                ),
-                CircularTab(
-                  tabController: tabController,
-                  index: 4,
+                  index: 2,
                   label: 'Service Supplies',
                   icon: Icons.science_outlined,
                   indexState: currentIndex,
                 ),
                 CircularTab(
                   tabController: tabController,
-                  index: 5,
-                  label: 'Archived Supplies',
-                  icon: Icons.archive_outlined,
-                  indexState: currentIndex,
-                ),
-                CircularTab(
-                  tabController: tabController,
-                  index: 6,
+                  index: 3,
                   label: 'Vendors',
                   icon: Icons.store_outlined,
-                  indexState: currentIndex,
-                ),
-                CircularTab(
-                  tabController: tabController,
-                  index: 7,
-                  label: 'Archived Vendors',
-                  icon: Icons.archive_outlined,
                   indexState: currentIndex,
                 ),
               ],
@@ -155,36 +127,20 @@ class ProductsAndServicesPage extends HookWidget {
                     onRefresh: () => refreshKey.value++,
                     isReadOnly: isReadOnly,
                   ),
-                  _ArchivedProductsTab(
-                    refreshKey: refreshKey.value,
-                    onRefresh: () => refreshKey.value++,
-                  ),
                   _MachinesTab(
                     refreshKey: refreshKey.value,
                     onRefresh: () => refreshKey.value++,
                     isReadOnly: isReadOnly,
-                  ),
-                  _ArchivedMachinesTab(
-                    refreshKey: refreshKey.value,
-                    onRefresh: () => refreshKey.value++,
                   ),
                   _ServiceSuppliesTab(
                     refreshKey: refreshKey.value,
                     onRefresh: () => refreshKey.value++,
                     isReadOnly: isReadOnly,
                   ),
-                  _ArchivedServiceSuppliesTab(
-                    refreshKey: refreshKey.value,
-                    onRefresh: () => refreshKey.value++,
-                  ),
                   _VendorsTab(
                     refreshKey: refreshKey.value,
                     onRefresh: () => refreshKey.value++,
                     isReadOnly: isReadOnly,
-                  ),
-                  _ArchivedVendorsTab(
-                    refreshKey: refreshKey.value,
-                    onRefresh: () => refreshKey.value++,
                   ),
                 ],
               ),
@@ -730,11 +686,11 @@ Future<void> _showArchiveProductDialog(
 
 // ── Archived Products Tab ────────────────────────────────────────────────────
 
-class _ArchivedProductsTab extends HookWidget {
+class ArchivedProductsTab extends HookWidget {
   final int refreshKey;
   final VoidCallback onRefresh;
 
-  const _ArchivedProductsTab({
+  const ArchivedProductsTab({
     required this.refreshKey,
     required this.onRefresh,
   });
@@ -2243,11 +2199,11 @@ Future<void> _showArchiveVendorDialog(
 
 // ── Archived Machines Tab ─────────────────────────────────────────────────────
 
-class _ArchivedMachinesTab extends HookWidget {
+class ArchivedMachinesTab extends HookWidget {
   final int refreshKey;
   final VoidCallback onRefresh;
 
-  const _ArchivedMachinesTab({
+  const ArchivedMachinesTab({
     required this.refreshKey,
     required this.onRefresh,
   });
@@ -2363,11 +2319,11 @@ Future<void> _showRestoreMachineDialog(
 
 // ── Archived Service Supplies Tab ─────────────────────────────────────────────
 
-class _ArchivedServiceSuppliesTab extends HookWidget {
+class ArchivedServiceSuppliesTab extends HookWidget {
   final int refreshKey;
   final VoidCallback onRefresh;
 
-  const _ArchivedServiceSuppliesTab({
+  const ArchivedServiceSuppliesTab({
     required this.refreshKey,
     required this.onRefresh,
   });
@@ -2492,11 +2448,11 @@ Future<void> _showRestoreServiceSupplyDialog(
 
 // ── Archived Vendors Tab ──────────────────────────────────────────────────────
 
-class _ArchivedVendorsTab extends HookWidget {
+class ArchivedVendorsTab extends HookWidget {
   final int refreshKey;
   final VoidCallback onRefresh;
 
-  const _ArchivedVendorsTab({
+  const ArchivedVendorsTab({
     required this.refreshKey,
     required this.onRefresh,
   });

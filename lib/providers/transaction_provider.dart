@@ -161,56 +161,61 @@ class TransactionProvider extends ChangeNotifier {
         if (item.printOrderId != null) {
           final printOrderRow = await supabase
               .from('print_orders')
-              .select('*, service_supplies(*)')
+              .select('*, service_types(*, service_supplies(*), service_type_costs(*))')
               .eq('id', item.printOrderId!)
               .single();
           final printOrder = PrintOrder.fromJson(printOrderRow);
-          final supply = printOrder.serviceSupply;
+          final serviceType = printOrder.serviceType;
 
-          if (supply != null) {
-            final expenseDate = now.toIso8601String();
-            await supabase.from('expenses').insert({
-              'description':
-                  'Supply cost - ${item.productName} (${printOrder.quantity} pages)',
-              'amount': supply.purchasePrice * printOrder.quantity,
-              'category_id': 2,
-              'date': expenseDate,
-              'linked_transaction_id': transactionId,
-              'source_id': 2,
-            });
+          if (serviceType != null) {
+            final latestCost = serviceType.cost;
+            if (latestCost != null) {
+              final expenseDate = now.toIso8601String();
+              await supabase.from('expenses').insert({
+                'description':
+                    'Supply cost - ${item.productName} (${printOrder.quantity} pages)',
+                'amount': latestCost.serviceTotalCost * printOrder.quantity,
+                'category_id': 2,
+                'date': expenseDate,
+                'linked_transaction_id': transactionId,
+                'source_id': 2,
+              });
+            }
 
             // Deduct supply stock
-            final supplyRow = await supabase
-                .from('inventory_items')
-                .select('id, stock')
-                .eq('service_supply_id', supply.id)
-                .maybeSingle();
-            if (supplyRow != null) {
-              final currentStock = (supplyRow['stock'] as num).toDouble();
-              final deduction = printOrder.quantity.toDouble();
-              final supplyInventoryId = supplyRow['id'] as int;
-              await supabase
+            if (serviceType.serviceSupplyId != null) {
+              final supplyRow = await supabase
                   .from('inventory_items')
-                  .update({'stock': (currentStock - deduction).clamp(0.0, double.infinity)})
-                  .eq('id', supplyInventoryId);
+                  .select('id, stock')
+                  .eq('service_supply_id', serviceType.serviceSupplyId!)
+                  .maybeSingle();
+              if (supplyRow != null) {
+                final currentStock = (supplyRow['stock'] as num).toDouble();
+                final deduction = printOrder.quantity.toDouble();
+                final supplyInventoryId = supplyRow['id'] as int;
+                await supabase
+                    .from('inventory_items')
+                    .update({'stock': (currentStock - deduction).clamp(0.0, double.infinity)})
+                    .eq('id', supplyInventoryId);
 
-              final currentUser = supabase.auth.currentUser;
-              if (currentUser != null) {
-                final profileRow = await supabase
-                    .from('profiles')
-                    .select('id')
-                    .eq('user_id', currentUser.id)
-                    .maybeSingle();
-                if (profileRow != null) {
-                  await supabase.from('stock_out').insert({
-                    'user_id': profileRow['id'] as int,
-                    'quantity_removed': deduction,
-                    'transaction_id': transactionId,
-                    'service_supply_id': supply.id,
-                    'inventory_item_id': supplyInventoryId,
-                    'stock_out_type': 'sale',
-                    'stock_out_date': now.toIso8601String(),
-                  });
+                final currentUser = supabase.auth.currentUser;
+                if (currentUser != null) {
+                  final profileRow = await supabase
+                      .from('profiles')
+                      .select('id')
+                      .eq('user_id', currentUser.id)
+                      .maybeSingle();
+                  if (profileRow != null) {
+                    await supabase.from('stock_out').insert({
+                      'user_id': profileRow['id'] as int,
+                      'quantity_removed': deduction,
+                      'transaction_id': transactionId,
+                      'service_supply_id': serviceType.serviceSupplyId,
+                      'inventory_item_id': supplyInventoryId,
+                      'stock_out_type': 'sale',
+                      'stock_out_date': now.toIso8601String(),
+                    });
+                  }
                 }
               }
             }

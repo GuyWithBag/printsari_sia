@@ -28,8 +28,12 @@ class POSTerminalPage extends HookWidget {
     final productsFuture = useMemoized(() => productProvider.getProducts(), [
       productProvider,
     ]);
-    final serviceSuppliesFuture = useMemoized(
-      () => productProvider.getServiceSupplies(),
+    final servicesFuture = useMemoized(
+      () => productProvider.getServices(),
+      [productProvider],
+    );
+    final serviceTypesFuture = useMemoized(
+      () => productProvider.getServiceTypes(),
       [productProvider],
     );
     final inventoryFuture = useMemoized(
@@ -41,7 +45,8 @@ class POSTerminalPage extends HookWidget {
     );
 
     final productsSnapshot = useFuture(productsFuture);
-    final serviceSuppliesSnapshot = useFuture(serviceSuppliesFuture);
+    final servicesSnapshot = useFuture(servicesFuture);
+    final serviceTypesSnapshot = useFuture(serviceTypesFuture);
     final inventorySnapshot = useFuture(inventoryFuture);
 
     return Container(
@@ -58,7 +63,8 @@ class POSTerminalPage extends HookWidget {
               searchQuery: searchQuery,
               tabIndex: tabIndex,
               productsSnapshot: productsSnapshot,
-              serviceSuppliesSnapshot: serviceSuppliesSnapshot,
+              servicesSnapshot: servicesSnapshot,
+              serviceTypesSnapshot: serviceTypesSnapshot,
               inventorySnapshot: inventorySnapshot,
               transactionProvider: transactionProvider,
             ),

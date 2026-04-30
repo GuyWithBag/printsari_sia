@@ -7,3 +7,5 @@ export 'financial_reports_page.dart';
 export 'business_expenses_page.dart';
 export 'activity_log_page.dart';
 export 'transactions_page.dart';
+export 'customers_page.dart';
+export 'archives_page.dart';

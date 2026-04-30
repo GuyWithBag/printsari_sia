@@ -1,0 +1,8 @@
+[Desktop Entry]
+Name=PrintSari
+Comment=PrintSari that does everything
+Exec=printsari
+Icon=${SNAP}/meta/gui/printsari.png # Replace name with your app name.
+Terminal=false
+Type=Application
+Categories=Education; # Adjust accordingly your snap category.

@@ -4,3 +4,4 @@ export 'product_provider.dart';
 export 'expense_provider.dart';
 export 'activity_log_provider.dart';
 export 'vendor_provider.dart';
+export 'customer_provider.dart';

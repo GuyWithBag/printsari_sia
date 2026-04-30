@@ -1,0 +1,28 @@
+name: printsari
+version: 0.1.0
+summary: PrintSari
+description: PrintSari POS!
+
+confinement: strict
+base: core22
+grade: stable
+
+slots:
+  dbus-printsari: # adjust accordingly to your app name
+    interface: dbus
+    bus: session
+    name: org.bld.printsari # adjust accordingly to your app name and
+
+apps:
+  printsari:
+    command: printsari
+    extensions: [gnome] # gnome includes the libraries required by flutter
+    plugs:
+      - network
+    slots:
+      - dbus-printsari
+parts:
+  printsari:
+    source: .
+    plugin: flutter
+    flutter-target: lib/main.dart # The main entry-point file of the application

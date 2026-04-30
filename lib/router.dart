@@ -30,6 +30,7 @@ final router = GoRouter(
           ChangeNotifierProvider(create: (_) => ExpenseProvider()),
           ChangeNotifierProvider(create: (_) => ActivityLogProvider()),
           ChangeNotifierProvider(create: (_) => VendorProvider()),
+          ChangeNotifierProvider(create: (_) => CustomerProvider()),
         ],
         child: child,
       ),
@@ -95,6 +96,14 @@ final router = GoRouter(
                 GoRoute(
                   path: '/transactions',
                   builder: (context, state) => const TransactionsPage(),
+                ),
+                GoRoute(
+                  path: '/customers',
+                  builder: (context, state) => const CustomersPage(),
+                ),
+                GoRoute(
+                  path: '/archives',
+                  builder: (context, state) => const ArchivesPage(),
                 ),
               ],
             ),
