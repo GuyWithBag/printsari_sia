@@ -13,9 +13,31 @@ class VendorProvider extends ChangeNotifier {
     final data = await supabase
         .from('vendors')
         .select()
+        .eq('is_archived', false)
         .order('name');
     _vendors = (data as List).map((r) => Vendor.fromJson(r as Map<String, dynamic>)).toList();
     return _vendors!;
+  }
+
+  Future<void> archiveVendor(int id) async {
+    await supabase.from('vendors').update({'is_archived': true}).eq('id', id);
+    _vendors?.removeWhere((v) => v.id == id);
+    notifyListeners();
+  }
+
+  Future<void> restoreVendor(int id) async {
+    await supabase.from('vendors').update({'is_archived': false}).eq('id', id);
+    _vendors = null;
+    notifyListeners();
+  }
+
+  Future<List<Vendor>> getArchivedVendors() async {
+    final data = await supabase
+        .from('vendors')
+        .select()
+        .eq('is_archived', true)
+        .order('name');
+    return (data as List).map((r) => Vendor.fromJson(r as Map<String, dynamic>)).toList();
   }
 
   Future<Vendor> createVendor(Vendor vendor) async {

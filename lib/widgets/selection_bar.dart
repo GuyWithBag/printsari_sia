@@ -7,6 +7,8 @@ class SelectionBar extends StatelessWidget {
   final String itemLabel;
   final VoidCallback onClear;
   final VoidCallback onDelete;
+  final String actionLabel;
+  final IconData actionIcon;
 
   const SelectionBar({
     super.key,
@@ -14,6 +16,8 @@ class SelectionBar extends StatelessWidget {
     required this.itemLabel,
     required this.onClear,
     required this.onDelete,
+    this.actionLabel = 'Delete Selected',
+    this.actionIcon = Icons.delete_rounded,
   });
 
   @override
@@ -42,8 +46,8 @@ class SelectionBar extends StatelessWidget {
           const Spacer(),
           FilledButton.icon(
             onPressed: onDelete,
-            icon: const Icon(Icons.delete_rounded, size: 16),
-            label: Text('Delete Selected', style: GoogleFonts.outfit()),
+            icon: Icon(actionIcon, size: 16),
+            label: Text(actionLabel, style: GoogleFonts.outfit()),
             style: FilledButton.styleFrom(
               backgroundColor: const Color(0xFFEF4444),
               foregroundColor: Colors.white,
@@ -99,6 +103,47 @@ Future<bool> confirmBulkDelete(
             foregroundColor: Colors.white,
           ),
           child: Text('Delete All', style: GoogleFonts.outfit()),
+        ),
+      ],
+    ),
+  );
+  return result ?? false;
+}
+
+Future<bool> confirmBulkArchive(
+  BuildContext context,
+  int count,
+  String label,
+) async {
+  final plural = count == 1 ? label : '${label}s';
+  final result = await showDialog<bool>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      backgroundColor: posSurface,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      title: Text(
+        'Archive $count $plural?',
+        style: GoogleFonts.outfit(
+          color: Colors.white,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+      content: Text(
+        'Archived $plural will be hidden from active lists. You can restore them from the Archived tab.',
+        style: GoogleFonts.outfit(color: posTextMuted),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(ctx, false),
+          child: Text('Cancel', style: GoogleFonts.outfit(color: posTextMuted)),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.pop(ctx, true),
+          style: FilledButton.styleFrom(
+            backgroundColor: const Color(0xFFEF4444),
+            foregroundColor: Colors.white,
+          ),
+          child: Text('Archive All', style: GoogleFonts.outfit()),
         ),
       ],
     ),

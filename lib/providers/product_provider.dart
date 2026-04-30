@@ -126,11 +126,34 @@ class ProductProvider extends ChangeNotifier {
 
   Future<List<ServiceSupply>> getServiceSupplies() async {
     if (_serviceSupplies != null) return _serviceSupplies!;
-    final query =
-        await supabase.from('service_supplies').select().order('name');
-    _serviceSupplies =
-        query.map((r) => ServiceSupply.fromJson(r)).toList();
+    final query = await supabase
+        .from('service_supplies')
+        .select()
+        .eq('is_archived', false)
+        .order('name');
+    _serviceSupplies = query.map((r) => ServiceSupply.fromJson(r)).toList();
     return _serviceSupplies!;
+  }
+
+  Future<void> archiveServiceSupply(int id) async {
+    await supabase.from('service_supplies').update({'is_archived': true}).eq('id', id);
+    _serviceSupplies?.removeWhere((s) => s.id == id);
+    notifyListeners();
+  }
+
+  Future<void> restoreServiceSupply(int id) async {
+    await supabase.from('service_supplies').update({'is_archived': false}).eq('id', id);
+    _serviceSupplies = null;
+    notifyListeners();
+  }
+
+  Future<List<ServiceSupply>> getArchivedServiceSupplies() async {
+    final query = await supabase
+        .from('service_supplies')
+        .select()
+        .eq('is_archived', true)
+        .order('name');
+    return query.map((r) => ServiceSupply.fromJson(r)).toList();
   }
 
   Future<ServiceSupply> createServiceSupply(
@@ -174,9 +197,34 @@ class ProductProvider extends ChangeNotifier {
 
   Future<List<Machine>> getMachines() async {
     if (_machines != null) return _machines!;
-    final query = await supabase.from('machines').select().order('name');
+    final query = await supabase
+        .from('machines')
+        .select()
+        .eq('is_archived', false)
+        .order('name');
     _machines = query.map((r) => Machine.fromJson(r)).toList();
     return _machines!;
+  }
+
+  Future<void> archiveMachine(int id) async {
+    await supabase.from('machines').update({'is_archived': true}).eq('id', id);
+    _machines?.removeWhere((m) => m.id == id);
+    notifyListeners();
+  }
+
+  Future<void> restoreMachine(int id) async {
+    await supabase.from('machines').update({'is_archived': false}).eq('id', id);
+    _machines = null;
+    notifyListeners();
+  }
+
+  Future<List<Machine>> getArchivedMachines() async {
+    final query = await supabase
+        .from('machines')
+        .select()
+        .eq('is_archived', true)
+        .order('name');
+    return query.map((r) => Machine.fromJson(r)).toList();
   }
 
   Future<Machine> createMachine(Machine machine) async {

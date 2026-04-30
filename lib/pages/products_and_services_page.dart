@@ -25,7 +25,7 @@ class ProductsAndServicesPage extends HookWidget {
 
   @override
   Widget build(BuildContext context) {
-    final tabController = useTabController(initialLength: 5);
+    final tabController = useTabController(initialLength: 8);
     final currentIndex = useState(0);
     final refreshKey = useState(0);
 
@@ -111,15 +111,36 @@ class ProductsAndServicesPage extends HookWidget {
                 CircularTab(
                   tabController: tabController,
                   index: 3,
+                  label: 'Archived Machines',
+                  icon: Icons.archive_outlined,
+                  indexState: currentIndex,
+                ),
+                CircularTab(
+                  tabController: tabController,
+                  index: 4,
                   label: 'Service Supplies',
                   icon: Icons.science_outlined,
                   indexState: currentIndex,
                 ),
                 CircularTab(
                   tabController: tabController,
-                  index: 4,
+                  index: 5,
+                  label: 'Archived Supplies',
+                  icon: Icons.archive_outlined,
+                  indexState: currentIndex,
+                ),
+                CircularTab(
+                  tabController: tabController,
+                  index: 6,
                   label: 'Vendors',
                   icon: Icons.store_outlined,
+                  indexState: currentIndex,
+                ),
+                CircularTab(
+                  tabController: tabController,
+                  index: 7,
+                  label: 'Archived Vendors',
+                  icon: Icons.archive_outlined,
                   indexState: currentIndex,
                 ),
               ],
@@ -143,15 +164,27 @@ class ProductsAndServicesPage extends HookWidget {
                     onRefresh: () => refreshKey.value++,
                     isReadOnly: isReadOnly,
                   ),
+                  _ArchivedMachinesTab(
+                    refreshKey: refreshKey.value,
+                    onRefresh: () => refreshKey.value++,
+                  ),
                   _ServiceSuppliesTab(
                     refreshKey: refreshKey.value,
                     onRefresh: () => refreshKey.value++,
                     isReadOnly: isReadOnly,
                   ),
+                  _ArchivedServiceSuppliesTab(
+                    refreshKey: refreshKey.value,
+                    onRefresh: () => refreshKey.value++,
+                  ),
                   _VendorsTab(
                     refreshKey: refreshKey.value,
                     onRefresh: () => refreshKey.value++,
                     isReadOnly: isReadOnly,
+                  ),
+                  _ArchivedVendorsTab(
+                    refreshKey: refreshKey.value,
+                    onRefresh: () => refreshKey.value++,
                   ),
                 ],
               ),
@@ -242,9 +275,11 @@ class _StoreProductsTab extends HookWidget {
             SelectionBar(
               count: selectedProductIds.value.length,
               itemLabel: 'product',
+              actionLabel: 'Archive Selected',
+              actionIcon: Icons.archive_outlined,
               onClear: () => selectedProductIds.value = {},
               onDelete: () async {
-                final ok = await confirmBulkDelete(
+                final ok = await confirmBulkArchive(
                   context,
                   selectedProductIds.value.length,
                   'product',
@@ -253,7 +288,7 @@ class _StoreProductsTab extends HookWidget {
                 final provider = context.read<ProductProvider>();
                 for (final id in selectedProductIds.value.toList()) {
                   try {
-                    await provider.deleteProduct(id);
+                    await provider.archiveProduct(id);
                   } catch (_) {}
                 }
                 selectedProductIds.value = {};
@@ -964,6 +999,7 @@ class _MachinesTab extends HookWidget {
     final productProvider = context.watch<ProductProvider>();
     final searchController = useTextEditingController();
     final searchQuery = useState('');
+    final selectedMachineIds = useState(<int>{});
 
     final machinesFuture = useMemoized(
       () => productProvider.getMachines(),
@@ -1017,10 +1053,40 @@ class _MachinesTab extends HookWidget {
             ],
           ),
           const SizedBox(height: 12),
+          if (selectedMachineIds.value.isNotEmpty && !isReadOnly)
+            SelectionBar(
+              count: selectedMachineIds.value.length,
+              itemLabel: 'machine',
+              actionLabel: 'Archive Selected',
+              actionIcon: Icons.archive_outlined,
+              onClear: () => selectedMachineIds.value = {},
+              onDelete: () async {
+                final ok = await confirmBulkArchive(
+                  context,
+                  selectedMachineIds.value.length,
+                  'machine',
+                );
+                if (!ok || !context.mounted) return;
+                final provider = context.read<ProductProvider>();
+                for (final id in selectedMachineIds.value.toList()) {
+                  try {
+                    await provider.archiveMachine(id);
+                  } catch (_) {}
+                }
+                selectedMachineIds.value = {};
+                onRefresh();
+              },
+            ),
           Expanded(
             child: snapshot.hasData
-                ? _buildMachineTable(context, snapshot.data!,
-                    searchQuery.value, isReadOnly)
+                ? _buildMachineTable(
+                    context,
+                    snapshot.data!,
+                    searchQuery.value,
+                    isReadOnly,
+                    selectedMachineIds.value,
+                    (ids) => selectedMachineIds.value = ids,
+                  )
                 : const Center(
                     child:
                         CircularProgressIndicator(color: posPrimary)),
@@ -1035,6 +1101,8 @@ class _MachinesTab extends HookWidget {
     List<Machine> machines,
     String searchQuery,
     bool isReadOnly,
+    Set<int> selectedIds,
+    void Function(Set<int>) onSelectionChanged,
   ) {
     if (machines.isEmpty) {
       return Center(
@@ -1075,6 +1143,11 @@ class _MachinesTab extends HookWidget {
                   fontSize: 13),
               dataTextStyle:
                   GoogleFonts.outfit(color: Colors.white, fontSize: 13),
+              onSelectAll: isReadOnly
+                  ? null
+                  : (v) => onSelectionChanged(
+                        v == true ? filtered.map((m) => m.id).toSet() : {},
+                      ),
               columns: [
                 const DataColumn(label: Text('Name')),
                 const DataColumn(label: Text('Status')),
@@ -1082,7 +1155,16 @@ class _MachinesTab extends HookWidget {
                   const DataColumn(label: Text('Actions')),
               ],
               rows: filtered.map((machine) {
-                return DataRow(cells: [
+                return DataRow(
+                  selected: selectedIds.contains(machine.id),
+                  onSelectChanged: isReadOnly
+                      ? null
+                      : (v) {
+                          final s = Set<int>.from(selectedIds);
+                          v == true ? s.add(machine.id) : s.remove(machine.id);
+                          onSelectionChanged(s);
+                        },
+                  cells: [
                   DataCell(Text(machine.name)),
                   DataCell(Container(
                     padding: const EdgeInsets.symmetric(
@@ -1135,14 +1217,15 @@ class _MachinesTab extends HookWidget {
                           },
                         ),
                         IconButton(
-                          icon: const Icon(Icons.delete_outline,
+                          icon: const Icon(Icons.archive_outlined,
                               size: 18, color: Color(0xFFEF4444)),
-                          onPressed: () => _showDeleteMachineDialog(
+                          tooltip: 'Archive',
+                          onPressed: () => _showArchiveMachineDialog(
                               context, machine, onRefresh),
                         ),
                       ],
                     )),
-                ]);
+                  ]);
               }).toList(),
             ),
           ),
@@ -1161,17 +1244,6 @@ Future<void> _showMachineDialog(
   final nameController =
       TextEditingController(text: machine?.name ?? '');
   bool isActive = machine?.isActive ?? true;
-
-  // Fetch services for dropdown
-  final supabase = Supabase.instance.client;
-  final servicesRaw =
-      await supabase.from('services').select().order('name');
-  final services = (servicesRaw as List)
-      .map((r) => Service.fromJson(r as Map<String, dynamic>))
-      .toList();
-
-  if (!context.mounted) return;
-  int? selectedServiceId = machine?.serviceId;
 
   final productProviderRef =
       Provider.of<ProductProvider>(context, listen: false);
@@ -1196,23 +1268,6 @@ Future<void> _showMachineDialog(
             mainAxisSize: MainAxisSize.min,
             children: [
               _dialogField('Machine Name', nameController),
-              _dropdownField<int?>(
-                label: 'Service (optional)',
-                value: selectedServiceId,
-                items: [
-                  DropdownMenuItem<int?>(
-                      value: null,
-                      child: Text('None',
-                          style:
-                              GoogleFonts.outfit(color: posTextMuted))),
-                  ...services.map((s) => DropdownMenuItem<int?>(
-                        value: s.id,
-                        child: Text(s.name),
-                      )),
-                ],
-                onChanged: (v) =>
-                    setDialogState(() => selectedServiceId = v),
-              ),
               Padding(
                 padding: const EdgeInsets.only(bottom: 12),
                 child: Row(
@@ -1252,7 +1307,6 @@ Future<void> _showMachineDialog(
                 if (isEditing) {
                   await productProviderRef.updateMachine(machine.id, {
                     'name': machineName,
-                    'service_id': selectedServiceId,
                     'is_active': isActive,
                   });
                   activityLogRef.log(
@@ -1264,7 +1318,6 @@ Future<void> _showMachineDialog(
                   await productProviderRef.createMachine(Machine(
                     id: 0,
                     name: machineName,
-                    serviceId: selectedServiceId,
                     isActive: isActive,
                     createdAt: now,
                     updatedAt: now,
@@ -1296,7 +1349,7 @@ Future<void> _showMachineDialog(
   );
 }
 
-Future<void> _showDeleteMachineDialog(
+Future<void> _showArchiveMachineDialog(
   BuildContext context,
   Machine machine,
   VoidCallback onRefresh,
@@ -1311,11 +1364,11 @@ Future<void> _showDeleteMachineDialog(
       backgroundColor: posSurface,
       shape:
           RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      title: Text('Delete Machine',
+      title: Text('Archive Machine',
           style: GoogleFonts.outfit(
               color: Colors.white, fontWeight: FontWeight.bold)),
       content: Text(
-        'Are you sure you want to delete "${machine.name}"? Service types assigned to this machine will be unlinked.',
+        'Archive "${machine.name}"? It will be hidden from active lists. You can restore it from Archived Machines.',
         style: GoogleFonts.outfit(color: posTextMuted),
       ),
       actions: [
@@ -1327,15 +1380,15 @@ Future<void> _showDeleteMachineDialog(
         FilledButton(
           onPressed: () async {
             try {
-              await productProviderRef.deleteMachine(machine.id);
+              await productProviderRef.archiveMachine(machine.id);
               activityLogRef.log(
-                actionName: 'Machine Deleted',
-                description: 'Deleted machine: ${machine.name}',
+                actionName: 'Machine Archived',
+                description: 'Archived machine: ${machine.name}',
               );
               if (ctx.mounted) Navigator.pop(ctx);
               onRefresh();
             } catch (e) {
-              debugPrint('Delete machine error: $e');
+              debugPrint('Archive machine error: $e');
               if (ctx.mounted) {
                 ScaffoldMessenger.of(ctx)
                     .showSnackBar(SnackBar(content: Text('Error: $e')));
@@ -1345,7 +1398,7 @@ Future<void> _showDeleteMachineDialog(
           style: FilledButton.styleFrom(
               backgroundColor: const Color(0xFFEF4444),
               foregroundColor: Colors.white),
-          child: Text('Delete', style: GoogleFonts.outfit()),
+          child: Text('Archive', style: GoogleFonts.outfit()),
         ),
       ],
     ),
@@ -1428,15 +1481,17 @@ class _ServiceSuppliesTab extends HookWidget {
             SelectionBar(
               count: selectedSupplyIds.value.length,
               itemLabel: 'supply',
+              actionLabel: 'Archive Selected',
+              actionIcon: Icons.archive_outlined,
               onClear: () => selectedSupplyIds.value = {},
               onDelete: () async {
-                final ok = await confirmBulkDelete(context,
+                final ok = await confirmBulkArchive(context,
                     selectedSupplyIds.value.length, 'supply');
                 if (!ok || !context.mounted) return;
-                final provider = context.read<InventoryProvider>();
+                final provider = context.read<ProductProvider>();
                 for (final id in selectedSupplyIds.value.toList()) {
                   try {
-                    await provider.deleteServiceSupply(id);
+                    await provider.archiveServiceSupply(id);
                   } catch (_) {}
                 }
                 selectedSupplyIds.value = {};
@@ -1575,10 +1630,11 @@ class _ServiceSuppliesTab extends HookWidget {
                                 context, supply, onRefresh),
                           ),
                           IconButton(
-                            icon: const Icon(Icons.delete_outline,
+                            icon: const Icon(Icons.archive_outlined,
                                 size: 18, color: Color(0xFFEF4444)),
+                            tooltip: 'Archive',
                             onPressed: () =>
-                                _showDeleteServiceSupplyDialog(
+                                _showArchiveServiceSupplyDialog(
                                     context, supply, onRefresh),
                           ),
                         ],
@@ -1740,13 +1796,13 @@ Future<void> _showServiceSupplyDialog(
   );
 }
 
-Future<void> _showDeleteServiceSupplyDialog(
+Future<void> _showArchiveServiceSupplyDialog(
   BuildContext context,
   ServiceSupply supply,
   VoidCallback onRefresh,
 ) async {
-  final inventoryProviderRef =
-      Provider.of<InventoryProvider>(context, listen: false);
+  final productProviderRef =
+      Provider.of<ProductProvider>(context, listen: false);
   final activityLogRef =
       Provider.of<ActivityLogProvider>(context, listen: false);
   await showDialog(
@@ -1755,11 +1811,11 @@ Future<void> _showDeleteServiceSupplyDialog(
       backgroundColor: posSurface,
       shape:
           RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      title: Text('Delete Service Supply',
+      title: Text('Archive Service Supply',
           style: GoogleFonts.outfit(
               color: Colors.white, fontWeight: FontWeight.bold)),
       content: Text(
-        'Are you sure you want to delete "${supply.name}"? This will also delete its inventory record and unlink it from any service types.',
+        'Archive "${supply.name}"? It will be hidden from active lists. You can restore it from Archived Supplies.',
         style: GoogleFonts.outfit(color: posTextMuted),
       ),
       actions: [
@@ -1771,16 +1827,15 @@ Future<void> _showDeleteServiceSupplyDialog(
         FilledButton(
           onPressed: () async {
             try {
-              await inventoryProviderRef.deleteServiceSupply(supply.id);
+              await productProviderRef.archiveServiceSupply(supply.id);
               activityLogRef.log(
-                actionName: 'Service Supply Deleted',
-                description:
-                    'Deleted service supply: ${supply.name}',
+                actionName: 'Service Supply Archived',
+                description: 'Archived service supply: ${supply.name}',
               );
               if (ctx.mounted) Navigator.pop(ctx);
               onRefresh();
             } catch (e) {
-              debugPrint('Delete supply error: $e');
+              debugPrint('Archive supply error: $e');
               if (ctx.mounted) {
                 ScaffoldMessenger.of(ctx)
                     .showSnackBar(SnackBar(content: Text('Error: $e')));
@@ -1790,7 +1845,7 @@ Future<void> _showDeleteServiceSupplyDialog(
           style: FilledButton.styleFrom(
               backgroundColor: const Color(0xFFEF4444),
               foregroundColor: Colors.white),
-          child: Text('Delete', style: GoogleFonts.outfit()),
+          child: Text('Archive', style: GoogleFonts.outfit()),
         ),
       ],
     ),
@@ -1816,6 +1871,7 @@ class _VendorsTab extends HookWidget {
   Widget build(BuildContext context) {
     final vendorProvider = context.read<VendorProvider>();
     final searchQuery = useState('');
+    final selectedVendorIds = useState(<int>{});
 
     final vendorsFuture = useMemoized(
       () {
@@ -1885,6 +1941,33 @@ class _VendorsTab extends HookWidget {
             ],
           ),
         const SizedBox(height: 16),
+        if (selectedVendorIds.value.isNotEmpty && !isReadOnly)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: SelectionBar(
+              count: selectedVendorIds.value.length,
+              itemLabel: 'vendor',
+              actionLabel: 'Archive Selected',
+              actionIcon: Icons.archive_outlined,
+              onClear: () => selectedVendorIds.value = {},
+              onDelete: () async {
+                final ok = await confirmBulkArchive(
+                  context,
+                  selectedVendorIds.value.length,
+                  'vendor',
+                );
+                if (!ok || !context.mounted) return;
+                final provider = context.read<VendorProvider>();
+                for (final id in selectedVendorIds.value.toList()) {
+                  try {
+                    await provider.archiveVendor(id);
+                  } catch (_) {}
+                }
+                selectedVendorIds.value = {};
+                onRefresh();
+              },
+            ),
+          ),
         Expanded(
           child: Skeletonizer(
             enabled: !snapshot.hasData && !snapshot.hasError,
@@ -1919,6 +2002,11 @@ class _VendorsTab extends HookWidget {
                                 fontSize: 13),
                             dataTextStyle: GoogleFonts.outfit(
                                 color: Colors.white, fontSize: 13),
+                            onSelectAll: isReadOnly
+                                ? null
+                                : (v) => selectedVendorIds.value = v == true
+                                    ? filtered.map((v) => v.id).toSet()
+                                    : {},
                             columns: [
                               const DataColumn(
                                   label: Text('Name')),
@@ -1933,7 +2021,16 @@ class _VendorsTab extends HookWidget {
                                     label: Text('Actions')),
                             ],
                             rows: filtered.map((vendor) {
-                              return DataRow(cells: [
+                              return DataRow(
+                                selected: selectedVendorIds.value.contains(vendor.id),
+                                onSelectChanged: isReadOnly
+                                    ? null
+                                    : (v) {
+                                        final s = Set<int>.from(selectedVendorIds.value);
+                                        v == true ? s.add(vendor.id) : s.remove(vendor.id);
+                                        selectedVendorIds.value = s;
+                                      },
+                                cells: [
                                 DataCell(Text(vendor.name)),
                                 DataCell(Text(
                                     vendor.contactNumber ?? '—')),
@@ -1957,12 +2054,12 @@ class _VendorsTab extends HookWidget {
                                       ),
                                       IconButton(
                                         icon: const Icon(
-                                            Icons.delete_outline,
+                                            Icons.archive_outlined,
                                             size: 18,
                                             color: Color(0xFFEF4444)),
-                                        tooltip: 'Delete',
+                                        tooltip: 'Archive',
                                         onPressed: () =>
-                                            _showDeleteVendorDialog(
+                                            _showArchiveVendorDialog(
                                                 context,
                                                 vendor,
                                                 onRefresh),
@@ -1970,7 +2067,7 @@ class _VendorsTab extends HookWidget {
                                     ],
                                   )),
                               ]);
-                            }).toList(),
+                              }).toList(),
                           ),
                         ),
                       ),
@@ -2095,7 +2192,7 @@ Future<void> _showVendorDialog(
   );
 }
 
-Future<void> _showDeleteVendorDialog(
+Future<void> _showArchiveVendorDialog(
   BuildContext context,
   Vendor vendor,
   VoidCallback onRefresh,
@@ -2107,11 +2204,11 @@ Future<void> _showDeleteVendorDialog(
       backgroundColor: posSurface,
       shape:
           RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      title: Text('Delete Vendor',
+      title: Text('Archive Vendor',
           style: GoogleFonts.outfit(
               color: Colors.white, fontWeight: FontWeight.bold)),
       content: Text(
-        'Are you sure you want to delete "${vendor.name}"?',
+        'Archive "${vendor.name}"? It will be hidden from active lists. You can restore it from Archived Vendors.',
         style: GoogleFonts.outfit(color: posTextMuted),
       ),
       actions: [
@@ -2123,11 +2220,11 @@ Future<void> _showDeleteVendorDialog(
         FilledButton(
           onPressed: () async {
             try {
-              await vendorProvider.deleteVendor(vendor.id);
+              await vendorProvider.archiveVendor(vendor.id);
               if (ctx.mounted) Navigator.pop(ctx);
               onRefresh();
             } catch (e) {
-              debugPrint('Delete vendor error: $e');
+              debugPrint('Archive vendor error: $e');
               if (ctx.mounted) {
                 ScaffoldMessenger.of(ctx)
                     .showSnackBar(SnackBar(content: Text('Error: $e')));
@@ -2137,7 +2234,386 @@ Future<void> _showDeleteVendorDialog(
           style: FilledButton.styleFrom(
               backgroundColor: const Color(0xFFEF4444),
               foregroundColor: Colors.white),
-          child: Text('Delete', style: GoogleFonts.outfit()),
+          child: Text('Archive', style: GoogleFonts.outfit()),
+        ),
+      ],
+    ),
+  );
+}
+
+// ── Archived Machines Tab ─────────────────────────────────────────────────────
+
+class _ArchivedMachinesTab extends HookWidget {
+  final int refreshKey;
+  final VoidCallback onRefresh;
+
+  const _ArchivedMachinesTab({
+    required this.refreshKey,
+    required this.onRefresh,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final productProvider = context.read<ProductProvider>();
+    final dataFuture = useMemoized(
+      () => productProvider.getArchivedMachines(),
+      [refreshKey],
+    );
+    final snapshot = useFuture(dataFuture);
+
+    return Skeletonizer(
+      enabled: !snapshot.hasData,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            child: snapshot.hasData
+                ? snapshot.data!.isEmpty
+                    ? Center(
+                        child: Text('No archived machines',
+                            style: GoogleFonts.outfit(color: posTextMuted)))
+                    : Container(
+                        decoration: BoxDecoration(
+                            color: posSurface,
+                            borderRadius: BorderRadius.circular(12)),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(12),
+                          child: SingleChildScrollView(
+                            child: DataTable(
+                              headingRowColor:
+                                  WidgetStateProperty.all(posSurfaceLight),
+                              dataRowColor:
+                                  WidgetStateProperty.all(posSurface),
+                              headingTextStyle: GoogleFonts.outfit(
+                                  color: posTextMuted,
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 13),
+                              dataTextStyle: GoogleFonts.outfit(
+                                  color: Colors.white, fontSize: 13),
+                              columns: const [
+                                DataColumn(label: Text('Name')),
+                                DataColumn(label: Text('Actions')),
+                              ],
+                              rows: snapshot.data!.map((machine) {
+                                return DataRow(cells: [
+                                  DataCell(Text(machine.name)),
+                                  DataCell(FilledButton.icon(
+                                    onPressed: () => _showRestoreMachineDialog(
+                                        context, machine, onRefresh),
+                                    icon: const Icon(Icons.restore, size: 16),
+                                    label: Text('Restore',
+                                        style: GoogleFonts.outfit()),
+                                    style: FilledButton.styleFrom(
+                                      backgroundColor: posPrimary,
+                                      foregroundColor: Colors.white,
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 12, vertical: 6),
+                                    ),
+                                  )),
+                                ]);
+                              }).toList(),
+                            ),
+                          ),
+                        ),
+                      )
+                : const Center(
+                    child: CircularProgressIndicator(color: posPrimary)),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+Future<void> _showRestoreMachineDialog(
+  BuildContext context,
+  Machine machine,
+  VoidCallback onRefresh,
+) async {
+  final provider = Provider.of<ProductProvider>(context, listen: false);
+  await showDialog(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      backgroundColor: posSurface,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      title: Text('Restore Machine',
+          style: GoogleFonts.outfit(
+              color: Colors.white, fontWeight: FontWeight.bold)),
+      content: Text('Restore "${machine.name}" to active machines?',
+          style: GoogleFonts.outfit(color: posTextMuted)),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(ctx),
+          child: Text('Cancel', style: GoogleFonts.outfit(color: posTextMuted)),
+        ),
+        FilledButton(
+          onPressed: () async {
+            await provider.restoreMachine(machine.id);
+            if (ctx.mounted) Navigator.pop(ctx);
+            onRefresh();
+          },
+          style: FilledButton.styleFrom(
+              backgroundColor: posPrimary, foregroundColor: Colors.white),
+          child: Text('Restore', style: GoogleFonts.outfit()),
+        ),
+      ],
+    ),
+  );
+}
+
+// ── Archived Service Supplies Tab ─────────────────────────────────────────────
+
+class _ArchivedServiceSuppliesTab extends HookWidget {
+  final int refreshKey;
+  final VoidCallback onRefresh;
+
+  const _ArchivedServiceSuppliesTab({
+    required this.refreshKey,
+    required this.onRefresh,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final productProvider = context.read<ProductProvider>();
+    final dataFuture = useMemoized(
+      () => productProvider.getArchivedServiceSupplies(),
+      [refreshKey],
+    );
+    final snapshot = useFuture(dataFuture);
+
+    return Skeletonizer(
+      enabled: !snapshot.hasData,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            child: snapshot.hasData
+                ? snapshot.data!.isEmpty
+                    ? Center(
+                        child: Text('No archived service supplies',
+                            style: GoogleFonts.outfit(color: posTextMuted)))
+                    : Container(
+                        decoration: BoxDecoration(
+                            color: posSurface,
+                            borderRadius: BorderRadius.circular(12)),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(12),
+                          child: SingleChildScrollView(
+                            child: SingleChildScrollView(
+                              scrollDirection: Axis.horizontal,
+                              child: DataTable(
+                                headingRowColor:
+                                    WidgetStateProperty.all(posSurfaceLight),
+                                dataRowColor:
+                                    WidgetStateProperty.all(posSurface),
+                                headingTextStyle: GoogleFonts.outfit(
+                                    color: posTextMuted,
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 13),
+                                dataTextStyle: GoogleFonts.outfit(
+                                    color: Colors.white, fontSize: 13),
+                                columns: const [
+                                  DataColumn(label: Text('Name')),
+                                  DataColumn(label: Text('Type')),
+                                  DataColumn(label: Text('Paper Size')),
+                                  DataColumn(label: Text('Actions')),
+                                ],
+                                rows: snapshot.data!.map((supply) {
+                                  return DataRow(cells: [
+                                    DataCell(Text(supply.name)),
+                                    DataCell(Text(supply.supplyType)),
+                                    DataCell(Text(supply.paperSize ?? '—')),
+                                    DataCell(FilledButton.icon(
+                                      onPressed: () =>
+                                          _showRestoreServiceSupplyDialog(
+                                              context, supply, onRefresh),
+                                      icon:
+                                          const Icon(Icons.restore, size: 16),
+                                      label: Text('Restore',
+                                          style: GoogleFonts.outfit()),
+                                      style: FilledButton.styleFrom(
+                                        backgroundColor: posPrimary,
+                                        foregroundColor: Colors.white,
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal: 12, vertical: 6),
+                                      ),
+                                    )),
+                                  ]);
+                                }).toList(),
+                              ),
+                            ),
+                          ),
+                        ),
+                      )
+                : const Center(
+                    child: CircularProgressIndicator(color: posPrimary)),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+Future<void> _showRestoreServiceSupplyDialog(
+  BuildContext context,
+  ServiceSupply supply,
+  VoidCallback onRefresh,
+) async {
+  final provider = Provider.of<ProductProvider>(context, listen: false);
+  await showDialog(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      backgroundColor: posSurface,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      title: Text('Restore Service Supply',
+          style: GoogleFonts.outfit(
+              color: Colors.white, fontWeight: FontWeight.bold)),
+      content: Text('Restore "${supply.name}" to active service supplies?',
+          style: GoogleFonts.outfit(color: posTextMuted)),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(ctx),
+          child: Text('Cancel', style: GoogleFonts.outfit(color: posTextMuted)),
+        ),
+        FilledButton(
+          onPressed: () async {
+            await provider.restoreServiceSupply(supply.id);
+            if (ctx.mounted) Navigator.pop(ctx);
+            onRefresh();
+          },
+          style: FilledButton.styleFrom(
+              backgroundColor: posPrimary, foregroundColor: Colors.white),
+          child: Text('Restore', style: GoogleFonts.outfit()),
+        ),
+      ],
+    ),
+  );
+}
+
+// ── Archived Vendors Tab ──────────────────────────────────────────────────────
+
+class _ArchivedVendorsTab extends HookWidget {
+  final int refreshKey;
+  final VoidCallback onRefresh;
+
+  const _ArchivedVendorsTab({
+    required this.refreshKey,
+    required this.onRefresh,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final vendorProvider = context.read<VendorProvider>();
+    final dataFuture = useMemoized(
+      () => vendorProvider.getArchivedVendors(),
+      [refreshKey],
+    );
+    final snapshot = useFuture(dataFuture);
+
+    return Skeletonizer(
+      enabled: !snapshot.hasData,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            child: snapshot.hasData
+                ? snapshot.data!.isEmpty
+                    ? Center(
+                        child: Text('No archived vendors',
+                            style: GoogleFonts.outfit(color: posTextMuted)))
+                    : Container(
+                        decoration: BoxDecoration(
+                            color: posSurface,
+                            borderRadius: BorderRadius.circular(12)),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(12),
+                          child: SingleChildScrollView(
+                            child: SingleChildScrollView(
+                              scrollDirection: Axis.horizontal,
+                              child: DataTable(
+                                headingRowColor:
+                                    WidgetStateProperty.all(posSurfaceLight),
+                                dataRowColor:
+                                    WidgetStateProperty.all(posSurface),
+                                headingTextStyle: GoogleFonts.outfit(
+                                    color: posTextMuted,
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 13),
+                                dataTextStyle: GoogleFonts.outfit(
+                                    color: Colors.white, fontSize: 13),
+                                columns: const [
+                                  DataColumn(label: Text('Name')),
+                                  DataColumn(label: Text('Contact')),
+                                  DataColumn(label: Text('Email')),
+                                  DataColumn(label: Text('Actions')),
+                                ],
+                                rows: snapshot.data!.map((vendor) {
+                                  return DataRow(cells: [
+                                    DataCell(Text(vendor.name)),
+                                    DataCell(
+                                        Text(vendor.contactNumber ?? '—')),
+                                    DataCell(Text(vendor.email ?? '—')),
+                                    DataCell(FilledButton.icon(
+                                      onPressed: () =>
+                                          _showRestoreVendorDialog(
+                                              context, vendor, onRefresh),
+                                      icon:
+                                          const Icon(Icons.restore, size: 16),
+                                      label: Text('Restore',
+                                          style: GoogleFonts.outfit()),
+                                      style: FilledButton.styleFrom(
+                                        backgroundColor: posPrimary,
+                                        foregroundColor: Colors.white,
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal: 12, vertical: 6),
+                                      ),
+                                    )),
+                                  ]);
+                                }).toList(),
+                              ),
+                            ),
+                          ),
+                        ),
+                      )
+                : const Center(
+                    child: CircularProgressIndicator(color: posPrimary)),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+Future<void> _showRestoreVendorDialog(
+  BuildContext context,
+  Vendor vendor,
+  VoidCallback onRefresh,
+) async {
+  final provider = Provider.of<VendorProvider>(context, listen: false);
+  await showDialog(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      backgroundColor: posSurface,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      title: Text('Restore Vendor',
+          style: GoogleFonts.outfit(
+              color: Colors.white, fontWeight: FontWeight.bold)),
+      content: Text('Restore "${vendor.name}" to active vendors?',
+          style: GoogleFonts.outfit(color: posTextMuted)),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(ctx),
+          child: Text('Cancel', style: GoogleFonts.outfit(color: posTextMuted)),
+        ),
+        FilledButton(
+          onPressed: () async {
+            await provider.restoreVendor(vendor.id);
+            if (ctx.mounted) Navigator.pop(ctx);
+            onRefresh();
+          },
+          style: FilledButton.styleFrom(
+              backgroundColor: posPrimary, foregroundColor: Colors.white),
+          child: Text('Restore', style: GoogleFonts.outfit()),
         ),
       ],
     ),
